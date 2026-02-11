@@ -29,6 +29,7 @@ config({ path: join(__dirname, '../.env.local') });
 // Import server factory
 import { createServer } from '../src/api/server.js';
 import { UniversalLLMClient } from '../src/core/llm-client.js';
+import errorHandler from '../src/core/error-handler.js';
 
 /**
  * Start the HTTP server.
@@ -41,6 +42,9 @@ async function main() {
   if (!existsSync(sessionsDir)) {
     mkdirSync(sessionsDir, { recursive: true });
   }
+
+  // Initialize error handler (observer-pattern error broadcasting)
+  errorHandler.initialize(sessionsDir);
 
   // Create Express app
   const { app, store } = createServer({
@@ -107,5 +111,6 @@ async function main() {
 
 main().catch((error) => {
   console.error(`[FATAL] ${error.message}`);
+  errorHandler.report('fatal', error, { source: 'server-main' });
   process.exit(1);
 });

@@ -19,6 +19,8 @@ import { SessionStore } from './session-store.js';
 import { chatRoutes } from './routes/chat.js';
 import { sessionRoutes } from './routes/sessions.js';
 import { configRoutes } from './routes/config.js';
+import { errorRoutes } from './routes/errors.js';
+import errorHandler from '../core/error-handler.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -51,6 +53,7 @@ export function createServer(options = {}) {
   // API routes
   app.use('/api/chat', chatRoutes());
   app.use('/api/sessions', sessionRoutes());
+  app.use('/api/errors', errorRoutes());
   app.use('/api', configRoutes());
 
   // Static frontend
@@ -66,12 +69,18 @@ export function createServer(options = {}) {
     }
   });
 
-  // Error handling middleware
+  // Error handling middleware (enhanced with observer-pattern error reporting)
   app.use((err, req, res, next) => {
     console.error(`[SERVER] Error: ${err.message}`);
+    const errorId = errorHandler.report('server_error', err, {
+      method: req.method,
+      path: req.path,
+      body: req.body
+    });
     res.status(500).json({
       error: 'Internal server error',
-      message: err.message
+      message: err.message,
+      errorId
     });
   });
 

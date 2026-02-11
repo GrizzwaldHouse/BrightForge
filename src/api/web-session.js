@@ -14,6 +14,7 @@ import { DiffApplier } from '../core/diff-applier.js';
 import { SessionLog } from '../core/session-log.js';
 import { MessageHistory } from '../core/message-history.js';
 import { MultiStepPlanner } from '../core/multi-step-planner.js';
+import errorHandler from '../core/error-handler.js';
 
 export class WebSession {
   constructor({ projectRoot, sessionsDir }) {
@@ -98,6 +99,7 @@ export class WebSession {
 
     } catch (error) {
       console.error(`[WEB] Plan generation failed: ${error.message}`);
+      const errorId = errorHandler.report('plan_error', error, { sessionId: this.id });
       const errorMsg = `Error generating plan: ${error.message}`;
       this.history.addAssistant(errorMsg);
 
@@ -105,6 +107,7 @@ export class WebSession {
         plan: null,
         status: 'error',
         message: errorMsg,
+        errorId,
         sessionId: this.id
       };
     }
@@ -145,9 +148,11 @@ export class WebSession {
       };
     } catch (error) {
       console.error(`[WEB] Apply failed: ${error.message}`);
+      const errorId = errorHandler.report('apply_error', error, { sessionId: this.id });
       return {
         status: 'error',
         message: `Apply failed: ${error.message}`,
+        errorId,
         applied: 0,
         failed: 0,
         errors: [error.message]

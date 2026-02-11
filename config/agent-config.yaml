@@ -199,6 +199,16 @@ web_server:
   session_timeout: 1800  # 30 minutes in seconds
   max_request_size: "1mb"
 
+# Error handling configuration (observer-pattern)
+error_handling:
+  enabled: true
+  ring_buffer_size: 100
+  log_file: "errors.jsonl"
+  crash_reports: true
+  retry:
+    max_attempts: 3
+    backoff_ms: 1000
+
 # Conversation mode configuration
 conversation:
   max_turns: 20

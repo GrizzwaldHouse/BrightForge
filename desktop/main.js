@@ -7,6 +7,7 @@ let mainWindow = null;
 let tray = null;
 let serverProcess = null;
 let serverPort = null;
+let errorHandler = null;
 
 // Find an available port
 function getAvailablePort() {
@@ -233,11 +234,35 @@ ipcMain.handle('show-notification', (event, { title, body }) => {
   showNotification(title, body);
 });
 
+// Initialize error handler (dynamic import for ESM module in CommonJS Electron main)
+async function initErrorHandler() {
+  try {
+    const sessionsDir = path.join(__dirname, '..', 'sessions');
+    const mod = await import('../src/core/error-handler.js');
+    errorHandler = mod.default;
+    errorHandler.initialize(sessionsDir);
+
+    // Listen for fatal errors and show dialog to user
+    errorHandler.onError('fatal', (entry) => {
+      console.error(`[ELECTRON] Fatal error: ${entry.message}`);
+      if (mainWindow) {
+        mainWindow.webContents.send('error-reported', entry);
+      }
+      dialog.showErrorBox('LLCApp Fatal Error', `${entry.message}\n\nCheck crash report in sessions/ directory.`);
+    });
+
+    console.log('[ELECTRON] Error handler initialized');
+  } catch (err) {
+    console.warn('[ELECTRON] Could not initialize error handler:', err.message);
+  }
+}
+
 // App lifecycle
 app.on('ready', async () => {
   console.log('[ELECTRON] Starting LLCApp Desktop...');
 
   try {
+    await initErrorHandler();
     await startServer();
     console.log(`[ELECTRON] Server running on port ${serverPort}`);
 
@@ -247,6 +272,7 @@ app.on('ready', async () => {
     console.log('[ELECTRON] Desktop app ready');
   } catch (error) {
     console.error('[ELECTRON] Failed to start:', error);
+    if (errorHandler) errorHandler.report('fatal', error, { source: 'electron-ready' });
     dialog.showErrorBox('LLCApp Error', `Failed to start server: ${error.message}`);
     app.quit();
   }

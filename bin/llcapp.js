@@ -31,6 +31,7 @@ import { DiffApplier } from '../src/core/diff-applier.js';
 import { SessionLog } from '../src/core/session-log.js';
 import { Terminal } from '../src/ui/terminal.js';
 import { ConversationSession } from '../src/core/conversation-session.js';
+import errorHandler from '../src/core/error-handler.js';
 
 /**
  * Parse CLI arguments into a structured object.
@@ -280,6 +281,9 @@ async function main() {
   // Use LLCApp's sessions dir, not the target project's
   const appSessionsDir = join(__dirname, '../sessions');
 
+  // Initialize error handler (observer-pattern error broadcasting)
+  errorHandler.initialize(appSessionsDir);
+
   if (args.help) {
     showHelp(terminal);
     process.exit(0);
@@ -311,5 +315,6 @@ async function main() {
 
 main().catch((error) => {
   console.error(`[FATAL] ${error.message}`);
+  errorHandler.report('fatal', error, { source: 'cli-main' });
   process.exit(1);
 });

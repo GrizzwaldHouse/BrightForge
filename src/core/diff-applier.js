@@ -11,6 +11,7 @@
 import { readFileSync, writeFileSync, unlinkSync, mkdirSync, existsSync, copyFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import errorHandler from './error-handler.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -99,6 +100,11 @@ export class DiffApplier {
 
       } catch (error) {
         console.error(`[APPLY] Failed to ${operation.type} ${operation.filePath}: ${error.message}`);
+        errorHandler.report('apply_error', error, {
+          operation: operation.type,
+          filePath: operation.filePath,
+          planId: plan.id
+        });
         results.failed++;
         results.errors.push(`${operation.filePath}: ${error.message}`);
       }

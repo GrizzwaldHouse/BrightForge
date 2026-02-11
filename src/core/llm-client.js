@@ -12,6 +12,7 @@ import { readFileSync } from 'fs';
 import { parse as parseYaml } from 'yaml';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import errorHandler from './error-handler.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -397,6 +398,7 @@ class UniversalLLMClient {
 
       } catch (error) {
         console.warn(`[LLM] ${provider} failed: ${error.message}`);
+        errorHandler.report('provider_error', error, { provider, task, severity: 'warning' });
         errors.push({ provider, error: error.message });
         continue;
       }
@@ -423,7 +425,9 @@ class UniversalLLMClient {
     }
 
     // All providers failed
-    throw new Error(`All LLM providers failed:\n${errors.map(e => `  - ${e.provider}: ${e.error}`).join('\n')}`);
+    const allFailedError = new Error(`All LLM providers failed:\n${errors.map(e => `  - ${e.provider}: ${e.error}`).join('\n')}`);
+    errorHandler.report('provider_error', allFailedError, { task, allProvidersFailed: true, providers: errors });
+    throw allFailedError;
   }
 
   /**
