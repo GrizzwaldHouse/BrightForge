@@ -15,7 +15,11 @@
     "test-diff": "node src/core/diff-applier.js --test",
     "test-session": "node src/core/session-log.js --test",
     "test-terminal": "node src/ui/terminal.js --test",
-    "lint": "eslint src/"
+    "lint": "eslint src/",
+    "chat": "node bin/llcapp.js --chat",
+    "test-history": "node src/core/message-history.js --test",
+    "test-conversation": "node src/core/conversation-session.js --test",
+    "test-multi-step": "node src/core/multi-step-planner.js --test"
   },
   "keywords": [
     "coding-agent",

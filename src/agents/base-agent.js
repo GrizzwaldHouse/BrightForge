@@ -50,15 +50,20 @@ export class BaseAgent {
    * Build the messages array for the LLM call.
    * @param {string} task
    * @param {Object} context
+   * @param {string|null} conversationHistory - Optional conversation context
    * @returns {Array<{role: string, content: string}>}
    */
-  buildMessages(task, context) {
+  buildMessages(task, context, conversationHistory = null) {
     const messages = [
       { role: 'system', content: this.systemPrompt }
     ];
 
     // Build user message with task and file context
     let userContent = `TASK: ${task}\n\n`;
+
+    if (conversationHistory) {
+      userContent += `CONVERSATION CONTEXT:\n${conversationHistory}\n\n`;
+    }
 
     if (context.files && context.files.length > 0) {
       userContent += `PROJECT FILES:\n\n`;

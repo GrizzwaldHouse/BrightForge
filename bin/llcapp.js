@@ -30,6 +30,7 @@ import { MasterAgent } from '../src/agents/master-agent.js';
 import { DiffApplier } from '../src/core/diff-applier.js';
 import { SessionLog } from '../src/core/session-log.js';
 import { Terminal } from '../src/ui/terminal.js';
+import { ConversationSession } from '../src/core/conversation-session.js';
 
 /**
  * Parse CLI arguments into a structured object.
@@ -41,6 +42,7 @@ function parseArgs(argv) {
     rollback: false,
     history: false,
     autoApprove: false,
+    chat: false,
     help: false
   };
 
@@ -58,6 +60,8 @@ function parseArgs(argv) {
       args.history = true;
     } else if (arg === '--auto-approve' || arg === '--yes' || arg === '-y') {
       args.autoApprove = true;
+    } else if (arg === '--chat' || arg === '-c') {
+      args.chat = true;
     } else if (arg === '--help' || arg === '-h') {
       args.help = true;
     } else if (!arg.startsWith('--')) {
@@ -83,12 +87,15 @@ function showHelp(terminal) {
   console.log('Usage:');
   console.log('  llcapp <task>                    Generate a coding plan');
   console.log('  llcapp <task> --project <path>   Target a specific project');
+  console.log('  llcapp --chat                    Interactive conversation mode');
+  console.log('  llcapp --chat --project <path>   Chat mode for a specific project');
   console.log('  llcapp --rollback                Undo last applied changes');
   console.log('  llcapp --history                 Show session history');
   console.log('');
   console.log('Options:');
   console.log('  --project, -p <path>   Target project directory (default: cwd)');
   console.log('  --auto-approve, -y     Skip approval prompt');
+  console.log('  --chat, -c             Enter interactive conversation mode');
   console.log('  --rollback             Rollback last applied plan');
   console.log('  --history              Show recent session logs');
   console.log('  --help, -h             Show this help message');
@@ -245,6 +252,25 @@ async function runTask(task, projectRoot, autoApprove, sessionsDir, terminal) {
 }
 
 /**
+ * Run interactive conversation mode.
+ */
+async function runChat(projectRoot, sessionsDir, terminal) {
+  // Validate project directory
+  if (!existsSync(projectRoot)) {
+    terminal.log(`Project directory not found: ${projectRoot}`, 'error');
+    process.exit(1);
+  }
+
+  const session = new ConversationSession({
+    projectRoot,
+    sessionsDir,
+    terminal
+  });
+
+  await session.run();
+}
+
+/**
  * Entry point.
  */
 async function main() {
@@ -266,6 +292,11 @@ async function main() {
 
   if (args.rollback) {
     await rollbackLast(args.project, appSessionsDir, terminal);
+    process.exit(0);
+  }
+
+  if (args.chat) {
+    await runChat(args.project, appSessionsDir, terminal);
     process.exit(0);
   }
 

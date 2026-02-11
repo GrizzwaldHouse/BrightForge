@@ -181,6 +181,15 @@ task_routing:
     fallback: "claude:balanced"
     max_tokens: 8192
 
+  task_decomposition:
+    description: "Break complex tasks into sequential sub-tasks"
+    prefer:
+      - groq
+      - cerebras
+      - together
+    fallback: "claude:balanced"
+    max_tokens: 2048
+
 # Budget limits (daily)
 budget:
   daily_limit_usd: 1.00

@@ -191,3 +191,17 @@ terminal_ui:
   prompts:
     default_action: "review"
     timeout_seconds: 300
+
+# Conversation mode configuration
+conversation:
+  max_turns: 20
+  max_history_tokens: 6000
+  auto_save: true
+  slash_commands:
+    - /help
+    - /status
+    - /history
+    - /rollback
+    - /save
+    - /reset
+    - /exit

@@ -168,6 +168,25 @@ export class Terminal {
     console.log(`${colors.bold}Operations:${colors.reset} ${opCount} file(s)`);
     console.log('');
   }
+
+  /**
+   * Prompt user for free-form text input in conversation mode.
+   * @param {string} prompt - Prompt text (default: 'llcapp> ')
+   * @returns {Promise<string>} User's input text (empty string if no input)
+   */
+  async promptInput(prompt = 'llcapp> ') {
+    const rl = createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+
+    return new Promise((resolve) => {
+      rl.question(`${colors.cyan}${prompt}${colors.reset}`, (answer) => {
+        rl.close();
+        resolve(answer.trim());
+      });
+    });
+  }
 }
 
 // Singleton instance
