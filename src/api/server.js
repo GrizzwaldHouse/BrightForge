@@ -20,6 +20,7 @@ import { chatRoutes } from './routes/chat.js';
 import { sessionRoutes } from './routes/sessions.js';
 import { configRoutes } from './routes/config.js';
 import { errorRoutes } from './routes/errors.js';
+import { metricsRoutes } from './routes/metrics.js';
 import errorHandler from '../core/error-handler.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -54,6 +55,7 @@ export function createServer(options = {}) {
   app.use('/api/chat', chatRoutes());
   app.use('/api/sessions', sessionRoutes());
   app.use('/api/errors', errorRoutes());
+  app.use('/api/metrics', metricsRoutes());
   app.use('/api', configRoutes());
 
   // Static frontend

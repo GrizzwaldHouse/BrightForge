@@ -255,10 +255,58 @@ body {
   overflow: hidden;
 }
 
+/* Tab Bar */
+.tab-bar {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  padding: 0 var(--spacing-lg);
+  background: var(--bg-secondary);
+}
+
+.tab {
+  padding: 12px 20px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  font-family: var(--font-sans);
+}
+
+.tab:hover {
+  color: var(--text-secondary);
+}
+
+.tab.active {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent-primary);
+}
+
+/* Tab Panels */
+.tab-panel {
+  display: none;
+  flex: 1;
+  overflow: hidden;
+}
+
+.tab-panel.active {
+  display: flex;
+  flex-direction: column;
+}
+
 .chat-panel {
   display: flex;
   flex-direction: column;
   height: 100%;
+}
+
+.sessions-panel {
+  padding: var(--spacing-xl);
+  color: var(--text-secondary);
 }
 
 /* Chat messages */

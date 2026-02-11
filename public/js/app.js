@@ -7,6 +7,7 @@
 import { ChatPanel } from './chat.js';
 import { PlanViewer } from './plan-viewer.js';
 import { SessionManager } from './session-manager.js';
+import { SystemHealthPanel } from './system-health.js';
 
 class App {
   constructor() {
@@ -20,6 +21,7 @@ class App {
     this.chat = new ChatPanel(this);
     this.planViewer = new PlanViewer(this);
     this.sessionManager = new SessionManager(this);
+    this.healthPanel = new SystemHealthPanel();
 
     this.init();
   }
@@ -29,6 +31,9 @@ class App {
 
     // Bind UI events
     this.bindEvents();
+
+    // Setup tab navigation
+    this.setupTabNavigation();
 
     // Load initial data
     try {
@@ -76,6 +81,36 @@ class App {
     // Settings (placeholder)
     document.getElementById('settings-btn').addEventListener('click', () => {
       alert('Settings panel coming soon!');
+    });
+  }
+
+  /**
+   * Setup tab navigation
+   */
+  setupTabNavigation() {
+    const tabs = document.querySelectorAll('.tab');
+    const panels = document.querySelectorAll('.tab-panel');
+
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const targetTab = tab.dataset.tab;
+
+        // Update active tab
+        tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+
+        // Update active panel
+        panels.forEach(p => p.classList.remove('active'));
+        const targetPanel = document.querySelector(`[data-panel="${targetTab}"]`);
+        if (targetPanel) {
+          targetPanel.classList.add('active');
+        }
+
+        // Initialize health panel on first view
+        if (targetTab === 'health' && !this.healthPanel.initialized) {
+          this.healthPanel.init();
+        }
+      });
     });
   }
 

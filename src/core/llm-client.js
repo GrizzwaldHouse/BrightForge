@@ -13,6 +13,7 @@ import { parse as parseYaml } from 'yaml';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import errorHandler from './error-handler.js';
+import telemetryBus from './telemetry-bus.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -368,6 +369,7 @@ class UniversalLLMClient {
     const routing = this.taskRouting[task] || { prefer: ['groq', 'ollama'], fallback: null };
 
     const errors = [];
+    const endTimer = telemetryBus.startTimer('llm_request', { task });
 
     // Try preferred providers in order
     for (const providerSpec of routing.prefer) {
@@ -394,11 +396,13 @@ class UniversalLLMClient {
         });
 
         console.log(`[LLM] Success with ${provider} (${result.model}), cost: $${result.cost.toFixed(4)}`);
+        endTimer({ provider, status: 'success', tokens: result.usage?.total_tokens || 0, cost: result.cost });
         return result;
 
       } catch (error) {
         console.warn(`[LLM] ${provider} failed: ${error.message}`);
         errorHandler.report('provider_error', error, { provider, task, severity: 'warning' });
+        endTimer({ provider, status: 'failed', error: error.message });
         errors.push({ provider, error: error.message });
         continue;
       }

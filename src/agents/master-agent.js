@@ -22,6 +22,7 @@ import { PlanEngine } from '../core/plan-engine.js';
 import { FileContext } from '../core/file-context.js';
 import { LocalAgent } from './local-agent.js';
 import { CloudAgent } from './cloud-agent.js';
+import telemetryBus from '../core/telemetry-bus.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -130,6 +131,7 @@ export class MasterAgent {
   async run(task, projectRoot, options = {}) {
     console.log(`[MASTER] Starting task: "${task}"`);
     console.log(`[MASTER] Project root: ${projectRoot}`);
+    const endTimer = telemetryBus.startTimer('plan_generated', { projectRoot });
 
     // 1. Scan project files for context
     console.log('[MASTER] Scanning project files...');
@@ -205,6 +207,7 @@ export class MasterAgent {
     const usage = this.llmClient.getUsageSummary();
     console.log(`[MASTER] Plan generated. Cost: $${plan.cost.toFixed(4)}, Budget remaining: $${usage.budget_remaining.toFixed(4)}`);
 
+    endTimer({ operations: plan.operations?.length || 0, cost: plan.cost, agent: agent.name });
     return plan;
   }
 }

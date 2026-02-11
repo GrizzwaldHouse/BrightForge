@@ -12,6 +12,7 @@ import { readFileSync, writeFileSync, unlinkSync, mkdirSync, existsSync, copyFil
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import errorHandler from './error-handler.js';
+import telemetryBus from './telemetry-bus.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -26,6 +27,7 @@ export class DiffApplier {
    */
   async apply(plan, projectRoot) {
     console.log(`[APPLY] Starting apply for plan ${plan.id}`);
+    const endTimer = telemetryBus.startTimer('apply_operation', { planId: plan.id });
 
     const results = {
       applied: 0,
@@ -35,6 +37,7 @@ export class DiffApplier {
 
     if (!plan.operations || plan.operations.length === 0) {
       console.log('[APPLY] No operations to apply');
+      endTimer({ status: 'skipped', operations: 0 });
       return results;
     }
 
@@ -114,9 +117,11 @@ export class DiffApplier {
     if (results.failed === 0) {
       plan.status = 'applied';
       console.log(`[APPLY] Successfully applied ${results.applied} operations`);
+      endTimer({ status: 'success', operations: results.applied });
     } else {
       plan.status = 'failed';
       console.error(`[APPLY] Failed ${results.failed}/${plan.operations.length} operations`);
+      endTimer({ status: 'failed', operations: results.applied, failed: results.failed });
     }
 
     return results;

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>LLCApp - Coding Agent Dashboard</title>
   <link rel="stylesheet" href="/css/dashboard.css">
+  <link rel="stylesheet" href="/css/system-health.css">
   <style>
     /* Error indicator badge */
     .error-indicator {
@@ -77,27 +78,46 @@
       </aside>
 
       <main class="main-content">
-        <div class="chat-panel">
-          <div id="chat-messages" class="chat-messages">
-            <div class="welcome-message">
-              <h2>Welcome to LLCApp</h2>
-              <p>Enter a coding task below to get started. The agent will analyze your project and generate a plan.</p>
+        <div class="tab-bar">
+          <button class="tab active" data-tab="chat">Chat</button>
+          <button class="tab" data-tab="health">System Health</button>
+          <button class="tab" data-tab="sessions">Sessions</button>
+        </div>
+
+        <div class="tab-panel active" data-panel="chat">
+          <div class="chat-panel">
+            <div id="chat-messages" class="chat-messages">
+              <div class="welcome-message">
+                <h2>Welcome to LLCApp</h2>
+                <p>Enter a coding task below to get started. The agent will analyze your project and generate a plan.</p>
+              </div>
+            </div>
+
+            <div id="plan-viewer" class="plan-viewer hidden">
+              <!-- Plan operations rendered here by plan-viewer.js -->
+            </div>
+
+            <div class="chat-input-bar">
+              <div class="project-path">
+                <label>Project:</label>
+                <input type="text" id="project-root" placeholder="C:\path\to\project" value="">
+              </div>
+              <div class="input-row">
+                <input type="text" id="chat-input" placeholder="Describe a coding task..." autofocus>
+                <button id="send-btn" class="btn btn-send">Send</button>
+              </div>
             </div>
           </div>
+        </div>
 
-          <div id="plan-viewer" class="plan-viewer hidden">
-            <!-- Plan operations rendered here by plan-viewer.js -->
-          </div>
+        <div class="tab-panel" data-panel="health">
+          <div id="health-panel"></div>
+        </div>
 
-          <div class="chat-input-bar">
-            <div class="project-path">
-              <label>Project:</label>
-              <input type="text" id="project-root" placeholder="C:\path\to\project" value="">
-            </div>
-            <div class="input-row">
-              <input type="text" id="chat-input" placeholder="Describe a coding task..." autofocus>
-              <button id="send-btn" class="btn btn-send">Send</button>
-            </div>
+        <div class="tab-panel" data-panel="sessions">
+          <div class="sessions-panel">
+            <h2>Session Management</h2>
+            <p>Session history and management coming soon...</p>
           </div>
         </div>
       </main>
@@ -105,6 +125,7 @@
   </div>
 
   <script type="module" src="/js/app.js"></script>
+  <script type="module" src="/js/system-health.js"></script>
   <script>
     // Error indicator polling (observer feedback in dashboard)
     (function() {

@@ -25,6 +25,7 @@ import { join } from 'path';
 import { randomUUID } from 'crypto';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import telemetryBus from './telemetry-bus.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -215,6 +216,7 @@ class ErrorHandler extends EventEmitter {
 
   /**
    * Write a crash report to disk on fatal errors.
+   * Enhanced with telemetry snapshot, memory pressure, and provider health.
    *
    * @param {Error} error - The fatal error
    * @param {Object} [entry] - The error entry from report()
@@ -224,6 +226,10 @@ class ErrorHandler extends EventEmitter {
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const reportPath = join(this.sessionsDir, `crash-report-${timestamp}.json`);
+
+    // Get memory usage for enhanced diagnostics
+    const memUsage = process.memoryUsage();
+    const heapPercentUsed = (memUsage.heapUsed / memUsage.heapTotal * 100).toFixed(1);
 
     const report = {
       timestamp: new Date().toISOString(),
@@ -242,8 +248,17 @@ class ErrorHandler extends EventEmitter {
         arch: process.arch,
         argv: process.argv
       },
-      memory: process.memoryUsage(),
-      errorCounts: { ...this.errorCounts }
+      memory: {
+        rss: memUsage.rss,
+        heapTotal: memUsage.heapTotal,
+        heapUsed: memUsage.heapUsed,
+        external: memUsage.external,
+        arrayBuffers: memUsage.arrayBuffers,
+        heapPercentUsed: `${heapPercentUsed}%`
+      },
+      errorCounts: { ...this.errorCounts },
+      providerHealth: this._snapshotProviderHealth(),
+      telemetry: this._snapshotTelemetry()
     };
 
     try {
@@ -251,6 +266,44 @@ class ErrorHandler extends EventEmitter {
       console.error(`[ERROR-HANDLER] Crash report written: ${reportPath}`);
     } catch (writeError) {
       console.error(`[ERROR-HANDLER] Failed to write crash report: ${writeError.message}`);
+    }
+  }
+
+  /**
+   * Snapshot provider health status for crash reports.
+   * Uses telemetryBus provider stats.
+   * @private
+   * @returns {Object} Provider health snapshot
+   */
+  _snapshotProviderHealth() {
+    try {
+      const metrics = telemetryBus.getMetrics();
+      return {
+        providers: metrics.providers || {}
+      };
+    } catch (err) {
+      return { error: `Failed to snapshot provider health: ${err.message}` };
+    }
+  }
+
+  /**
+   * Snapshot telemetry metrics for crash reports.
+   * @private
+   * @returns {Object} Telemetry snapshot
+   */
+  _snapshotTelemetry() {
+    try {
+      const metrics = telemetryBus.getMetrics();
+
+      return {
+        counters: metrics.counters || {},
+        latency: metrics.latency || {},
+        providers: metrics.providers || {},
+        recentLLM: (metrics.recentEvents?.llmRequests || []).slice(-5),
+        recentOps: (metrics.recentEvents?.operations || []).slice(-5)
+      };
+    } catch (err) {
+      return { error: `Failed to snapshot telemetry: ${err.message}` };
     }
   }
 

@@ -15,6 +15,7 @@ import { SessionLog } from '../core/session-log.js';
 import { MessageHistory } from '../core/message-history.js';
 import { MultiStepPlanner } from '../core/multi-step-planner.js';
 import errorHandler from '../core/error-handler.js';
+import telemetryBus from '../core/telemetry-bus.js';
 
 export class WebSession {
   constructor({ projectRoot, sessionsDir }) {
@@ -34,6 +35,8 @@ export class WebSession {
     this.plans = [];
     this.totalCost = 0;
     this.turns = 0;
+
+    telemetryBus.emit('session_created', { sessionId: this.id, projectRoot });
   }
 
   touch() {
@@ -125,6 +128,7 @@ export class WebSession {
     }
 
     console.log(`[WEB] Session ${this.id.slice(0, 8)} - approving plan`);
+    telemetryBus.emit('plan_approved', { sessionId: this.id, planId: this.pendingPlan.id });
 
     try {
       const result = await this.diffApplier.apply(this.pendingPlan, this.projectRoot);
@@ -172,6 +176,7 @@ export class WebSession {
     }
 
     console.log(`[WEB] Session ${this.id.slice(0, 8)} - rejecting plan`);
+    telemetryBus.emit('plan_rejected', { sessionId: this.id, planId: this.pendingPlan.id });
 
     this.pendingPlan.status = 'rejected';
     await this.sessionLog.record(this.pendingPlan, this.sessionsDir);
