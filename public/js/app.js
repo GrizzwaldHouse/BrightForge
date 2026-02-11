@@ -8,6 +8,7 @@ import { ChatPanel } from './chat.js';
 import { PlanViewer } from './plan-viewer.js';
 import { SessionManager } from './session-manager.js';
 import { SystemHealthPanel } from './system-health.js';
+import { FileBrowser } from './file-browser.js';
 
 class App {
   constructor() {
@@ -22,6 +23,7 @@ class App {
     this.planViewer = new PlanViewer(this);
     this.sessionManager = new SessionManager(this);
     this.healthPanel = new SystemHealthPanel();
+    this.fileBrowser = null; // Initialized after DOM ready
 
     this.init();
   }
@@ -44,12 +46,22 @@ class App {
 
       await this.sessionManager.loadSessions();
 
+      // Initialize file browser
+      this.fileBrowser = new FileBrowser('project-root-container', {
+        placeholder: 'Search or browse project folder...',
+        maxRecent: 5
+      });
+      this.fileBrowser.render();
+
       // Restore project root from localStorage
       const savedProject = localStorage.getItem('llcapp-project-root');
       if (savedProject) {
         this.projectRoot = savedProject;
-        document.getElementById('project-root').value = savedProject;
+        this.fileBrowser.setValue(savedProject);
       }
+
+      // Start provider status polling (every 30 seconds)
+      this.startProviderStatusPolling();
 
       console.log('[APP] Initialization complete');
     } catch (error) {
@@ -72,10 +84,11 @@ class App {
     // New session
     document.getElementById('new-session-btn').addEventListener('click', () => this.newSession());
 
-    // Project root change
-    document.getElementById('project-root').addEventListener('change', (e) => {
-      this.projectRoot = e.target.value.trim();
+    // File browser selection change
+    document.getElementById('project-root-container').addEventListener('filebrowser:select', (e) => {
+      this.projectRoot = e.detail.path;
       localStorage.setItem('llcapp-project-root', this.projectRoot);
+      console.log('[APP] Project root selected:', this.projectRoot);
     });
 
     // Settings (placeholder)
@@ -135,7 +148,7 @@ class App {
     this.chat.showLoading();
 
     try {
-      const projectRoot = document.getElementById('project-root').value.trim();
+      const projectRoot = this.fileBrowser?.getValue()?.trim() || '';
 
       const response = await this.apiPost('/api/chat/turn', {
         sessionId: this.sessionId,
@@ -401,6 +414,22 @@ class App {
       item.appendChild(statusSpan);
       list.appendChild(item);
     });
+  }
+
+  /**
+   * Start polling provider status every 30 seconds
+   */
+  startProviderStatusPolling() {
+    // Initial update already done in loadHealth()
+
+    // Poll every 30 seconds
+    setInterval(async () => {
+      try {
+        await this.loadHealth();
+      } catch (error) {
+        console.warn('[APP] Provider status update failed:', error.message);
+      }
+    }, 30000);
   }
 
   /**

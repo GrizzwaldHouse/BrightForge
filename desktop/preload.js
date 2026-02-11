@@ -15,3 +15,8 @@ contextBridge.exposeInMainWorld('electron', {
   platform: process.platform,
   isElectron: true
 });
+
+// Also expose as electronAPI for compatibility with file-browser.js
+contextBridge.exposeInMainWorld('electronAPI', {
+  selectFolder: () => ipcRenderer.invoke('dialog:selectFolder')
+});

@@ -6,6 +6,7 @@
   <title>LLCApp - Coding Agent Dashboard</title>
   <link rel="stylesheet" href="/css/dashboard.css">
   <link rel="stylesheet" href="/css/system-health.css">
+  <link rel="stylesheet" href="/css/file-browser.css">
   <style>
     /* Error indicator badge */
     .error-indicator {
@@ -100,7 +101,7 @@
             <div class="chat-input-bar">
               <div class="project-path">
                 <label>Project:</label>
-                <input type="text" id="project-root" placeholder="C:\path\to\project" value="">
+                <div id="project-root-container"></div>
               </div>
               <div class="input-row">
                 <input type="text" id="chat-input" placeholder="Describe a coding task..." autofocus>
