@@ -192,6 +192,13 @@ terminal_ui:
     default_action: "review"
     timeout_seconds: 300
 
+# Web server configuration
+web_server:
+  port: 3847
+  cors: true
+  session_timeout: 1800  # 30 minutes in seconds
+  max_request_size: "1mb"
+
 # Conversation mode configuration
 conversation:
   max_turns: 20

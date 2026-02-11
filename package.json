@@ -5,7 +5,8 @@
   "main": "bin/llcapp.js",
   "type": "module",
   "bin": {
-    "llcapp": "./bin/llcapp.js"
+    "llcapp": "./bin/llcapp.js",
+    "llcapp-server": "./bin/llcapp-server.js"
   },
   "scripts": {
     "start": "node bin/llcapp.js",
@@ -19,7 +20,10 @@
     "chat": "node bin/llcapp.js --chat",
     "test-history": "node src/core/message-history.js --test",
     "test-conversation": "node src/core/conversation-session.js --test",
-    "test-multi-step": "node src/core/multi-step-planner.js --test"
+    "test-multi-step": "node src/core/multi-step-planner.js --test",
+    "server": "node bin/llcapp-server.js",
+    "test-api": "node src/api/web-session.js --test",
+    "dev": "node bin/llcapp-server.js"
   },
   "keywords": [
     "coding-agent",
@@ -33,6 +37,7 @@
   "license": "MIT",
   "dependencies": {
     "dotenv": "^16.6.1",
+    "express": "^4.21.0",
     "yaml": "^2.3.4"
   },
   "devDependencies": {
