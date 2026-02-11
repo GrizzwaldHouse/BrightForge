@@ -23,7 +23,9 @@
     "test-multi-step": "node src/core/multi-step-planner.js --test",
     "server": "node bin/llcapp-server.js",
     "test-api": "node src/api/web-session.js --test",
-    "dev": "node bin/llcapp-server.js"
+    "dev": "node bin/llcapp-server.js",
+    "desktop": "node bin/llcapp-desktop.js",
+    "build-desktop": "cd desktop && electron-builder"
   },
   "keywords": [
     "coding-agent",
@@ -41,7 +43,9 @@
     "yaml": "^2.3.4"
   },
   "devDependencies": {
-    "eslint": "^8.56.0"
+    "eslint": "^8.56.0",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
   },
   "engines": {
     "node": ">=18.0.0"

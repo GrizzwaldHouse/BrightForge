@@ -5,3 +5,7 @@ sessions/
 *.llcapp-backup
 .claude/settings.local.json
 nul
+dist-electron/
+desktop/icons/*.png
+desktop/icons/*.ico
+desktop/icons/*.icns

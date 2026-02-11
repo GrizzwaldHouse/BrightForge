@@ -1,0 +1,36 @@
+{
+  "name": "llcapp-desktop",
+  "version": "3.0.0-alpha",
+  "description": "LLCApp Coding Agent - Desktop Application",
+  "main": "main.js",
+  "author": "Marcus Daley <github.com/GrizzwaldHouse>",
+  "license": "MIT",
+  "build": {
+    "appId": "com.grizzwaldhouse.llcapp",
+    "productName": "LLCApp",
+    "directories": {
+      "output": "../dist-electron"
+    },
+    "files": [
+      "**/*",
+      "../bin/**/*",
+      "../src/**/*",
+      "../public/**/*",
+      "../config/**/*",
+      "../node_modules/**/*",
+      "../package.json"
+    ],
+    "win": {
+      "target": ["nsis"],
+      "icon": "icons/icon.ico"
+    },
+    "mac": {
+      "target": ["dmg"],
+      "icon": "icons/icon.icns"
+    },
+    "linux": {
+      "target": ["AppImage"],
+      "icon": "icons/icon.png"
+    }
+  }
+}
