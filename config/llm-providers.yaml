@@ -62,6 +62,20 @@ providers:
     priority: 5
     cost_per_1k_tokens: 0  # Free tier
 
+  # Priority 5.5: Google Gemini (free tier + paid)
+  gemini:
+    enabled: true
+    base_url: "https://generativelanguage.googleapis.com/v1beta"
+    api_key_env: "GEMINI_API_KEY"
+    models:
+      default: "gemini-2.0-flash"
+      code: "gemini-2.0-flash"
+      complex: "gemini-2.0-pro-exp-02-05"
+    priority: 5
+    cost_per_1k_tokens:
+      flash: 0.0
+      pro: 0.00125
+
   # Priority 6: Paid Cloud (fallback for complex tasks)
   claude:
     enabled: true
@@ -82,7 +96,7 @@ providers:
       - business_strategy
 
   openai:
-    enabled: false  # Disabled by default - enable if you have key
+    enabled: true  # ChatGPT - uses same OpenAI-compatible format
     base_url: "https://api.openai.com/v1"
     api_key_env: "OPENAI_API_KEY"
     models:
@@ -168,6 +182,7 @@ task_routing:
     prefer:
       - ollama:code
       - groq
+      - gemini:code
       - together:code
     fallback: "claude:balanced"
     max_tokens: 4096
@@ -176,8 +191,10 @@ task_routing:
     description: "Complex multi-file code generation"
     prefer:
       - groq
+      - gemini:code
       - together:code
       - mistral:code
+      - openai:default
     fallback: "claude:balanced"
     max_tokens: 8192
 
@@ -186,6 +203,7 @@ task_routing:
     prefer:
       - groq
       - cerebras
+      - gemini
       - together
     fallback: "claude:balanced"
     max_tokens: 2048
@@ -204,5 +222,7 @@ budget:
       max_cost_usd: 0.50  # Preserve free credits
     claude:
       max_cost_usd: 0.50
+    gemini:
+      max_cost_usd: 0.25  # Pro model only (Flash is free)
     openai:
       max_cost_usd: 0.25

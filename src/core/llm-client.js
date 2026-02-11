@@ -1,7 +1,7 @@
 /**
  * Universal LLM Client - OpenAI-Compatible API
  *
- * Supports: Ollama, Groq, Cerebras, Together, Mistral, Claude, OpenAI, OpenRouter
+ * Supports: Ollama, Groq, Cerebras, Together, Mistral, Gemini, Claude, OpenAI, OpenRouter
  * All providers use the same OpenAI-compatible chat/completions endpoint
  *
  * @author Marcus Daley (GrizzwaldHouse)
@@ -150,10 +150,12 @@ class UniversalLLMClient {
       'Content-Type': 'application/json'
     };
 
-    // Claude uses a different header format
+    // Provider-specific auth headers
     if (provider === 'claude') {
       headers['x-api-key'] = apiKey;
       headers['anthropic-version'] = '2023-06-01';
+    } else if (provider === 'gemini') {
+      // Gemini uses API key in query params, not headers
     } else {
       headers['Authorization'] = `Bearer ${apiKey}`;
     }
@@ -181,6 +183,24 @@ class UniversalLLMClient {
   }
 
   /**
+   * Convert messages to Google Gemini format
+   */
+  formatMessagesForGemini(messages) {
+    const systemMessages = messages.filter(m => m.role === 'system');
+    const otherMessages = messages.filter(m => m.role !== 'system');
+
+    return {
+      systemInstruction: systemMessages.length > 0
+        ? { parts: [{ text: systemMessages.map(m => m.content).join('\n\n') }] }
+        : undefined,
+      contents: otherMessages.map(m => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }]
+      }))
+    };
+  }
+
+  /**
    * Make API request to provider
    */
   async callProvider(providerName, messages, options = {}) {
@@ -197,8 +217,19 @@ class UniversalLLMClient {
     let body;
     let endpoint = `${provider.base_url}/chat/completions`;
 
-    // Claude has a different API format
-    if (providerName === 'claude') {
+    // Provider-specific API formats
+    if (providerName === 'gemini') {
+      const { systemInstruction, contents } = this.formatMessagesForGemini(messages);
+      endpoint = `${provider.base_url}/models/${model}:generateContent?key=${apiKey}`;
+      body = JSON.stringify({
+        systemInstruction,
+        contents,
+        generationConfig: {
+          temperature: options.temperature ?? 0.7,
+          maxOutputTokens: options.max_tokens || 2048
+        }
+      });
+    } else if (providerName === 'claude') {
       const { system, messages: claudeMessages } = this.formatMessagesForClaude(messages);
       endpoint = `${provider.base_url}/messages`;
       body = JSON.stringify({
@@ -209,7 +240,7 @@ class UniversalLLMClient {
         messages: claudeMessages
       });
     } else {
-      // OpenAI-compatible format
+      // OpenAI-compatible format (Groq, Cerebras, Together, Mistral, OpenAI, Ollama, OpenRouter)
       body = JSON.stringify({
         model,
         messages,
@@ -235,7 +266,14 @@ class UniversalLLMClient {
     // Normalize response format
     let content, usage;
 
-    if (providerName === 'claude') {
+    if (providerName === 'gemini') {
+      content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      usage = {
+        prompt_tokens: data.usageMetadata?.promptTokenCount || 0,
+        completion_tokens: data.usageMetadata?.candidatesTokenCount || 0,
+        total_tokens: data.usageMetadata?.totalTokenCount || 0
+      };
+    } else if (providerName === 'claude') {
       content = data.content?.[0]?.text || '';
       usage = {
         prompt_tokens: data.usage?.input_tokens || 0,
