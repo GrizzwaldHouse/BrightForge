@@ -1,0 +1,37 @@
+## SUMMARY
+Added a greeting function to index.js and created a new utility file
+
+## FILE: src/index.js
+## ACTION: modify
+## DESCRIPTION: Add greeting function
+```javascript
+// index.js - Main entry point
+export function greet(name) {
+  return `Hello, ${name}!`;
+}
+
+export function main() {
+  console.log(greet('World'));
+}
+```
+
+## FILE: src/utils.js
+## ACTION: create
+## DESCRIPTION: New utility file for helper functions
+```javascript
+// utils.js - Utility functions
+export function capitalize(str) {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+export function formatDate(date) {
+  return date.toISOString().split('T')[0];
+}
+```
+
+## FILE: src/old-file.js
+## ACTION: delete
+## DESCRIPTION: Remove deprecated file
+```javascript
+// This file is no longer needed
+```

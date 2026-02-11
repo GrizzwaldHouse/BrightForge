@@ -1,0 +1,193 @@
+# LLCApp - Master Agent Configuration
+# Coding agent with plan-review-run workflow
+
+master_agent:
+  name: "LLCApp"
+  version: "1.0.0"
+  mode: "plan-review-run"
+
+  # File context scanning configuration
+  file_context:
+    default_extensions:
+      - .js
+      - .mjs
+      - .ts
+      - .tsx
+      - .json
+      - .yaml
+      - .yml
+      - .md
+      - .txt
+      - .css
+      - .html
+      - .sh
+      - .bash
+
+    ignore_patterns:
+      - node_modules
+      - .git
+      - dist
+      - build
+      - .next
+      - coverage
+      - .cache
+      - .thumbnail
+      - .vscode
+      - .idea
+      - __pycache__
+      - "*.pyc"
+      - .DS_Store
+      - thumbs.db
+      - package-lock.json
+      - "*.min.js"
+      - "*.map"
+
+    max_files: 15
+    max_file_size: 10000  # characters
+    max_total_tokens: 8000
+
+    binary_extensions:
+      - .png
+      - .jpg
+      - .jpeg
+      - .gif
+      - .ico
+      - .svg
+      - .pdf
+      - .zip
+      - .gz
+      - .tar
+      - .exe
+      - .dll
+      - .so
+      - .bin
+      - .dat
+      - .db
+      - .sqlite
+      - .woff
+      - .woff2
+      - .ttf
+      - .eot
+      - .mp4
+      - .mp3
+      - .wav
+      - .avi
+      - .mov
+
+  # Task complexity classification
+  classification:
+    simple_keywords:
+      - fix
+      - typo
+      - rename
+      - comment
+      - format
+      - lint
+      - remove
+      - delete
+    complex_keywords:
+      - refactor
+      - redesign
+      - migrate
+      - integrate
+      - architecture
+      - across modules
+      - framework
+    complex_char_threshold: 200
+
+  complexity_classifier:
+    simple:
+      max_files: 3
+      max_lines_changed: 50
+      keywords:
+        - typo
+        - comment
+        - rename
+        - format
+        - style
+
+    moderate:
+      max_files: 10
+      max_lines_changed: 200
+      keywords:
+        - function
+        - method
+        - component
+        - update
+        - add
+        - implement
+        - create
+
+    complex:
+      max_files: 999
+      keywords:
+        - architecture
+        - migrate
+        - redesign
+        - integrate
+        - framework
+        - refactor
+        - across modules
+
+  # Plan engine configuration
+  plan_engine:
+    max_iterations: 3
+    require_approval: true
+    auto_rollback: true
+
+    plan_sections:
+      - overview
+      - files_to_modify
+      - files_to_create
+      - files_to_delete
+      - risks
+      - test_strategy
+
+  # Diff applier configuration
+  diff_applier:
+    backup_enabled: true
+    backup_suffix: ".llcapp-backup"
+    max_backups: 5
+
+    conflict_resolution: "interactive"  # interactive | auto | manual
+
+  # Session logging
+  session_log:
+    enabled: true
+    log_dir: "sessions"
+    max_sessions: 100
+    format: "json"  # json | markdown | both
+
+# Workflow defaults
+workflow:
+  steps:
+    - classify_task
+    - gather_context
+    - generate_plan
+    - review_plan
+    - apply_changes
+    - verify_results
+    - commit_if_approved
+
+  auto_stages:
+    - classify_task
+    - gather_context
+
+  manual_approval_required:
+    - apply_changes
+    - commit_if_approved
+
+# Terminal UI configuration
+terminal_ui:
+  colors:
+    enabled: true
+    theme: "dark"  # dark | light | auto
+
+  diff_display:
+    context_lines: 3
+    show_line_numbers: true
+    highlight_changes: true
+
+  prompts:
+    default_action: "review"
+    timeout_seconds: 300

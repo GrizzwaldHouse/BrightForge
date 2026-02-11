@@ -1,0 +1,40 @@
+{
+  "name": "llcapp",
+  "version": "1.0.0",
+  "description": "Hybrid developer coding agent - local LLMs + cloud fallback with plan-review-run workflow",
+  "main": "bin/llcapp.js",
+  "type": "module",
+  "bin": {
+    "llcapp": "./bin/llcapp.js"
+  },
+  "scripts": {
+    "start": "node bin/llcapp.js",
+    "test-llm": "node src/core/llm-client.js --test",
+    "test-plan": "node src/core/plan-engine.js --test",
+    "test-context": "node src/core/file-context.js --test",
+    "test-diff": "node src/core/diff-applier.js --test",
+    "test-session": "node src/core/session-log.js --test",
+    "test-terminal": "node src/ui/terminal.js --test",
+    "lint": "eslint src/"
+  },
+  "keywords": [
+    "coding-agent",
+    "llm",
+    "ollama",
+    "hybrid-ai",
+    "developer-tools",
+    "plan-review-run"
+  ],
+  "author": "Marcus Daley <github.com/GrizzwaldHouse>",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "yaml": "^2.3.4"
+  },
+  "devDependencies": {
+    "eslint": "^8.56.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

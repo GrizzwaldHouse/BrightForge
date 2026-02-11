@@ -1,0 +1,199 @@
+# LLCApp - LLM Provider Configuration
+# Priority: FREE providers first, paid as fallback
+
+providers:
+  # Priority 1: FREE Local (always try first when available)
+  ollama:
+    enabled: true
+    base_url: "http://127.0.0.1:11434/v1"
+    api_key: null  # No key needed for local
+    models:
+      code: "qwen2.5-coder:14b"
+      fast: "qwen2.5-coder:1.5b"
+      embed: "nomic-embed-text"
+    priority: 1
+    cost_per_1k_tokens: 0
+    requires_local: true
+
+  # Priority 2: FREE Cloud APIs
+  groq:
+    enabled: true
+    base_url: "https://api.groq.com/openai/v1"
+    api_key_env: "GROQ_API_KEY"
+    models:
+      default: "llama-3.3-70b-versatile"
+      fast: "llama-3.1-8b-instant"
+      code: "llama-3.3-70b-versatile"
+    priority: 2
+    cost_per_1k_tokens: 0
+    rate_limit:
+      tokens_per_minute: 14000
+      requests_per_minute: 30
+
+  cerebras:
+    enabled: true
+    base_url: "https://api.cerebras.ai/v1"
+    api_key_env: "CEREBRAS_API_KEY"
+    models:
+      default: "llama-3.3-70b"
+    priority: 3
+    cost_per_1k_tokens: 0
+    rate_limit:
+      requests_per_minute: 30
+
+  together:
+    enabled: true
+    base_url: "https://api.together.xyz/v1"
+    api_key_env: "TOGETHER_API_KEY"
+    models:
+      code: "Qwen/Qwen2.5-Coder-32B-Instruct"
+      default: "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+    priority: 4
+    cost_per_1k_tokens: 0.0008  # ~$25 free credit
+    free_credit: 25.00
+
+  mistral:
+    enabled: true
+    base_url: "https://api.mistral.ai/v1"
+    api_key_env: "MISTRAL_API_KEY"
+    models:
+      code: "codestral-latest"
+      default: "mistral-small-latest"
+    priority: 5
+    cost_per_1k_tokens: 0  # Free tier
+
+  # Priority 6: Paid Cloud (fallback for complex tasks)
+  claude:
+    enabled: true
+    base_url: "https://api.anthropic.com/v1"
+    api_key_env: "CLAUDE_API_KEY"
+    models:
+      simple: "claude-3-5-haiku-20241022"
+      balanced: "claude-sonnet-4-20250514"
+      complex: "claude-opus-4-20250514"
+    priority: 6
+    cost_per_1k_tokens:
+      haiku: 0.0008
+      sonnet: 0.003
+      opus: 0.015
+    use_only_for:
+      - complex_reasoning
+      - architecture_decisions
+      - business_strategy
+
+  openai:
+    enabled: false  # Disabled by default - enable if you have key
+    base_url: "https://api.openai.com/v1"
+    api_key_env: "OPENAI_API_KEY"
+    models:
+      default: "gpt-4o-mini"
+      complex: "gpt-4o"
+    priority: 7
+    cost_per_1k_tokens:
+      gpt-4o-mini: 0.00015
+      gpt-4o: 0.005
+
+  # Aggregator fallback (last resort)
+  openrouter:
+    enabled: true
+    base_url: "https://openrouter.ai/api/v1"
+    api_key_env: "OPENROUTER_API_KEY"
+    models:
+      default: "meta-llama/llama-3.3-70b-instruct"
+    priority: 99
+    cost_per_1k_tokens: variable
+
+# Task-to-provider routing
+task_routing:
+  morning_brief:
+    description: "Daily summary generation"
+    prefer:
+      - groq
+      - cerebras
+      - ollama
+    fallback: "claude:simple"
+    max_tokens: 2048
+
+  code_review:
+    description: "Analyze code changes, suggest improvements"
+    prefer:
+      - ollama:code
+      - together:code
+      - mistral:code
+    fallback: "claude:balanced"
+    max_tokens: 4096
+
+  email_parsing:
+    description: "Parse Fiverr order emails"
+    prefer:
+      - groq:fast
+      - cerebras
+      - ollama:fast
+    fallback: "claude:simple"
+    max_tokens: 1024
+
+  pr_analysis:
+    description: "Analyze pull requests"
+    prefer:
+      - mistral:code
+      - together:code
+      - ollama:code
+    fallback: "claude:balanced"
+    max_tokens: 4096
+
+  complex_reasoning:
+    description: "Architecture decisions, business strategy"
+    prefer:
+      - claude:complex
+    fallback: "together:default"
+    max_tokens: 8192
+
+  client_communication:
+    description: "Generate client emails, responses"
+    prefer:
+      - groq
+      - cerebras
+    fallback: "claude:simple"
+    max_tokens: 1024
+
+  autocomplete:
+    description: "Code completion (local only)"
+    prefer:
+      - ollama:fast
+    fallback: null  # No cloud fallback for autocomplete
+    max_tokens: 256
+
+  code_generation:
+    description: "Generate code changes from task (simple/moderate)"
+    prefer:
+      - ollama:code
+      - groq
+      - together:code
+    fallback: "claude:balanced"
+    max_tokens: 4096
+
+  code_generation_complex:
+    description: "Complex multi-file code generation"
+    prefer:
+      - groq
+      - together:code
+      - mistral:code
+    fallback: "claude:balanced"
+    max_tokens: 8192
+
+# Budget limits (daily)
+budget:
+  daily_limit_usd: 1.00
+  alert_threshold_usd: 0.50
+
+  per_provider:
+    groq:
+      max_requests: 1000  # Rate limited anyway
+    cerebras:
+      max_requests: 500
+    together:
+      max_cost_usd: 0.50  # Preserve free credits
+    claude:
+      max_cost_usd: 0.50
+    openai:
+      max_cost_usd: 0.25
