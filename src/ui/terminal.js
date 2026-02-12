@@ -171,10 +171,10 @@ export class Terminal {
 
   /**
    * Prompt user for free-form text input in conversation mode.
-   * @param {string} prompt - Prompt text (default: 'llcapp> ')
+   * @param {string} prompt - Prompt text (default: 'brightforge> ')
    * @returns {Promise<string>} User's input text (empty string if no input)
    */
-  async promptInput(prompt = 'llcapp> ') {
+  async promptInput(prompt = 'brightforge> ') {
     const rl = createInterface({
       input: process.stdin,
       output: process.stdout
@@ -227,7 +227,7 @@ if (import.meta.url === `file:///${process.argv[1].replace(/\\/g, '/')}`) {
   };
 
   // Test header
-  terminal.header('LLCApp Coding Agent');
+  terminal.header('BrightForge Coding Agent');
 
   // Test summary
   terminal.showSummary(samplePlan);

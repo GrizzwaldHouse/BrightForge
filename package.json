@@ -1,15 +1,19 @@
 {
-  "name": "llcapp",
-  "version": "1.0.0",
-  "description": "Hybrid developer coding agent - local LLMs + cloud fallback with plan-review-run workflow",
-  "main": "bin/llcapp.js",
+  "name": "brightforge",
+  "version": "3.1.0-alpha",
+  "description": "BrightForge - Hybrid developer coding + design agent with local LLMs, cloud fallback, and AI-powered image generation",
+  "main": "bin/brightforge.js",
   "type": "module",
   "bin": {
+    "brightforge": "./bin/brightforge.js",
+    "brightforge-server": "./bin/brightforge-server.js",
+    "brightforge-desktop": "./bin/brightforge-desktop.js",
     "llcapp": "./bin/llcapp.js",
-    "llcapp-server": "./bin/llcapp-server.js"
+    "llcapp-server": "./bin/llcapp-server.js",
+    "llcapp-desktop": "./bin/llcapp-desktop.js"
   },
   "scripts": {
-    "start": "node bin/llcapp.js",
+    "start": "node bin/brightforge.js",
     "test-llm": "node src/core/llm-client.js --test",
     "test-plan": "node src/core/plan-engine.js --test",
     "test-context": "node src/core/file-context.js --test",
@@ -18,14 +22,14 @@
     "test-terminal": "node src/ui/terminal.js --test",
     "lint": "eslint src/ public/js/ bin/ --ext .js",
     "lint:fix": "eslint src/ public/js/ bin/ --ext .js --fix",
-    "chat": "node bin/llcapp.js --chat",
+    "chat": "node bin/brightforge.js --chat",
     "test-history": "node src/core/message-history.js --test",
     "test-conversation": "node src/core/conversation-session.js --test",
     "test-multi-step": "node src/core/multi-step-planner.js --test",
-    "server": "node bin/llcapp-server.js",
+    "server": "node bin/brightforge-server.js",
     "test-api": "node src/api/web-session.js --test",
-    "dev": "node bin/llcapp-server.js",
-    "desktop": "node bin/llcapp-desktop.js",
+    "dev": "node bin/brightforge-server.js",
+    "desktop": "node bin/brightforge-desktop.js",
     "build-desktop": "cd desktop && electron-builder"
   },
   "keywords": [

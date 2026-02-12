@@ -1,0 +1,109 @@
+# BrightForge Image Generation Providers
+# Free-first provider chain for AI image generation
+# Priority: lower number = higher priority
+
+providers:
+  # Priority 1: Pollinations.ai - Zero auth, completely free
+  pollinations:
+    enabled: true
+    base_url: "https://image.pollinations.ai"
+    api_key_env: null  # No authentication required
+    priority: 1
+    cost_per_image: 0.0
+    rate_limit: 4  # requests per minute (anonymous tier)
+    models:
+      default: "flux"
+      fast: "turbo"
+      edit: "kontext"
+    supported_formats:
+      - png
+    max_dimensions: 2048
+    default_width: 1024
+    default_height: 1024
+    features:
+      - text-to-image
+      - image-editing
+
+  # Priority 2: Together AI - FLUX.1 Schnell Free
+  together:
+    enabled: true
+    base_url: "https://api.together.xyz/v1/images/generations"
+    api_key_env: "TOGETHER_API_KEY"
+    priority: 2
+    cost_per_image: 0.0  # Free tier endpoint
+    rate_limit: 60  # requests per minute
+    models:
+      default: "black-forest-labs/FLUX.1-schnell-Free"
+    supported_formats:
+      - png
+      - jpg
+    max_dimensions: 1440
+    default_width: 1024
+    default_height: 768
+    features:
+      - text-to-image
+
+  # Priority 3: Gemini - Free tier image generation
+  gemini:
+    enabled: true
+    base_url: "https://generativelanguage.googleapis.com/v1beta"
+    api_key_env: "GEMINI_API_KEY"
+    priority: 3
+    cost_per_image: 0.0  # Free tier
+    rate_limit: 60  # requests per minute
+    models:
+      default: "gemini-2.0-flash-exp"
+    supported_formats:
+      - png
+      - jpg
+    max_dimensions: 2048
+    default_width: 1024
+    default_height: 1024
+    features:
+      - text-to-image
+      - image-understanding
+
+  # Priority 4: Stability AI - Premium fallback (paid)
+  stability:
+    enabled: false  # Disabled by default - requires API key
+    base_url: "https://api.stability.ai/v2beta/stable-image/generate/sd3"
+    api_key_env: "STABILITY_API_KEY"
+    priority: 4
+    cost_per_image: 0.03  # 3 credits per image
+    rate_limit: 150  # requests per minute
+    models:
+      default: "sd3.5-large"
+      fast: "stable-image-core"
+    supported_formats:
+      - png
+      - jpg
+      - webp
+    max_dimensions: 2048
+    default_width: 1024
+    default_height: 1024
+    features:
+      - text-to-image
+      - image-to-image
+      - upscaling
+
+# Task routing preferences
+task_routing:
+  image_generation:
+    prefer:
+      - pollinations
+      - together
+      - gemini
+    fallback: stability
+  image_editing:
+    prefer:
+      - pollinations
+      - gemini
+    fallback: stability
+
+# Global defaults
+defaults:
+  width: 1024
+  height: 1024
+  format: "png"
+  output_dir: "output/images"
+  save_metadata: true

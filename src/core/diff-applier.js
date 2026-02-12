@@ -2,7 +2,7 @@
  * Diff Applier - Apply Plan Operations to Filesystem
  *
  * Applies file operations from plans with backup/rollback support.
- * Creates .llcapp-backup files before modifying originals.
+ * Creates .brightforge-backup files before modifying originals.
  *
  * @author Marcus Daley (GrizzwaldHouse)
  * @date February 10, 2026
@@ -20,7 +20,7 @@ const __dirname = dirname(__filename);
 export class DiffApplier {
   /**
    * Apply all operations in a plan to the filesystem.
-   * Creates .llcapp-backup files before modifying.
+   * Creates .brightforge-backup files before modifying.
    * @param {Object} plan - Plan object with operations array
    * @param {string} projectRoot - Absolute path to project root
    * @returns {Promise<{ applied: number, failed: number, errors: string[] }>}
@@ -43,7 +43,7 @@ export class DiffApplier {
 
     for (const operation of plan.operations) {
       const filePath = join(projectRoot, operation.filePath);
-      const backupPath = `${filePath}.llcapp-backup`;
+      const backupPath = `${filePath}.brightforge-backup`;
 
       try {
         switch (operation.type) {
@@ -150,7 +150,7 @@ export class DiffApplier {
     for (let i = plan.operations.length - 1; i >= 0; i--) {
       const operation = plan.operations[i];
       const filePath = join(projectRoot, operation.filePath);
-      const backupPath = `${filePath}.llcapp-backup`;
+      const backupPath = `${filePath}.brightforge-backup`;
 
       try {
         switch (operation.type) {
@@ -265,7 +265,7 @@ if (process.argv.includes('--test')) {
     console.log('[TEST] File content verified: MODIFIED');
 
     // Verify backup exists
-    const backupPath = `${testFilePath}.llcapp-backup`;
+    const backupPath = `${testFilePath}.brightforge-backup`;
     if (!existsSync(backupPath)) {
       throw new Error('Backup file was not created');
     }

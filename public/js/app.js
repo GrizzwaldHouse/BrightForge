@@ -1,5 +1,5 @@
 /**
- * LLCApp Dashboard - Main Application
+ * BrightForge Dashboard - Main Application
  * @author Marcus Daley (GrizzwaldHouse)
  * @date February 11, 2026
  */
@@ -9,6 +9,7 @@ import { PlanViewer } from './plan-viewer.js';
 import { SessionManager } from './session-manager.js';
 import { SystemHealthPanel } from './system-health.js';
 import { FileBrowser } from './file-browser.js';
+import { DesignViewer } from './design-viewer.js';
 
 class App {
   constructor() {
@@ -23,13 +24,14 @@ class App {
     this.planViewer = new PlanViewer(this);
     this.sessionManager = new SessionManager(this);
     this.healthPanel = new SystemHealthPanel();
+    this.designViewer = new DesignViewer();
     this.fileBrowser = null; // Initialized after DOM ready
 
     this.init();
   }
 
   async init() {
-    console.log('[APP] Initializing LLCApp dashboard...');
+    console.log('[APP] Initializing BrightForge dashboard...');
 
     // Bind UI events
     this.bindEvents();
@@ -54,7 +56,7 @@ class App {
       this.fileBrowser.render();
 
       // Restore project root from localStorage
-      const savedProject = localStorage.getItem('llcapp-project-root');
+      const savedProject = localStorage.getItem('brightforge-project-root');
       if (savedProject) {
         this.projectRoot = savedProject;
         this.fileBrowser.setValue(savedProject);
@@ -87,7 +89,7 @@ class App {
     // File browser selection change
     document.getElementById('project-root-container').addEventListener('filebrowser:select', (e) => {
       this.projectRoot = e.detail.path;
-      localStorage.setItem('llcapp-project-root', this.projectRoot);
+      localStorage.setItem('brightforge-project-root', this.projectRoot);
       console.log('[APP] Project root selected:', this.projectRoot);
     });
 

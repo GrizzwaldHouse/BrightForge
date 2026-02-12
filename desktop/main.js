@@ -26,7 +26,7 @@ async function startServer() {
 
   return new Promise((resolve, reject) => {
     serverProcess = fork(
-      path.join(__dirname, '..', 'bin', 'llcapp-server.js'),
+      path.join(__dirname, '..', 'bin', 'brightforge-server.js'),
       [],
       {
         env: { ...process.env, PORT: String(serverPort) },
@@ -59,7 +59,7 @@ function createWindow() {
     height: 900,
     minWidth: 800,
     minHeight: 600,
-    title: 'LLCApp - Coding Agent',
+    title: 'BrightForge - Coding Agent',
     icon: path.join(__dirname, 'icons', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -82,7 +82,7 @@ function createWindow() {
       event.preventDefault();
       mainWindow.hide();
       if (tray) {
-        showNotification('LLCApp', 'Minimized to system tray');
+        showNotification('BrightForge', 'Minimized to system tray');
       }
     }
   });
@@ -108,7 +108,7 @@ function createTray() {
 
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: 'Show LLCApp',
+      label: 'Show BrightForge',
       click: () => {
         if (mainWindow) {
           mainWindow.show();
@@ -128,7 +128,7 @@ function createTray() {
     },
     { type: 'separator' },
     {
-      label: 'Quit LLCApp',
+      label: 'Quit BrightForge',
       click: () => {
         app.isQuitting = true;
         app.quit();
@@ -136,7 +136,7 @@ function createTray() {
     }
   ]);
 
-  tray.setToolTip('LLCApp - Coding Agent');
+  tray.setToolTip('BrightForge - Coding Agent');
   tray.setContextMenu(contextMenu);
 
   tray.on('double-click', () => {
@@ -257,7 +257,7 @@ async function initErrorHandler() {
       if (mainWindow) {
         mainWindow.webContents.send('error-reported', entry);
       }
-      dialog.showErrorBox('LLCApp Fatal Error', `${entry.message}\n\nCheck crash report in sessions/ directory.`);
+      dialog.showErrorBox('BrightForge Fatal Error', `${entry.message}\n\nCheck crash report in sessions/ directory.`);
     });
 
     console.log('[ELECTRON] Error handler initialized');
@@ -268,7 +268,7 @@ async function initErrorHandler() {
 
 // App lifecycle
 app.on('ready', async () => {
-  console.log('[ELECTRON] Starting LLCApp Desktop...');
+  console.log('[ELECTRON] Starting BrightForge Desktop...');
 
   try {
     await initErrorHandler();
@@ -282,7 +282,7 @@ app.on('ready', async () => {
   } catch (error) {
     console.error('[ELECTRON] Failed to start:', error);
     if (errorHandler) errorHandler.report('fatal', error, { source: 'electron-ready' });
-    dialog.showErrorBox('LLCApp Error', `Failed to start server: ${error.message}`);
+    dialog.showErrorBox('BrightForge Error', `Failed to start server: ${error.message}`);
     app.quit();
   }
 });

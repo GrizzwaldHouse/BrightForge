@@ -3,10 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LLCApp - Coding Agent Dashboard</title>
+  <title>BrightForge - Coding Agent Dashboard</title>
   <link rel="stylesheet" href="/css/dashboard.css">
   <link rel="stylesheet" href="/css/system-health.css">
   <link rel="stylesheet" href="/css/file-browser.css">
+  <link rel="stylesheet" href="/css/design-viewer.css">
   <style>
     /* Error indicator badge */
     .error-indicator {
@@ -38,7 +39,7 @@
 <body>
   <div id="app">
     <header class="topbar">
-      <h1 class="logo">LLCApp</h1>
+      <h1 class="logo">BrightForge</h1>
       <div class="topbar-right">
         <span id="error-indicator" class="error-indicator hidden" title="Recent errors">
           <span class="error-icon">⚠️</span>
@@ -81,6 +82,7 @@
       <main class="main-content">
         <div class="tab-bar">
           <button class="tab active" data-tab="chat">Chat</button>
+          <button class="tab" data-tab="design">Design</button>
           <button class="tab" data-tab="health">System Health</button>
           <button class="tab" data-tab="sessions">Sessions</button>
         </div>
@@ -89,7 +91,7 @@
           <div class="chat-panel">
             <div id="chat-messages" class="chat-messages">
               <div class="welcome-message">
-                <h2>Welcome to LLCApp</h2>
+                <h2>Welcome to BrightForge</h2>
                 <p>Enter a coding task below to get started. The agent will analyze your project and generate a plan.</p>
               </div>
             </div>
@@ -113,6 +115,48 @@
 
         <div class="tab-panel" data-panel="health">
           <div id="health-panel"></div>
+        </div>
+
+        <div class="tab-panel" data-panel="design">
+          <div id="design-panel">
+            <div class="design-header">
+              <h2>AI Design Generation</h2>
+              <p>Generate complete HTML designs with AI-powered images and layouts</p>
+            </div>
+
+            <div class="design-input-section">
+              <div class="input-group">
+                <label for="design-prompt">Design Brief:</label>
+                <textarea id="design-prompt" placeholder="Describe the design you want to create... (e.g., &quot;Create a landing page for a coffee shop with a hero image and menu section&quot;)"></textarea>
+              </div>
+
+              <div class="input-group">
+                <label for="design-style">Style:</label>
+                <select id="design-style">
+                  <option value="default">Default - Clean & Professional</option>
+                  <option value="blue-glass">Blue Glass - 3D Glassmorphism</option>
+                  <option value="dark-industrial">Dark Industrial - Bold & Technical</option>
+                </select>
+              </div>
+
+              <button id="generate-design-btn" class="btn btn-primary">Generate Design</button>
+
+              <div id="design-status" class="status"></div>
+            </div>
+
+            <div id="design-preview" class="hidden">
+              <div class="preview-header">
+                <h3>Design Preview</h3>
+                <div class="preview-actions">
+                  <button id="approve-design-btn" class="btn btn-success" disabled>Export Design</button>
+                  <button id="cancel-design-btn" class="btn btn-secondary" disabled>Cancel</button>
+                </div>
+              </div>
+
+              <div id="design-images"></div>
+              <div id="design-metadata"></div>
+            </div>
+          </div>
         </div>
 
         <div class="tab-panel" data-panel="sessions">

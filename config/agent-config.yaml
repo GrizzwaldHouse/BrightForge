@@ -1,9 +1,9 @@
-# LLCApp - Master Agent Configuration
-# Coding agent with plan-review-run workflow
+# BrightForge - Master Agent Configuration
+# Coding + design agent with plan-review-run workflow
 
 master_agent:
-  name: "LLCApp"
-  version: "1.0.0"
+  name: "BrightForge"
+  version: "3.1.0"
   mode: "plan-review-run"
 
   # File context scanning configuration

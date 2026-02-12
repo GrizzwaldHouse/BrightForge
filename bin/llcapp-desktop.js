@@ -1,10 +1,14 @@
 #!/usr/bin/env node
 
 /**
- * LLCApp Desktop Launcher
+ * LLCApp Desktop - DEPRECATED
  *
- * Starts the Electron desktop application.
- * Usage: npm run desktop
+ * This command has been renamed to `brightforge-desktop`.
+ * Please use `brightforge-desktop` instead.
+ *
+ * @deprecated Use `brightforge-desktop` instead
+ * @author Marcus Daley (GrizzwaldHouse)
+ * @date February 11, 2026
  */
 
 import { spawn } from 'child_process';
@@ -14,18 +18,20 @@ import { dirname, join } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const electronPath = join(__dirname, '../node_modules/.bin/electron');
-const mainPath = join(__dirname, '../desktop/main.js');
+// Print deprecation warning
+console.warn('\x1b[33m%s\x1b[0m', '⚠️  DEPRECATED: The "llcapp-desktop" command has been renamed to "brightforge-desktop"');
+console.warn('\x1b[33m%s\x1b[0m', '   Please use "brightforge-desktop" instead. This wrapper will be removed in a future version.');
+console.warn('');
 
-console.log('[LAUNCHER] Starting LLCApp Desktop...');
+// Forward to brightforge-desktop
+const brightforgePath = join(__dirname, 'brightforge-desktop.js');
+const args = process.argv.slice(2);
 
-const child = spawn(electronPath, [mainPath], {
+const child = spawn('node', [brightforgePath, ...args], {
   stdio: 'inherit',
-  env: process.env,
-  shell: true
+  env: process.env
 });
 
 child.on('close', (code) => {
-  console.log(`[LAUNCHER] LLCApp Desktop exited with code ${code}`);
   process.exit(code || 0);
 });
