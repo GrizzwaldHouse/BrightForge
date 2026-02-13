@@ -47,58 +47,58 @@ export class DiffApplier {
 
       try {
         switch (operation.type) {
-          case 'modify': {
-            console.log(`[APPLY] Modifying: ${operation.filePath}`);
+        case 'modify': {
+          console.log(`[APPLY] Modifying: ${operation.filePath}`);
 
-            // Create backup of original
-            if (existsSync(filePath)) {
-              copyFileSync(filePath, backupPath);
-            }
-
-            // Write modified content
-            const parentDir = dirname(filePath);
-            if (!existsSync(parentDir)) {
-              mkdirSync(parentDir, { recursive: true });
-            }
-            writeFileSync(filePath, operation.modified, 'utf8');
-
-            results.applied++;
-            break;
+          // Create backup of original
+          if (existsSync(filePath)) {
+            copyFileSync(filePath, backupPath);
           }
 
-          case 'create': {
-            console.log(`[APPLY] Creating: ${operation.filePath}`);
+          // Write modified content
+          const parentDir = dirname(filePath);
+          if (!existsSync(parentDir)) {
+            mkdirSync(parentDir, { recursive: true });
+          }
+          writeFileSync(filePath, operation.modified, 'utf8');
 
-            // Ensure parent directory exists
-            const parentDir = dirname(filePath);
-            if (!existsSync(parentDir)) {
-              mkdirSync(parentDir, { recursive: true });
-            }
+          results.applied++;
+          break;
+        }
 
-            // Write new file
-            writeFileSync(filePath, operation.modified, 'utf8');
+        case 'create': {
+          console.log(`[APPLY] Creating: ${operation.filePath}`);
 
-            results.applied++;
-            break;
+          // Ensure parent directory exists
+          const parentDir = dirname(filePath);
+          if (!existsSync(parentDir)) {
+            mkdirSync(parentDir, { recursive: true });
           }
 
-          case 'delete': {
-            console.log(`[APPLY] Deleting: ${operation.filePath}`);
+          // Write new file
+          writeFileSync(filePath, operation.modified, 'utf8');
 
-            // Create backup before deleting
-            if (existsSync(filePath)) {
-              copyFileSync(filePath, backupPath);
-              unlinkSync(filePath);
-            } else {
-              console.warn(`[APPLY] File not found for deletion: ${operation.filePath}`);
-            }
+          results.applied++;
+          break;
+        }
 
-            results.applied++;
-            break;
+        case 'delete': {
+          console.log(`[APPLY] Deleting: ${operation.filePath}`);
+
+          // Create backup before deleting
+          if (existsSync(filePath)) {
+            copyFileSync(filePath, backupPath);
+            unlinkSync(filePath);
+          } else {
+            console.warn(`[APPLY] File not found for deletion: ${operation.filePath}`);
           }
 
-          default:
-            throw new Error(`Unknown operation type: ${operation.type}`);
+          results.applied++;
+          break;
+        }
+
+        default:
+          throw new Error(`Unknown operation type: ${operation.type}`);
         }
 
       } catch (error) {
@@ -154,50 +154,50 @@ export class DiffApplier {
 
       try {
         switch (operation.type) {
-          case 'modify': {
-            console.log(`[APPLY] Restoring modified file: ${operation.filePath}`);
+        case 'modify': {
+          console.log(`[APPLY] Restoring modified file: ${operation.filePath}`);
 
-            if (existsSync(backupPath)) {
-              copyFileSync(backupPath, filePath);
-              unlinkSync(backupPath);
-              results.restored++;
-            } else {
-              console.warn(`[APPLY] No backup found for: ${operation.filePath}`);
-            }
-            break;
+          if (existsSync(backupPath)) {
+            copyFileSync(backupPath, filePath);
+            unlinkSync(backupPath);
+            results.restored++;
+          } else {
+            console.warn(`[APPLY] No backup found for: ${operation.filePath}`);
           }
+          break;
+        }
 
-          case 'create': {
-            console.log(`[APPLY] Removing created file: ${operation.filePath}`);
+        case 'create': {
+          console.log(`[APPLY] Removing created file: ${operation.filePath}`);
 
-            if (existsSync(filePath)) {
-              unlinkSync(filePath);
-              results.restored++;
-            } else {
-              console.warn(`[APPLY] Created file not found: ${operation.filePath}`);
-            }
-            break;
+          if (existsSync(filePath)) {
+            unlinkSync(filePath);
+            results.restored++;
+          } else {
+            console.warn(`[APPLY] Created file not found: ${operation.filePath}`);
           }
+          break;
+        }
 
-          case 'delete': {
-            console.log(`[APPLY] Restoring deleted file: ${operation.filePath}`);
+        case 'delete': {
+          console.log(`[APPLY] Restoring deleted file: ${operation.filePath}`);
 
-            if (existsSync(backupPath)) {
-              const parentDir = dirname(filePath);
-              if (!existsSync(parentDir)) {
-                mkdirSync(parentDir, { recursive: true });
-              }
-              copyFileSync(backupPath, filePath);
-              unlinkSync(backupPath);
-              results.restored++;
-            } else {
-              console.warn(`[APPLY] No backup found for deleted file: ${operation.filePath}`);
+          if (existsSync(backupPath)) {
+            const parentDir = dirname(filePath);
+            if (!existsSync(parentDir)) {
+              mkdirSync(parentDir, { recursive: true });
             }
-            break;
+            copyFileSync(backupPath, filePath);
+            unlinkSync(backupPath);
+            results.restored++;
+          } else {
+            console.warn(`[APPLY] No backup found for deleted file: ${operation.filePath}`);
           }
+          break;
+        }
 
-          default:
-            console.warn(`[APPLY] Unknown operation type for rollback: ${operation.type}`);
+        default:
+          console.warn(`[APPLY] Unknown operation type for rollback: ${operation.type}`);
         }
 
       } catch (error) {

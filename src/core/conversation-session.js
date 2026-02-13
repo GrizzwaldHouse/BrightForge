@@ -276,7 +276,7 @@ export class ConversationSession {
         await this.handleTurn(input);
       } catch (error) {
         this.terminal.log(`Unexpected error: ${error.message}`, 'error');
-        console.error(`[CHAT] Error details:`, error);
+        console.error('[CHAT] Error details:', error);
       }
 
       console.log(''); // blank line between turns

@@ -66,12 +66,12 @@ export class BaseAgent {
     }
 
     if (context.files && context.files.length > 0) {
-      userContent += `PROJECT FILES:\n\n`;
+      userContent += 'PROJECT FILES:\n\n';
       for (const file of context.files) {
         userContent += `--- ${file.path} ---\n${file.content}\n\n`;
       }
     } else {
-      userContent += `No existing project files provided. Create new files as needed.\n`;
+      userContent += 'No existing project files provided. Create new files as needed.\n';
     }
 
     messages.push({ role: 'user', content: userContent });

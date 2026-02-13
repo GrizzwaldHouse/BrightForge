@@ -89,7 +89,7 @@ async function main() {
 
     console.log('');
     console.log(`  [SERVER] Sessions dir: ${sessionsDir}`);
-    console.log(`  [SERVER] Session timeout: 30 min`);
+    console.log('  [SERVER] Session timeout: 30 min');
     console.log('');
     console.log('  Press Ctrl+C to stop');
     console.log('');

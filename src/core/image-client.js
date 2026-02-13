@@ -171,16 +171,16 @@ class ImageClient {
    */
   async callProvider(providerName, prompt, options = {}) {
     switch (providerName) {
-      case 'pollinations':
-        return await this._callPollinations(prompt, options);
-      case 'together':
-        return await this._callTogether(prompt, options);
-      case 'gemini':
-        return await this._callGemini(prompt, options);
-      case 'stability':
-        return await this._callStability(prompt, options);
-      default:
-        throw new Error(`Unknown provider: ${providerName}`);
+    case 'pollinations':
+      return await this._callPollinations(prompt, options);
+    case 'together':
+      return await this._callTogether(prompt, options);
+    case 'gemini':
+      return await this._callGemini(prompt, options);
+    case 'stability':
+      return await this._callStability(prompt, options);
+    default:
+      throw new Error(`Unknown provider: ${providerName}`);
     }
   }
 
@@ -414,7 +414,7 @@ if (import.meta.url === `file://${process.argv[1]}` && process.argv.includes('--
           width: 512,
           height: 512
         });
-        console.log(`✓ Image generated successfully`);
+        console.log('✓ Image generated successfully');
         console.log(`  Provider: ${result.provider}`);
         console.log(`  Path: ${result.path}`);
         console.log(`  Cost: $${result.cost.toFixed(4)}`);
