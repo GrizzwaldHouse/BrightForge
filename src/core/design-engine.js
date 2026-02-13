@@ -53,15 +53,16 @@ class DesignEngine {
       console.log(`[DESIGN] Generated ${images.length} images`);
 
       // 4. Generate HTML layout with LLM
-      const layout = await this.generateLayout(prompt, images, style);
-      console.log(`[DESIGN] Generated HTML layout (${layout.length} chars)`);
+      const layoutResult = await this.generateLayout(prompt, images, style);
+      const layout = layoutResult.html || layoutResult;
+      const llmCost = layoutResult.cost || 0;
+      console.log(`[DESIGN] Generated HTML layout (${layout.length} chars), LLM cost: $${llmCost.toFixed(4)}`);
 
       // 5. Combine images into HTML
       const html = this.combineDesign(layout, images);
 
       // Calculate total cost
       const imageCost = images.reduce((sum, img) => sum + img.cost, 0);
-      const llmCost = 0; // TODO: Track LLM cost from generateLayout
       const totalCost = imageCost + llmCost;
 
       console.log(`[DESIGN] Design complete! Total cost: $${totalCost.toFixed(4)}`);
@@ -195,7 +196,11 @@ Generate a complete HTML page that implements this design using the provided sty
 
     // Extract HTML from response (may be wrapped in markdown code block)
     const html = this._extractHTML(response.content);
-    return html;
+
+    return {
+      html,
+      cost: response.cost || 0
+    };
   }
 
   /**

@@ -3,9 +3,11 @@ node_modules/
 .env
 sessions/
 *.llcapp-backup
+*.brightforge-backup
 .claude/settings.local.json
 nul
 dist-electron/
 desktop/icons/*.png
 desktop/icons/*.ico
 desktop/icons/*.icns
+output/designs/*.html

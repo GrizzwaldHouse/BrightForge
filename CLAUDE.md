@@ -172,3 +172,14 @@ Requires `.env.local` with API keys: `GROQ_API_KEY`, `CEREBRAS_API_KEY`, `TOGETH
 
 - `config/llm-providers.yaml` — All 9 LLM providers, task routing rules, budget limits ($1/day)
 - `config/agent-config.yaml` — Task classification keywords, file context limits, plan engine settings, web server config, error handling config
+
+## Commit & Attribution Guidelines
+
+**IMPORTANT:** Do not add co-authored attribution or references to Claude/Anthropic in commits unless explicitly requested by the user.
+
+- ❌ **Never include** `Co-Authored-By: Claude` or similar attribution
+- ❌ **Never include** references to Claude Code, Anthropic, or AI assistance
+- ✅ **Keep commits clean** with only the work description
+- ✅ **Focus on what changed** not who/what created it
+
+This applies to all commit messages, code comments, documentation, and generated files.

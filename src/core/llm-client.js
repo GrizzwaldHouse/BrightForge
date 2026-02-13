@@ -83,10 +83,9 @@ class UniversalLLMClient {
     const provider = this.providers[providerName];
     if (!provider || !provider.enabled) return false;
 
-    // Ollama doesn't need an API key
+    // Ollama doesn't need an API key - availability checked at runtime
     if (providerName === 'ollama') {
-      // TODO: Check if Ollama is running locally
-      return provider.requires_local ? this.checkOllamaRunning() : true;
+      return true; // Optimistic - actual connectivity checked during LLM call
     }
 
     const apiKey = this.getApiKey(providerName);
