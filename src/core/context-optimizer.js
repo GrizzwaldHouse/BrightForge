@@ -10,8 +10,7 @@
  * @date February 11, 2026
  */
 
-import { readFileSync, statSync } from 'fs';
-import { join, extname, basename } from 'path';
+import { extname, basename } from 'path';
 
 export class ContextOptimizer {
   constructor(options = {}) {

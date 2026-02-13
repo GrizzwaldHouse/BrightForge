@@ -85,7 +85,7 @@ if (process.argv.includes('--test')) {
 
   // Create a mock LLM client
   const mockClient = {
-    async chat(messages, options) {
+    async chat(_messages, _options) {
       return {
         content: '## SUMMARY\nTest plan\n\n## FILE: test.js\n## ACTION: create\n## DESCRIPTION: Test file\n```javascript\nconsole.log("test");\n```',
         provider: 'mock',

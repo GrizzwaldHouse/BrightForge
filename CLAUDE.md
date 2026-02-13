@@ -183,3 +183,19 @@ Requires `.env.local` with API keys: `GROQ_API_KEY`, `CEREBRAS_API_KEY`, `TOGETH
 - ✅ **Focus on what changed** not who/what created it
 
 This applies to all commit messages, code comments, documentation, and generated files.
+
+## Code Quality Guidelines
+
+**Unused Variables & Parameters:**
+- Prefix unused parameters with underscore: `function foo(_unusedParam, used) {}`
+- Remove unused imports completely rather than leaving them
+- In test blocks, prefix mock function parameters with underscore if not used
+- Fix ESLint warnings immediately - don't let them accumulate
+- Run `npm run lint:fix` after major changes to auto-fix formatting issues
+
+**Before Committing:**
+```bash
+npm run lint:fix  # Auto-fix formatting
+npm run lint      # Check for remaining issues
+# Fix any remaining warnings manually (especially unused vars)
+```
