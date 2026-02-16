@@ -5,6 +5,15 @@
  * Uses WAL mode for concurrent reads, single-writer with busy_timeout.
  * Migration system with version table.
  *
+ * STATUS: Complete. Schema v1 with 3 tables, integrity checks, stats.
+ *
+ * TODO(P1): Add daily automated backup of forge3d.db (e.g. on server start)
+ * TODO(P1): Add database export/import (JSON) for migration between machines
+ * TODO(P1): Add generation_history pruning (auto-delete entries older than N days)
+ * TODO(P2): Add full-text search index on generation prompts
+ * TODO(P2): Schema v2 — add tags/labels table for asset organization
+ * TODO(P2): Add asset versioning (re-generate same prompt, keep history)
+ *
  * @author Marcus Daley (GrizzwaldHouse)
  * @date February 14, 2026
  */

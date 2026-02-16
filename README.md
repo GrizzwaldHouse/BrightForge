@@ -1,6 +1,6 @@
-# BrightForge - Hybrid Developer Coding + Design Agent
+# BrightForge - Hybrid Developer Coding, Design + 3D Agent
 
-A CLI coding and design agent that uses local LLMs (Ollama) for free, with cloud fallback for complex tasks. Features AI-powered image generation and HTML layout creation. Plan-review-run workflow ensures you always approve changes before they're applied.
+A CLI coding, design, and 3D generation agent that uses local LLMs (Ollama) for free, with cloud fallback for complex tasks. Features AI-powered image generation, HTML layout creation, and GPU-accelerated 3D mesh generation. Plan-review-run workflow ensures you always approve changes before they're applied.
 
 ## Quick Start
 
@@ -60,6 +60,31 @@ npm run server
 - Web dashboard with live preview
 - Export to standalone HTML files
 
+### ForgePipeline (3D Generation)
+
+GPU-accelerated 3D mesh generation powered by a local Python inference server (InstantMesh + SDXL). Runs entirely offline after initial model download.
+
+**Three generation modes:**
+- **Image-to-mesh** -- Upload a reference image, receive a GLB mesh
+- **Text-to-image** -- Generate an image from a text prompt via SDXL
+- **Full pipeline (text-to-mesh)** -- Text prompt goes through SDXL image generation, then InstantMesh converts to a 3D mesh
+
+**Features:**
+- Web-based Three.js 3D preview with orbit controls, grid, and wireframe toggle
+- Project and asset management backed by SQLite
+- Batch generation queue (FIFO, one GPU job at a time)
+- VRAM monitoring with auto-warning and degradation thresholds
+- glTF/GLB download for generated assets
+- Crash recovery for interrupted generations
+
+**ForgePipeline system requirements:**
+- NVIDIA GPU with 8GB+ VRAM (tested on RTX 5080)
+- Python 3.10+
+- CUDA 12.x
+- Node.js 18+ (same as base BrightForge)
+
+See `docs/30_DAY_PLAN.md` for the full development roadmap.
+
 ## Provider Priority (free-first)
 
 1. Ollama (local, free)
@@ -69,6 +94,40 @@ npm run server
 5. Mistral (free tier)
 6. Claude (paid fallback)
 7. OpenAI (last resort)
+
+## Testing
+
+Each module has a self-contained `--test` block. Run individual tests via npm scripts:
+
+```bash
+# Core modules
+npm run test-llm              # LLM client provider chain
+npm run test-plan             # Plan engine parsing
+npm run test-context          # File context scanning
+npm run test-diff             # Diff applier + rollback
+npm run test-session          # Session logging
+npm run test-terminal         # Terminal UI
+npm run test-image            # Image generation client
+npm run test-design           # Design engine
+npm run test-history          # Message history
+npm run test-conversation     # Conversation session
+npm run test-multi-step       # Multi-step planner
+npm run test-api              # Web session API
+
+# ForgePipeline (3D generation)
+npm run test-bridge           # Python inference server bridge
+npm run test-forge-db         # SQLite database layer
+npm run test-forge-session    # Generation lifecycle
+npm run test-project-manager  # Project/asset CRUD
+npm run test-queue            # Batch generation queue
+
+# Run all core tests
+npm run test-all-core
+
+# Linting
+npm run lint
+npm run lint:fix
+```
 
 ## License
 

@@ -3,6 +3,17 @@
  *
  * High-level operations for managing 3D generation projects.
  * Wraps database.js with file I/O for asset storage.
+ * Path traversal protection on all file operations.
+ *
+ * STATUS: Complete. CRUD + asset I/O + disk usage tracking tested.
+ *
+ * TODO(P1): Add FBX export support (requires Blender automation or Assimp)
+ * TODO(P1): Add asset thumbnail generation for gallery view (render preview PNG)
+ * TODO(P1): Add mesh validation on save (vertex count, manifold check via trimesh)
+ * TODO(P1): Add disk quota per project (configurable max size)
+ * TODO(P2): Add project templates with pre-configured generation settings
+ * TODO(P2): Add project sharing (export as zip with metadata)
+ * TODO(P2): Add Unreal Engine material mapping (.uasset generation)
  *
  * @author Marcus Daley (GrizzwaldHouse)
  * @date February 14, 2026

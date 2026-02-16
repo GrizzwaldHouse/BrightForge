@@ -12,6 +12,17 @@ Endpoints:
   GET  /status          - VRAM usage, current operation
 
 Usage: python python/inference_server.py [--port 8001] [--host 127.0.0.1]
+
+STATUS: Complete. CUDA OOM handling, temp file cleanup, path validation.
+        Not yet tested with actual GPU inference (requires model downloads).
+
+TODO(P0): End-to-end test with InstantMesh + SDXL models on real GPU
+TODO(P1): Add TripoSR as alternative to InstantMesh (MIT license, similar API)
+TODO(P1): Add CPU fallback mode (slow but works without CUDA)
+TODO(P1): Add configurable generation parameters per request (steps, guidance_scale)
+TODO(P1): Add model version tracking in response headers
+TODO(P2): Add request queue visualization endpoint
+TODO(P2): Add generation caching (same prompt+seed = same output)
 """
 
 import os

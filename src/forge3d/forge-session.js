@@ -6,6 +6,15 @@
  *
  * Emits progress events via TelemetryBus for dashboard tracking.
  *
+ * STATUS: Complete. Session creation and state tracking tested.
+ *         In-memory store with 20-session limit and 1-hour TTL.
+ *
+ * TODO(P1): Add progress percentage estimation from historical generation times
+ * TODO(P1): Add session persistence to SQLite (survives server restart)
+ * TODO(P1): Add generation parameter presets (quality vs speed tradeoffs)
+ * TODO(P2): Add batch session support (multiple generations in one session)
+ * TODO(P2): Add generation comparison (A/B testing different prompts)
+ *
  * @author Marcus Daley (GrizzwaldHouse)
  * @date February 14, 2026
  */

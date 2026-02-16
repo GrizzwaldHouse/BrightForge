@@ -38,7 +38,8 @@
     "test-forge-session": "node src/forge3d/forge-session.js --test",
     "test-forge-db": "node src/forge3d/database.js --test",
     "test-project-manager": "node src/forge3d/project-manager.js --test",
-    "test-queue": "node src/forge3d/generation-queue.js --test"
+    "test-queue": "node src/forge3d/generation-queue.js --test",
+    "test-downloader": "node src/forge3d/model-downloader.js --test"
   },
   "keywords": [
     "coding-agent",

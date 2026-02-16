@@ -5,6 +5,16 @@
  * Supports pause/resume/cancel operations.
  * Emits progress events via TelemetryBus.
  *
+ * STATUS: Complete. Job lifecycle tested via self-test.
+ *         Bridge crash recovery wired to ModelBridge 'crash' event.
+ *
+ * TODO(P1): Add configurable max queue size to prevent unbounded growth
+ * TODO(P1): Add priority queue support (urgent jobs jump ahead)
+ * TODO(P1): Add estimated wait time calculation from historical generation times
+ * TODO(P1): Add dead-letter queue for repeatedly failing prompts
+ * TODO(P2): Add scheduled/cron-based batch generation
+ * TODO(P2): Add webhook notification on job completion
+ *
  * @author Marcus Daley (GrizzwaldHouse)
  * @date February 14, 2026
  */

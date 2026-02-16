@@ -1,6 +1,8 @@
 /**
  * Forge3D Routes - API endpoints for 3D generation
  *
+ * 19 endpoints for generation, projects, assets, queue, models:
+ *
  * POST /api/forge3d/generate        - Start generation (image or text)
  * GET  /api/forge3d/status/:id      - Check generation progress
  * GET  /api/forge3d/download/:id    - Download .glb or .png file
@@ -17,6 +19,19 @@
  * POST /api/forge3d/queue/pause     - Pause queue
  * POST /api/forge3d/queue/resume    - Resume queue
  * DELETE /api/forge3d/queue/:id     - Cancel queued job
+ * GET  /api/forge3d/models          - List installed models
+ * POST /api/forge3d/models/download - Start model download
+ * GET  /api/forge3d/models/status   - Download progress for all active
+ *
+ * STATUS: Complete. All endpoints have error handling + telemetry.
+ *         Localhost-only by default (Express binds to 127.0.0.1).
+ *
+ * TODO(P1): Add rate limiting on /generate endpoint (prevent GPU queue flooding)
+ * TODO(P1): Add API key authentication for non-localhost access
+ * TODO(P1): Add WebSocket or SSE for real-time generation progress (replace polling)
+ * TODO(P1): Add request body size limit middleware (prevent OOM from large uploads)
+ * TODO(P2): Add OpenAPI/Swagger spec generation from route definitions
+ * TODO(P2): Add /api/forge3d/models/delete endpoint for model cleanup
  *
  * @author Marcus Daley (GrizzwaldHouse)
  * @date February 14, 2026
@@ -29,15 +44,17 @@ import modelBridge from '../../forge3d/model-bridge.js';
 import forgeSession from '../../forge3d/forge-session.js';
 import projectManager from '../../forge3d/project-manager.js';
 import generationQueue from '../../forge3d/generation-queue.js';
+import modelDownloader from '../../forge3d/model-downloader.js';
 
 const router = express.Router();
 
-// Initialize project manager and queue on first request
+// Initialize project manager, queue, and model downloader on first request
 let initialized = false;
 function ensureInit() {
   if (!initialized) {
     projectManager.init();
     generationQueue.init();
+    modelDownloader.initialize();
     initialized = true;
   }
 }
@@ -436,6 +453,87 @@ router.delete('/queue/:id', (req, res) => {
     res.json({ cancelled: true });
   } else {
     res.status(400).json({ error: 'Job cannot be cancelled (may be processing or already complete)' });
+  }
+});
+
+// --- Models ---
+
+/**
+ * GET /api/forge3d/models
+ * List all known models and their installation status.
+ */
+router.get('/models', (_req, res) => {
+  ensureInit();
+  try {
+    const models = modelDownloader.getInstalledModels();
+    res.json({ models });
+  } catch (err) {
+    errorHandler.report('forge3d_error', err, { endpoint: 'list_models' });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/forge3d/models/download
+ * Start downloading a model. Returns 202 for async operation.
+ * Body: { model: "instantmesh" | "sdxl" }
+ */
+router.post('/models/download', async (req, res) => {
+  ensureInit();
+  const { model } = req.body;
+
+  if (!model || !modelDownloader.models.has(model)) {
+    const known = [...modelDownloader.models.keys()].join(', ');
+    return res.status(400).json({ error: `Invalid model. Must be one of: ${known}` });
+  }
+
+  try {
+    if (modelDownloader.isModelInstalled(model)) {
+      return res.json({ model, status: 'already_installed' });
+    }
+
+    if (modelDownloader.getDownloadProgress(model)) {
+      return res.json({ model, status: 'already_downloading' });
+    }
+
+    console.log(`[ROUTE] POST /api/forge3d/models/download - starting ${model}`);
+    telemetryBus.emit('forge3d_download_start', { model, source: 'api' });
+
+    // Start download async (don't await)
+    modelDownloader.downloadModel(model).catch((err) => {
+      console.error(`[ROUTE] Model download failed: ${err.message}`);
+      errorHandler.report('forge3d_error', err, { endpoint: 'download_model', model });
+    });
+
+    res.status(202).json({
+      model,
+      status: 'downloading',
+      statusUrl: '/api/forge3d/models/status'
+    });
+  } catch (err) {
+    errorHandler.report('forge3d_error', err, { endpoint: 'download_model', model });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/forge3d/models/status
+ * Get download progress for all active downloads.
+ */
+router.get('/models/status', (_req, res) => {
+  ensureInit();
+  try {
+    const downloads = {};
+    for (const [name] of modelDownloader.models) {
+      const progress = modelDownloader.getDownloadProgress(name);
+      if (progress) {
+        downloads[name] = progress;
+      }
+    }
+    res.json({ activeDownloads: downloads });
+  } catch (err) {
+    errorHandler.report('forge3d_error', err, { endpoint: 'models_status' });
+    res.status(500).json({ error: err.message });
   }
 });
 

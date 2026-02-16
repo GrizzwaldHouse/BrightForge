@@ -4,6 +4,17 @@
  * Spawns and manages the Python FastAPI inference server.
  * Handles health checks, auto-restart, and HTTP client calls.
  *
+ * STATUS: Complete. Tested with self-test block.
+ *         Not yet tested with actual Python inference server running.
+ *
+ * TODO(P0): End-to-end test: start() -> health check -> generateMesh() -> shutdown()
+ * TODO(P1): Check modelDownloader.isModelInstalled() before starting Python process
+ * TODO(P1): Add CPU fallback mode when no CUDA GPU detected
+ * TODO(P1): Add GPU benchmarking (measure inference speed per model per resolution)
+ * TODO(P1): Docker container support for Python environment isolation
+ * TODO(P2): Multi-GPU support (multiple Python processes on different CUDA devices)
+ * TODO(P2): Windows service mode for persistent background operation
+ *
  * @author Marcus Daley (GrizzwaldHouse)
  * @date February 14, 2026
  */
