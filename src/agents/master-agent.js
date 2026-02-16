@@ -228,7 +228,7 @@ if (process.argv.includes('--test')) {
     getUsageSummary() {
       return { ...this.dailyUsage, budget_remaining: this.budget.daily_limit_usd - this.dailyUsage.cost_usd };
     },
-    async chat(messages, options) {
+    async chat(_messages, _options) {
       return {
         content: '## SUMMARY\nAdded greeting function\n\n## FILE: index.js\n## ACTION: create\n## DESCRIPTION: Create index.js with greeting\n```javascript\nexport function greet(name) {\n  return `Hello, ${name}!`;\n}\n```',
         provider: 'mock',

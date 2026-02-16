@@ -104,7 +104,7 @@ class DesignViewer {
     this.elements.previewContainer.classList.remove('hidden');
 
     // Render images
-    this.elements.imagesContainer.innerHTML = preview.images.map((img, i) => `
+    this.elements.imagesContainer.innerHTML = preview.images.map((img, _i) => `
       <div class="design-image-card">
         <img src="${img.path}" alt="${img.alt}" loading="lazy">
         <div class="image-meta">

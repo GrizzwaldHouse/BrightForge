@@ -108,8 +108,8 @@ class FileContext {
    * @returns {Promise<{files: Array<{path: string, content: string, size: number}>, totalTokensEstimate: number}>}
    */
   async scan(projectRoot, options = {}) {
-    const extensions = options.extensions || this.defaultExtensions;
-    const ignorePatterns = options.ignorePatterns || this.ignorePatterns;
+    const _extensions = options.extensions || this.defaultExtensions;
+    const _ignorePatterns = options.ignorePatterns || this.ignorePatterns;
     const maxFiles = options.maxFiles || this.maxFiles;
     const maxFileSize = options.maxFileSize || this.maxFileSize;
 

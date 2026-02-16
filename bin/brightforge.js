@@ -341,7 +341,7 @@ async function runDesign(prompt, style, terminal) {
 async function main() {
   const terminal = new Terminal();
   const args = parseArgs(process.argv);
-  const sessionsDir = join(args.project, '..', 'sessions');
+  const _sessionsDir = join(args.project, '..', 'sessions');
   // Use BrightForge's sessions dir, not the target project's
   const appSessionsDir = join(__dirname, '../sessions');
 

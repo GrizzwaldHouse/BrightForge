@@ -126,7 +126,7 @@ export class ConfidenceScorer {
    * @param {number} opCount - Operation count
    * @returns {string} - Recommendation text
    */
-  _getRecommendation(score, opCount) {
+  _getRecommendation(score, _opCount) {
     if (score >= 80) {
       return 'High confidence - safe to proceed';
     } else if (score >= 60) {

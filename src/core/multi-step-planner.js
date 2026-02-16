@@ -78,7 +78,7 @@ export class MultiStepPlanner {
    * @param {Object} context - Additional context for decomposition
    * @returns {Promise<Array<{step: number, subtask: string}>>}
    */
-  async decompose(task, context = {}) {
+  async decompose(task, _context = {}) {
     console.log('[MULTI-STEP] Decomposing task into sub-tasks...');
 
     try {
@@ -196,7 +196,7 @@ if (process.argv.includes('--test')) {
         throw new Error('mock failure');
       }
     },
-    async run(task) {
+    async run(_task) {
       return {
         summary: 'mock plan',
         cost: 0,

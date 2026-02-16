@@ -303,7 +303,7 @@ class ImageClient {
       throw new Error(`Gemini API error: ${response.status} ${errorText}`);
     }
 
-    const data = await response.json();
+    const _data = await response.json();
     // Gemini image generation would return image data in response
     // For now, return placeholder since Gemini's image gen API varies
     console.warn('[IMAGE] Gemini image generation needs full implementation');

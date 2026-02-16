@@ -280,7 +280,7 @@ class SystemHealthPanel {
     const timeline = recentRequests.map(req => {
       const timestamp = new Date(req.timestamp);
       const timeAgo = this.formatTimeAgo(timestamp);
-      const status = req.error ? 'error' : 'success';
+      const _status = req.error ? 'error' : 'success';
       const statusClass = req.error ? 'status-error' : 'status-success';
 
       return `

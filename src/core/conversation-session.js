@@ -247,6 +247,7 @@ export class ConversationSession {
     this.terminal.log('Type a coding task, or /help for commands. /exit to quit.', 'info');
     console.log('');
 
+    // eslint-disable-next-line no-constant-condition
     while (true) {
       let input;
       try {
@@ -356,7 +357,7 @@ if (process.argv.includes('--test')) {
       getUsageSummary() {
         return { ...this.dailyUsage, budget_remaining: 1.0 };
       },
-      async chat(messages, options) {
+      async chat(_messages, _options) {
         return {
           content: '## SUMMARY\nTest\n\n## FILE: test.js\n## ACTION: create\n## DESCRIPTION: Test\n```javascript\nconsole.log("test");\n```',
           provider: 'mock',
