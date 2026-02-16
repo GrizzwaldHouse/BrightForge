@@ -22,6 +22,7 @@ import { configRoutes } from './routes/config.js';
 import { errorRoutes } from './routes/errors.js';
 import { metricsRoutes } from './routes/metrics.js';
 import designRoutes from './routes/design.js';
+import forge3dRoutes from './routes/forge3d.js';
 import errorHandler from '../core/error-handler.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -39,7 +40,7 @@ export function createServer(options = {}) {
   // CORS for local development
   app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type');
     if (req.method === 'OPTIONS') return res.sendStatus(204);
     next();
@@ -58,6 +59,7 @@ export function createServer(options = {}) {
   app.use('/api/errors', errorRoutes());
   app.use('/api/metrics', metricsRoutes());
   app.use('/api/design', designRoutes);
+  app.use('/api/forge3d', forge3dRoutes);
   app.use('/api', configRoutes());
 
   // Static frontend
@@ -74,7 +76,7 @@ export function createServer(options = {}) {
   });
 
   // Error handling middleware (enhanced with observer-pattern error reporting)
-  app.use((err, req, res, next) => {
+  app.use((err, req, res, _next) => {
     console.error(`[SERVER] Error: ${err.message}`);
     const errorId = errorHandler.report('server_error', err, {
       method: req.method,

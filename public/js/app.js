@@ -10,6 +10,7 @@ import { SessionManager } from './session-manager.js';
 import { SystemHealthPanel } from './system-health.js';
 import { FileBrowser } from './file-browser.js';
 import { DesignViewer } from './design-viewer.js';
+import { Forge3DPanel } from './forge3d-panel.js';
 
 class App {
   constructor() {
@@ -25,6 +26,7 @@ class App {
     this.sessionManager = new SessionManager(this);
     this.healthPanel = new SystemHealthPanel();
     this.designViewer = new DesignViewer();
+    this.forge3dPanel = new Forge3DPanel();
     this.fileBrowser = null; // Initialized after DOM ready
 
     this.init();
@@ -121,9 +123,12 @@ class App {
           targetPanel.classList.add('active');
         }
 
-        // Initialize health panel on first view
+        // Initialize panels on first view
         if (targetTab === 'health' && !this.healthPanel.initialized) {
           this.healthPanel.init();
+        }
+        if (targetTab === 'forge3d' && !this.forge3dPanel.initialized) {
+          this.forge3dPanel.init();
         }
       });
     });
@@ -267,7 +272,7 @@ class App {
     this.planViewer.setLoading(true);
 
     try {
-      const response = await this.apiPost('/api/chat/approve', {
+      await this.apiPost('/api/chat/approve', {
         sessionId: this.sessionId,
         planId: this.currentPlan.id || 'current',
         action: 'reject'

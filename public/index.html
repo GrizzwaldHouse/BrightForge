@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/css/system-health.css">
   <link rel="stylesheet" href="/css/file-browser.css">
   <link rel="stylesheet" href="/css/design-viewer.css">
+  <link rel="stylesheet" href="/css/forge3d.css">
   <style>
     /* Error indicator badge */
     .error-indicator {
@@ -83,6 +84,7 @@
         <div class="tab-bar">
           <button class="tab active" data-tab="chat">Chat</button>
           <button class="tab" data-tab="design">Design</button>
+          <button class="tab" data-tab="forge3d">Forge 3D</button>
           <button class="tab" data-tab="health">System Health</button>
           <button class="tab" data-tab="sessions">Sessions</button>
         </div>
@@ -159,6 +161,101 @@
           </div>
         </div>
 
+        <div class="tab-panel" data-panel="forge3d">
+          <div id="forge3d-panel" class="forge3d-layout">
+            <!-- 3D Viewport -->
+            <div class="forge3d-viewport-wrapper">
+              <div id="forge3d-viewport"></div>
+              <div class="forge3d-viewport-toolbar">
+                <button id="forge3d-wireframe-btn" title="Toggle wireframe">Wireframe</button>
+                <button id="forge3d-reset-btn" title="Reset camera">Reset</button>
+              </div>
+            </div>
+
+            <!-- Sidebar Controls -->
+            <div class="forge3d-controls">
+              <!-- VRAM Monitor -->
+              <div class="forge3d-section">
+                <h3>GPU / VRAM</h3>
+                <div class="forge3d-vram">
+                  <div class="forge3d-vram-bar-wrapper">
+                    <div id="forge3d-vram-bar" class="vram-fill vram-ok" style="width: 0%"></div>
+                  </div>
+                  <span id="forge3d-vram-text" class="forge3d-vram-text">Checking...</span>
+                </div>
+              </div>
+
+              <!-- Generation Controls -->
+              <div class="forge3d-section">
+                <h3>Generate</h3>
+                <div class="forge3d-input-group">
+                  <label for="forge3d-type">Type</label>
+                  <select id="forge3d-type">
+                    <option value="full">Text to 3D (Full Pipeline)</option>
+                    <option value="image">Text to Image (SDXL)</option>
+                    <option value="mesh">Image to Mesh</option>
+                  </select>
+                </div>
+
+                <div id="forge3d-prompt-group" class="forge3d-input-group">
+                  <label for="forge3d-prompt">Prompt</label>
+                  <textarea id="forge3d-prompt" placeholder="Describe a 3D object... (e.g., 'a red medieval sword')"></textarea>
+                </div>
+
+                <div id="forge3d-upload-group" class="forge3d-input-group hidden">
+                  <div id="forge3d-upload-area" class="forge3d-upload-area">
+                    <input type="file" id="forge3d-upload" accept="image/*">
+                    Drop image here or click to upload
+                  </div>
+                </div>
+
+                <div class="forge3d-input-group">
+                  <label for="forge3d-project-select">Save to Project</label>
+                  <div style="display: flex; gap: 4px;">
+                    <select id="forge3d-project-select" style="flex: 1;">
+                      <option value="">No project</option>
+                    </select>
+                    <button id="forge3d-create-project-btn" class="btn-small" title="New project">+</button>
+                  </div>
+                </div>
+
+                <button id="forge3d-generate-btn" class="forge3d-generate-btn">Generate</button>
+                <div class="forge3d-progress">
+                  <div id="forge3d-progress-bar" class="forge3d-progress-bar"></div>
+                </div>
+                <div id="forge3d-status" class="forge3d-status"></div>
+              </div>
+
+              <!-- Stats -->
+              <div class="forge3d-section">
+                <h3>Stats</h3>
+                <div id="forge3d-stats" class="forge3d-stats">
+                  <div class="stat-item"><span class="stat-value">0</span><span class="stat-label">Total</span></div>
+                  <div class="stat-item"><span class="stat-value">0</span><span class="stat-label">Completed</span></div>
+                  <div class="stat-item"><span class="stat-value">0%</span><span class="stat-label">Fail Rate</span></div>
+                  <div class="stat-item"><span class="stat-value">0s</span><span class="stat-label">Avg Time</span></div>
+                </div>
+              </div>
+
+              <!-- Queue -->
+              <div class="forge3d-section">
+                <h3>Queue</h3>
+                <div id="forge3d-queue-list" class="forge3d-queue">
+                  <div class="queue-empty">No recent jobs</div>
+                </div>
+              </div>
+
+              <!-- Asset Gallery -->
+              <div class="forge3d-section">
+                <h3>Assets</h3>
+                <div id="forge3d-gallery" class="forge3d-gallery">
+                  <div class="gallery-empty">Select a project to view assets</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="tab-panel" data-panel="sessions">
           <div class="sessions-panel">
             <h2>Session Management</h2>
@@ -169,7 +266,13 @@
     </div>
   </div>
 
+  <!-- Three.js (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.171.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.171.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.171.0/examples/js/loaders/GLTFLoader.js"></script>
+
   <script type="module" src="/js/app.js"></script>
+  <script type="module" src="/js/forge3d-panel.js"></script>
   <script type="module" src="/js/system-health.js"></script>
   <script>
     // Error indicator polling (observer feedback in dashboard)

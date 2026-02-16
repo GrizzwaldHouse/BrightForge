@@ -46,14 +46,15 @@
   "author": "Marcus Daley <github.com/GrizzwaldHouse>",
   "license": "MIT",
   "dependencies": {
+    "better-sqlite3": "^12.6.2",
     "dotenv": "^16.6.1",
     "express": "^4.21.0",
     "yaml": "^2.3.4"
   },
   "devDependencies": {
-    "eslint": "^8.56.0",
     "electron": "^33.0.0",
-    "electron-builder": "^25.0.0"
+    "electron-builder": "^25.0.0",
+    "eslint": "^8.56.0"
   },
   "engines": {
     "node": ">=18.0.0"
