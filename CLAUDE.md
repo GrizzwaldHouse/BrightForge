@@ -4,27 +4,30 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-**BrightForge** (currently named LLCApp, rename pending in Phase 6). A hybrid AI coding agent that uses local LLMs (Ollama) with cloud fallback via a free-first provider chain. Plan-review-run workflow: LLM generates a plan, user reviews colored diffs, approves or rejects, changes are applied with backup/rollback support.
+**BrightForge** (v3.1.0-alpha). A hybrid AI coding + design + 3D generation agent that uses local LLMs (Ollama) with cloud fallback via a free-first provider chain. Plan-review-run workflow: LLM generates a plan, user reviews colored diffs, approves or rejects, changes are applied with backup/rollback support. Includes AI-powered image generation (Design Engine) and GPU-accelerated 3D mesh generation (ForgePipeline).
 
 ## Commands
 
 ```bash
 # Run a coding task
-node bin/llcapp.js "add a loading spinner" --project ./my-project
+node bin/brightforge.js "add a loading spinner" --project ./my-project
 
 # Interactive chat mode
-node bin/llcapp.js --chat --project ./my-project
+node bin/brightforge.js --chat --project ./my-project
 npm run chat
 
+# Design mode (image generation + HTML layout)
+node bin/brightforge.js --design "modern landing page" --style blue-glass
+
 # Start web dashboard (port 3847)
-node bin/llcapp-server.js
+node bin/brightforge-server.js
 npm run server
 
 # Start Electron desktop app
-node bin/llcapp-desktop.js
+node bin/brightforge-desktop.js
 npm run desktop
 
-# Run individual module self-tests (each module has a --test block)
+# Core module self-tests
 npm run test-llm          # src/core/llm-client.js --test
 npm run test-plan         # src/core/plan-engine.js --test
 npm run test-context      # src/core/file-context.js --test
@@ -35,6 +38,15 @@ npm run test-history      # src/core/message-history.js --test
 npm run test-conversation # src/core/conversation-session.js --test
 npm run test-multi-step   # src/core/multi-step-planner.js --test
 npm run test-api          # src/api/web-session.js --test
+npm run test-image        # src/core/image-client.js --test
+npm run test-design       # src/core/design-engine.js --test
+
+# Forge3D module self-tests
+npm run test-bridge        # src/forge3d/model-bridge.js --test
+npm run test-forge-session # src/forge3d/forge-session.js --test
+npm run test-forge-db      # src/forge3d/database.js --test
+npm run test-project-manager # src/forge3d/project-manager.js --test
+npm run test-queue         # src/forge3d/generation-queue.js --test
 
 # Lint
 npm run lint
@@ -43,14 +55,14 @@ npm run lint:fix
 
 ## Architecture
 
-### Request Flow
+### Coding Agent Flow
 
 ```
-CLI (bin/llcapp.js)  -or-  Web API (POST /api/chat/turn)
-        |                           |
-        v                           v
-   MasterAgent.run()          WebSession.generatePlan()
-        |                           |
+CLI (bin/brightforge.js)  -or-  Web API (POST /api/chat/turn)
+        |                              |
+        v                              v
+   MasterAgent.run()             WebSession.generatePlan()
+        |                              |
         |  1. FileContext.scan() — gather project files
         |  2. classifyTask() — heuristic keywords, NO LLM call
         |  3. selectAgent() — simple/moderate→LocalAgent, complex→CloudAgent
@@ -65,8 +77,31 @@ CLI (bin/llcapp.js)  -or-  Web API (POST /api/chat/turn)
    Web: return pending plan → POST /api/chat/approve
         |
         v
-   DiffApplier.apply() — creates .llcapp-backup files, writes changes
+   DiffApplier.apply() — creates .brightforge-backup files, writes changes
    DiffApplier.rollback() — restores from backups (reverse order)
+```
+
+### ForgePipeline 3D Generation Flow (Phase 8)
+
+```
+Web API (POST /api/forge3d/generate)  -or-  CLI --forge3d
+        |
+        v
+   ForgeSession.create({type, prompt, imageBuffer})
+        |
+        v
+   GenerationQueue.enqueue() — FIFO, max 1 concurrent (GPU constraint)
+        |
+        v
+   ModelBridge → Python FastAPI server (subprocess)
+        |
+        |  Image generation: SDXL → PNG
+        |  Mesh generation:  PNG → InstantMesh → GLB
+        |  Full pipeline:    Prompt → SDXL → InstantMesh → GLB
+        |
+        v
+   ProjectManager.saveAsset() → data/output/{projectId}/
+   Database.recordGeneration() → data/forge3d.db (SQLite)
 ```
 
 ### Provider Chain (UniversalLLMClient)
@@ -97,14 +132,14 @@ Plans are parsed by PlanEngine via regex. LLM output must follow:
 
 System prompt is at `src/prompts/plan-system.txt`. Classification prompt at `classify-system.txt`, decomposition at `decompose-system.txt`.
 
-### Observability Layer
+### Observability Layer (Phase 7)
 
 Two singleton EventEmitter hubs provide cross-cutting observability:
 
-- **TelemetryBus** (`src/core/telemetry-bus.js`): Ring buffers (100 events) for LLM requests, operations, sessions. Tracks per-provider stats (requests, tokens, cost, failures, success rate). Latency percentiles (P50/P95/P99). `startTimer(category)` returns `endTimer()` function.
-- **ErrorHandler** (`src/core/error-handler.js`): Observer-pattern error broadcasting by category (`provider_error`, `plan_error`, `apply_error`, `session_error`, `server_error`, `fatal`). JSONL persistent log at `sessions/errors.jsonl`. Crash reports with memory/telemetry snapshots. Exponential backoff retry tracking.
+- **TelemetryBus** (`src/core/telemetry-bus.js`): Ring buffers (100 events) for LLM requests, operations, sessions, performance, and `forge3d` events. Tracks per-provider stats (requests, tokens, cost, failures, success rate). Latency percentiles (P50/P95/P99). `startTimer(category)` returns `endTimer()` function.
+- **ErrorHandler** (`src/core/error-handler.js`): Observer-pattern error broadcasting by category (`provider_error`, `plan_error`, `apply_error`, `session_error`, `server_error`, `fatal`, `forge3d_error`, `bridge_error`, `gpu_error`). JSONL persistent log at `sessions/errors.jsonl`. Crash reports with memory/telemetry snapshots. Exponential backoff retry tracking.
 
-Both are imported and used throughout: `telemetryBus.startTimer()`, `errorHandler.report()`.
+Both are imported and used throughout: `telemetryBus.emit(category, data)`, `errorHandler.report(category, error, context)`.
 
 ### Predictive IDE Intelligence (Phase 6 modules)
 
@@ -123,12 +158,38 @@ Express server (`src/api/server.js`) created via `createServer()` factory. Route
 | `routes/config.js` | `/api` | `/api/config`, `/api/health` |
 | `routes/errors.js` | `/api/errors` | Error log queries |
 | `routes/metrics.js` | `/api/metrics` | Telemetry dashboard |
+| `routes/design.js` | `/api/design` | Image generation + layout design |
+| `routes/forge3d.js` | `/api/forge3d` | 3D generation, projects, assets, queue |
 
 WebSession (`src/api/web-session.js`) separates plan generation from application (2-step API):
 1. `POST /api/chat/turn` → `generatePlan()` → returns pending plan
 2. `POST /api/chat/approve` → `approvePlan()` → applies to disk
 
-Frontend at `public/` — modular JS classes: `App`, `ChatPanel`, `PlanViewer`, `SessionManager`, `SystemHealthPanel`, `FileBrowser`. Dark theme, card-based UI.
+Frontend at `public/` — modular JS classes: `App`, `ChatPanel`, `PlanViewer`, `SessionManager`, `SystemHealthPanel`, `FileBrowser`, `DesignViewer`, `Forge3DPanel`, `Forge3DViewer`. Dark theme, card-based UI. Tabs: Chat, Health, Design, Forge3D, Sessions.
+
+### ForgePipeline 3D Subsystem (Phase 8)
+
+Five modules in `src/forge3d/`:
+
+| Module | Purpose |
+|---|---|
+| `model-bridge.js` | Spawns/manages Python inference server subprocess, HTTP client |
+| `database.js` | SQLite persistence (projects, assets, generation_history) via `better-sqlite3` |
+| `generation-queue.js` | FIFO GPU queue, max 1 concurrent, pause/resume/cancel |
+| `forge-session.js` | Generation lifecycle (idle → generating → complete/failed) |
+| `project-manager.js` | CRUD for projects + file I/O with path traversal protection |
+
+**Python Inference Server** (`python/inference_server.py`): FastAPI subprocess on localhost, manages SDXL (image gen) and InstantMesh (mesh gen) models. Endpoints: `/generate/mesh`, `/generate/image`, `/generate/full`, `/health`, `/status`, `/download/{jobId}/{filename}`.
+
+**Forge3D API** (17 endpoints at `/api/forge3d/`):
+- `POST /generate` — Start generation (returns 202 + sessionId)
+- `GET /status/:id`, `GET /download/:id` — Progress + file download
+- `GET|POST|DELETE /projects`, `GET /projects/:id/assets` — Project CRUD
+- `DELETE /assets/:id` — Delete single asset
+- `GET /history`, `GET /stats` — Query history + aggregates
+- `GET /bridge`, `GET /queue`, `POST /queue/pause|resume`, `DELETE /queue/:id` — Infrastructure
+
+**Data Storage**: SQLite at `data/forge3d.db`, output files at `data/output/{projectId}/`.
 
 ### Electron Desktop
 
@@ -154,11 +215,11 @@ if (process.argv.includes('--test')) {
 
 **YAML config loading** — Provider and agent configs loaded with `readFileSync` + `parse` from the `yaml` package.
 
-**Logging** — Console output with `[PREFIX]` tags: `[MASTER]`, `[PLAN]`, `[APPLY]`, `[LLM]`, `[WEB]`, `[STORE]`, `[SERVER]`, `[ROUTE]`, `[CHAT]`, `[HISTORY]`, `[MULTI-STEP]`, `[ERROR-HANDLER]`, `[TELEMETRY]`.
+**Logging** — Console output with `[PREFIX]` tags: `[MASTER]`, `[PLAN]`, `[APPLY]`, `[LLM]`, `[WEB]`, `[STORE]`, `[SERVER]`, `[ROUTE]`, `[CHAT]`, `[HISTORY]`, `[MULTI-STEP]`, `[ERROR-HANDLER]`, `[TELEMETRY]`, `[IMAGE]`, `[DESIGN]`, `[FORGE3D]`, `[BRIDGE]`, `[QUEUE]`, `[PROJECT]`.
 
-**No new dependencies** — Only `dotenv`, `yaml`, `express` (+ `eslint`, `electron`, `electron-builder` as dev). Uses native `fetch` (Node 18+).
+**Dependencies** — `dotenv`, `yaml`, `express`, `better-sqlite3` (+ `eslint`, `electron`, `electron-builder` as dev). Uses native `fetch` (Node 18+).
 
-**Backup suffix** — `.llcapp-backup` (will become `.brightforge-backup` after rename).
+**Backup suffix** — `.brightforge-backup`.
 
 ## ESLint
 
@@ -172,6 +233,16 @@ Requires `.env.local` with API keys: `GROQ_API_KEY`, `CEREBRAS_API_KEY`, `TOGETH
 
 - `config/llm-providers.yaml` — All 9 LLM providers, task routing rules, budget limits ($1/day)
 - `config/agent-config.yaml` — Task classification keywords, file context limits, plan engine settings, web server config, error handling config
+- `config/image-providers.yaml` — Image generation providers (Pollinations, Together, Gemini, Stability)
+- `config/styles/*.md` — Design style templates (blue-glass, dark-industrial, default)
+
+## Python Environment (Forge3D)
+
+The 3D generation pipeline requires a Python environment with GPU support:
+- `python/requirements.txt` — PyTorch 2.10.0+cu124, diffusers, transformers, FastAPI, trimesh, pynvml
+- Python server is auto-spawned by `model-bridge.js` as a subprocess
+- CUDA GPU required for mesh/image generation (SDXL + InstantMesh models)
+- Data directory: `data/` (SQLite DB, output files, temp files)
 
 ## Commit & Attribution Guidelines
 
