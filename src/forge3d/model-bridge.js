@@ -24,6 +24,8 @@ const STARTUP_TIMEOUT = 30000; // 30 sec
 const GENERATION_TIMEOUT = 180000; // 180 sec
 const MAX_RESTART_ATTEMPTS = 3;
 const RESTART_COOLDOWN = 5000; // 5 sec
+const MAX_IMAGE_SIZE = 20 * 1024 * 1024; // 20 MB (matches Python limit)
+const MAX_HEALTH_FAILURES = 3; // Kill + restart after N consecutive failures
 
 class ModelBridge extends EventEmitter {
   constructor(options = {}) {
@@ -37,6 +39,7 @@ class ModelBridge extends EventEmitter {
     this.restartCount = 0;
     this.lastHealthCheck = null;
     this.startTime = null;
+    this.consecutiveHealthFailures = 0;
   }
 
   /**
@@ -49,25 +52,44 @@ class ModelBridge extends EventEmitter {
       return true;
     }
 
-    console.log(`[BRIDGE] Starting Python inference server on ${this.host}:${this.port}...`);
     this.state = 'starting';
 
-    try {
-      this._spawnProcess();
-      await this._waitForStartup();
-      this.state = 'running';
-      this.startTime = Date.now();
-      this.restartCount = 0;
-      this._startHealthChecks();
-      console.log('[BRIDGE] Python server is running');
-      this.emit('started');
-      return true;
-    } catch (err) {
-      console.error(`[BRIDGE] Failed to start: ${err.message}`);
-      this.state = 'error';
-      this.emit('error', err);
-      return false;
+    // Try a range of ports starting from the configured port
+    const startPort = this.port;
+    const endPort = startPort + 9; // Try up to 10 ports
+
+    for (let port = startPort; port <= endPort; port++) {
+      this.port = port;
+      this.baseUrl = `http://${this.host}:${this.port}`;
+      console.log(`[BRIDGE] Starting Python inference server on ${this.host}:${this.port}...`);
+
+      try {
+        this._spawnProcess();
+        await this._waitForStartup();
+        this.state = 'running';
+        this.startTime = Date.now();
+        this.restartCount = 0;
+        this._startHealthChecks();
+        console.log('[BRIDGE] Python server is running');
+        this.emit('started');
+        return true;
+      } catch (err) {
+        console.warn(`[BRIDGE] Failed on port ${port}: ${err.message}`);
+        // Kill the spawned process before trying next port
+        if (this.pythonProcess) {
+          this.pythonProcess.kill('SIGKILL');
+          this.pythonProcess = null;
+        }
+        if (port === endPort) {
+          console.error(`[BRIDGE] Failed to start on ports ${startPort}-${endPort}. Giving up.`);
+          this.state = 'error';
+          this.emit('error', err);
+          return false;
+        }
+      }
     }
+
+    return false;
   }
 
   /**
@@ -202,9 +224,11 @@ class ModelBridge extends EventEmitter {
    */
   _startHealthChecks() {
     this._stopHealthChecks();
+    this.consecutiveHealthFailures = 0;
     this.healthInterval = setInterval(async () => {
       try {
         const health = await this._fetchWithTimeout(`${this.baseUrl}/health`, 5000);
+        this.consecutiveHealthFailures = 0;
         this.lastHealthCheck = {
           timestamp: Date.now(),
           status: 'ok',
@@ -212,12 +236,26 @@ class ModelBridge extends EventEmitter {
         };
         this.emit('health', health);
       } catch (err) {
+        this.consecutiveHealthFailures++;
         this.lastHealthCheck = {
           timestamp: Date.now(),
           status: 'error',
           error: err.message
         };
-        console.warn(`[BRIDGE] Health check failed: ${err.message}`);
+        console.warn(`[BRIDGE] Health check failed (${this.consecutiveHealthFailures}/${MAX_HEALTH_FAILURES}): ${err.message}`);
+
+        // After N consecutive failures, kill and restart
+        if (this.consecutiveHealthFailures >= MAX_HEALTH_FAILURES) {
+          console.error(`[BRIDGE] ${MAX_HEALTH_FAILURES} consecutive health failures — killing Python process`);
+          this._stopHealthChecks();
+          if (this.pythonProcess) {
+            this.pythonProcess.kill('SIGKILL');
+            this.pythonProcess = null;
+          }
+          this.state = 'error';
+          this.emit('crash', { code: null, signal: 'health_timeout' });
+          this._attemptRestart();
+        }
       }
     }, HEALTH_CHECK_INTERVAL);
   }
@@ -240,6 +278,15 @@ class ModelBridge extends EventEmitter {
    */
   async generateMesh(imageBuffer, filename = 'input.png', jobId = null) {
     this._ensureRunning();
+
+    // Validate image before sending to Python
+    if (!imageBuffer || imageBuffer.length === 0) {
+      throw new Error('Image buffer is empty');
+    }
+    if (imageBuffer.length > MAX_IMAGE_SIZE) {
+      throw new Error(`Image too large: ${(imageBuffer.length / (1024 * 1024)).toFixed(1)} MB (max ${MAX_IMAGE_SIZE / (1024 * 1024)} MB)`);
+    }
+
     console.log(`[BRIDGE] Requesting mesh generation (${imageBuffer.length} bytes)...`);
 
     const formData = new FormData();

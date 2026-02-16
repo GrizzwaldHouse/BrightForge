@@ -488,11 +488,23 @@ class Forge3DPanel {
    * Toggle queue pause.
    */
   async _toggleQueuePause() {
-    // Toggle via API would go here — for now just visual
     const btn = document.getElementById('forge3d-queue-pause');
-    if (btn) {
-      const isPaused = btn.textContent.includes('Resume');
+    if (!btn) return;
+
+    const isPaused = btn.textContent.includes('Resume');
+    const endpoint = isPaused ? '/api/forge3d/queue/resume' : '/api/forge3d/queue/pause';
+
+    try {
+      const res = await fetch(endpoint, { method: 'POST' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(err.error || res.statusText);
+      }
+
       btn.textContent = isPaused ? 'Pause Queue' : 'Resume Queue';
+      this._showStatus(isPaused ? 'Queue resumed' : 'Queue paused', 'info');
+    } catch (err) {
+      this._showStatus(`Queue toggle failed: ${err.message}`, 'error');
     }
   }
 

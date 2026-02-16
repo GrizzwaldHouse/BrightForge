@@ -30,6 +30,15 @@ import uvicorn
 
 from model_manager import model_manager, ModelState
 
+# Resolve CUDA OOM exception type (safe import — works even without torch)
+try:
+    import torch
+    CudaOOMError = torch.cuda.OutOfMemoryError
+except (ImportError, AttributeError):
+    # If torch is not available, create a placeholder that never matches
+    class CudaOOMError(Exception):
+        pass
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -189,6 +198,10 @@ async def generate_mesh(
 
     except HTTPException:
         raise
+    except CudaOOMError as e:
+        logger.error(f'[SERVER] CUDA OOM during mesh generation: {e}')
+        model_manager._clear_vram()
+        raise HTTPException(507, 'GPU out of memory. Try a smaller image or wait for VRAM to free up.')
     except Exception as e:
         logger.error(f'[SERVER] Mesh generation error: {e}')
         raise HTTPException(500, f'Internal error: {str(e)}')
@@ -197,6 +210,8 @@ async def generate_mesh(
         # Clean up temp input
         if temp_image.exists():
             temp_image.unlink()
+        # Clean up stale temp files between generations
+        cleanup_temp_files()
 
 
 @app.post('/generate/image')
@@ -257,9 +272,16 @@ async def generate_image(
 
     except HTTPException:
         raise
+    except CudaOOMError as e:
+        logger.error(f'[SERVER] CUDA OOM during image generation: {e}')
+        model_manager._clear_vram()
+        raise HTTPException(507, 'GPU out of memory. Try smaller dimensions or fewer steps.')
     except Exception as e:
         logger.error(f'[SERVER] Image generation error: {e}')
         raise HTTPException(500, f'Internal error: {str(e)}')
+    finally:
+        # Clean up stale temp files between generations
+        cleanup_temp_files()
 
 
 @app.post('/generate/full')
@@ -313,9 +335,16 @@ async def generate_full(
 
     except HTTPException:
         raise
+    except CudaOOMError as e:
+        logger.error(f'[SERVER] CUDA OOM during full pipeline: {e}')
+        model_manager._clear_vram()
+        raise HTTPException(507, 'GPU out of memory. Try a simpler prompt or fewer steps.')
     except Exception as e:
         logger.error(f'[SERVER] Full pipeline error: {e}')
         raise HTTPException(500, f'Internal error: {str(e)}')
+    finally:
+        # Clean up stale temp files between generations
+        cleanup_temp_files()
 
 
 @app.get('/download/{job_id}/{filename}')

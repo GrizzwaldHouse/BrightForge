@@ -33,7 +33,12 @@
     "test-api": "node src/api/web-session.js --test",
     "dev": "node bin/brightforge-server.js",
     "desktop": "node bin/brightforge-desktop.js",
-    "build-desktop": "cd desktop && electron-builder"
+    "build-desktop": "cd desktop && electron-builder",
+    "test-bridge": "node src/forge3d/model-bridge.js --test",
+    "test-forge-session": "node src/forge3d/forge-session.js --test",
+    "test-forge-db": "node src/forge3d/database.js --test",
+    "test-project-manager": "node src/forge3d/project-manager.js --test",
+    "test-queue": "node src/forge3d/generation-queue.js --test"
   },
   "keywords": [
     "coding-agent",

@@ -9,7 +9,7 @@
  */
 
 import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { dirname, join, resolve } from 'path';
 import { mkdirSync, existsSync, writeFileSync, unlinkSync, readdirSync, statSync, rmSync } from 'fs';
 import forge3dDb from './database.js';
 
@@ -21,6 +21,20 @@ const OUTPUT_DIR = join(__dirname, '../../data/output');
 class ProjectManager {
   constructor() {
     this.outputDir = OUTPUT_DIR;
+  }
+
+  /**
+   * Validate that a resolved path is within the output directory.
+   * Prevents path traversal attacks (mirrors Python's download_file validation).
+   * @param {string} resolvedPath - Resolved absolute path
+   * @throws {Error} If path is outside the output directory
+   */
+  _validatePath(resolvedPath) {
+    const base = resolve(this.outputDir);
+    const target = resolve(resolvedPath);
+    if (!target.startsWith(base)) {
+      throw new Error('Path traversal detected');
+    }
   }
 
   /**
@@ -55,8 +69,9 @@ class ProjectManager {
 
     const project = forge3dDb.createProject(safeName, description);
 
-    // Create project output directory
+    // Create project output directory (with path traversal check)
     const projectDir = join(this.outputDir, project.id);
+    this._validatePath(projectDir);
     mkdirSync(projectDir, { recursive: true });
 
     console.log(`[PROJECT] Created: "${safeName}" (${project.id})`);
@@ -86,8 +101,9 @@ class ProjectManager {
     const project = forge3dDb.getProject(id);
     if (!project) throw new Error(`Project not found: ${id}`);
 
-    // Delete project directory
+    // Delete project directory (with path traversal check)
     const projectDir = join(this.outputDir, id);
+    this._validatePath(projectDir);
     if (existsSync(projectDir)) {
       rmSync(projectDir, { recursive: true, force: true });
     }
@@ -114,12 +130,14 @@ class ProjectManager {
     const project = forge3dDb.getProject(projectId);
     if (!project) throw new Error(`Project not found: ${projectId}`);
 
-    // Write file to project directory
+    // Write file to project directory (with path traversal check)
     const projectDir = join(this.outputDir, projectId);
+    this._validatePath(projectDir);
     mkdirSync(projectDir, { recursive: true });
 
     const safeName = data.name.replace(/[<>:"/\\|?*]/g, '_');
     const filePath = join(projectDir, `${safeName}${data.extension}`);
+    this._validatePath(filePath);
 
     writeFileSync(filePath, data.buffer);
 
@@ -190,6 +208,7 @@ class ProjectManager {
    */
   getProjectDiskUsage(projectId) {
     const projectDir = join(this.outputDir, projectId);
+    this._validatePath(projectDir);
     if (!existsSync(projectDir)) return { files: 0, totalBytes: 0 };
 
     let files = 0;

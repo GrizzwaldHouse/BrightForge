@@ -103,6 +103,12 @@ class Forge3DDatabase {
     // Run migrations
     this._migrate();
 
+    // Validate database integrity on startup
+    const healthy = this.integrityCheck();
+    if (healthy) {
+      console.log('[DB] Integrity check passed');
+    }
+
     console.log('[DB] Database ready');
   }
 

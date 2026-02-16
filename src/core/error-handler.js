@@ -12,7 +12,7 @@
  * - Process-level handlers (uncaughtException, unhandledRejection)
  * - Exponential backoff retry tracking
  *
- * Categories: provider_error, plan_error, apply_error, session_error, server_error, fatal
+ * Categories: provider_error, plan_error, apply_error, session_error, server_error, fatal, forge3d_error, bridge_error, gpu_error
  * Severity:   warning, error, fatal
  *
  * @author Marcus Daley (GrizzwaldHouse)
@@ -30,7 +30,7 @@ import telemetryBus from './telemetry-bus.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const VALID_CATEGORIES = ['provider_error', 'plan_error', 'apply_error', 'session_error', 'server_error', 'fatal'];
+const VALID_CATEGORIES = ['provider_error', 'plan_error', 'apply_error', 'session_error', 'server_error', 'fatal', 'forge3d_error', 'bridge_error', 'gpu_error'];
 const VALID_SEVERITIES = ['warning', 'error', 'fatal'];
 
 class ErrorHandler extends EventEmitter {
@@ -393,7 +393,7 @@ export default errorHandler;
 if (process.argv.includes('--test') && process.argv[1]?.endsWith('error-handler.js')) {
   console.log('Testing ErrorHandler...\n');
 
-  const { mkdtempSync, rmSync, readFileSync, existsSync: existsTest } = await import('fs');
+  const { mkdtempSync, rmSync, readFileSync } = await import('fs');
   const { tmpdir } = await import('os');
   const { join: joinPath } = await import('path');
 

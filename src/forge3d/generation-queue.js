@@ -15,6 +15,7 @@ import { EventEmitter } from 'events';
 import telemetryBus from '../core/telemetry-bus.js';
 import forge3dDb from './database.js';
 import forgeSession from './forge-session.js';
+import modelBridge from './model-bridge.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -34,7 +35,34 @@ class GenerationQueue extends EventEmitter {
   init() {
     forge3dDb.open();
     this._recoverIncomplete();
+    this._listenForBridgeCrash();
     console.log('[QUEUE] GenerationQueue initialized');
+  }
+
+  /**
+   * Listen for Python bridge crashes and mark active job as failed.
+   */
+  _listenForBridgeCrash() {
+    modelBridge.on('crash', ({ code, signal }) => {
+      if (this.currentJobId) {
+        console.error(`[QUEUE] Bridge crashed during job ${this.currentJobId} (code=${code}, signal=${signal})`);
+        forge3dDb.updateHistoryEntry(this.currentJobId, {
+          status: 'failed',
+          errorMessage: `Python process crashed (code=${code}, signal=${signal})`
+        });
+
+        telemetryBus.emit('forge3d_job_failed', {
+          jobId: this.currentJobId,
+          type: 'unknown',
+          error: 'Python process crashed'
+        });
+
+        this.emit('failed', { jobId: this.currentJobId, error: 'Python process crashed' });
+
+        this.processing = false;
+        this.currentJobId = null;
+      }
+    });
   }
 
   /**

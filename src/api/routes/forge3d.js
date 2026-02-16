@@ -224,6 +224,7 @@ router.get('/projects', (_req, res) => {
     const projects = projectManager.listProjects();
     res.json({ projects });
   } catch (err) {
+    errorHandler.report('forge3d_error', err, { endpoint: 'list_projects' });
     res.status(500).json({ error: err.message });
   }
 });
@@ -244,6 +245,7 @@ router.post('/projects', (req, res) => {
     const project = projectManager.createProject(name.trim(), description || '');
     res.status(201).json(project);
   } catch (err) {
+    errorHandler.report('forge3d_error', err, { endpoint: 'create_project' });
     res.status(500).json({ error: err.message });
   }
 });
@@ -278,6 +280,7 @@ router.delete('/projects/:id', (req, res) => {
     if (err.message.includes('not found')) {
       return res.status(404).json({ error: err.message });
     }
+    errorHandler.report('forge3d_error', err, { endpoint: 'delete_project', projectId: req.params.id });
     res.status(500).json({ error: err.message });
   }
 });
@@ -292,6 +295,7 @@ router.get('/projects/:id/assets', (req, res) => {
     const assets = projectManager.listAssets(req.params.id);
     res.json({ assets });
   } catch (err) {
+    errorHandler.report('forge3d_error', err, { endpoint: 'list_assets', projectId: req.params.id });
     res.status(500).json({ error: err.message });
   }
 });
@@ -311,6 +315,7 @@ router.delete('/assets/:id', (req, res) => {
     if (err.message.includes('not found')) {
       return res.status(404).json({ error: err.message });
     }
+    errorHandler.report('forge3d_error', err, { endpoint: 'delete_asset', assetId: req.params.id });
     res.status(500).json({ error: err.message });
   }
 });
@@ -333,6 +338,7 @@ router.get('/history', (req, res) => {
     });
     res.json({ history });
   } catch (err) {
+    errorHandler.report('forge3d_error', err, { endpoint: 'history' });
     res.status(500).json({ error: err.message });
   }
 });
@@ -347,6 +353,7 @@ router.get('/stats', (_req, res) => {
     const stats = projectManager.getStats();
     res.json(stats);
   } catch (err) {
+    errorHandler.report('forge3d_error', err, { endpoint: 'stats' });
     res.status(500).json({ error: err.message });
   }
 });
@@ -370,6 +377,7 @@ router.get('/bridge', async (_req, res) => {
 
     res.json({ bridge: info, health });
   } catch (err) {
+    errorHandler.report('bridge_error', err, { endpoint: 'bridge_status' });
     res.status(500).json({ error: err.message });
   }
 });
@@ -395,6 +403,7 @@ router.get('/queue', (_req, res) => {
     const status = generationQueue.getStatus();
     res.json(status);
   } catch (err) {
+    errorHandler.report('forge3d_error', err, { endpoint: 'queue_status' });
     res.status(500).json({ error: err.message });
   }
 });
