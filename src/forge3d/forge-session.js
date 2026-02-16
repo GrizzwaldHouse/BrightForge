@@ -24,6 +24,7 @@ import { EventEmitter } from 'events';
 import { fileURLToPath } from 'url';
 import telemetryBus from '../core/telemetry-bus.js';
 import modelBridge from './model-bridge.js';
+import forge3dDb from './database.js';
 
 const SESSION_STATES = {
   IDLE: 'idle',
@@ -36,7 +37,48 @@ const SESSION_STATES = {
 class ForgeSession extends EventEmitter {
   constructor() {
     super();
+    // TODO(phase8-high): Session persistence — hybrid in-memory + DB.
+    // Active sessions (idle/generating) stay in Map for fast access.
+    // Completed/failed sessions are persisted to the 'sessions' table (migration v2).
+    // On init(), recent completed sessions are loaded from DB into Map.
+    // On getStatus(), if not in Map, check DB (for sessions from previous server runs).
     this.sessions = new Map();
+    this._dbReady = false;
+  }
+
+  /**
+   * Initialize with database persistence.
+   * Loads recent completed sessions from DB into memory.
+   */
+  init() {
+    if (this._dbReady) return;
+    try {
+      // Load recent completed sessions from DB
+      const rows = forge3dDb.listSessions({ limit: 50 });
+      for (const row of rows) {
+        if (!this.sessions.has(row.id)) {
+          this.sessions.set(row.id, {
+            id: row.id,
+            type: row.type,
+            prompt: row.prompt,
+            imageBuffer: null,
+            filename: null,
+            options: {},
+            state: row.state,
+            createdAt: new Date(row.created_at).getTime(),
+            startedAt: row.started_at ? new Date(row.started_at).getTime() : null,
+            completedAt: row.completed_at ? new Date(row.completed_at).getTime() : null,
+            result: row.result_path ? { _persisted: true, resultPath: row.result_path, resultType: row.result_type } : null,
+            error: row.error,
+            progress: row.state === 'complete' ? { stage: 'complete', percent: 100 } : { stage: null, percent: 0 }
+          });
+        }
+      }
+      this._dbReady = true;
+      console.log(`[FORGE] Loaded ${rows.length} sessions from database`);
+    } catch (err) {
+      console.warn(`[FORGE] Session DB init failed (non-fatal): ${err.message}`);
+    }
   }
 
   /**
@@ -69,6 +111,21 @@ class ForgeSession extends EventEmitter {
     };
 
     this.sessions.set(id, session);
+
+    // Persist to DB if available
+    if (this._dbReady) {
+      try {
+        forge3dDb.createSession({
+          id,
+          type: params.type,
+          state: SESSION_STATES.IDLE,
+          prompt: params.prompt || null
+        });
+      } catch (err) {
+        console.warn(`[FORGE] Session DB write failed (non-fatal): ${err.message}`);
+      }
+    }
+
     console.log(`[FORGE] Session created: ${id} (type=${params.type})`);
     return id;
   }
@@ -118,6 +175,20 @@ class ForgeSession extends EventEmitter {
       const duration = session.completedAt - session.startedAt;
       console.log(`[FORGE] Session ${sessionId} complete in ${duration}ms`);
 
+      // TODO(phase8-high): Emit Python performance metrics to TelemetryBus.
+      // Parse generation time from result and emit for dashboard trends.
+      if (result.generationTime) {
+        telemetryBus.emit('forge3d_perf', {
+          sessionId,
+          type: session.type,
+          generationTime: result.generationTime,
+          fileSize: result.fileSize || 0
+        });
+      }
+
+      // Persist completion to DB
+      this._persistState(sessionId, SESSION_STATES.COMPLETE);
+
       telemetryBus.emit('forge3d_generation_complete', {
         sessionId,
         type: session.type,
@@ -135,6 +206,9 @@ class ForgeSession extends EventEmitter {
 
       const duration = session.completedAt - session.startedAt;
       console.error(`[FORGE] Session ${sessionId} failed after ${duration}ms: ${err.message}`);
+
+      // Persist failure to DB
+      this._persistState(sessionId, SESSION_STATES.FAILED, err.message);
 
       telemetryBus.emit('forge3d_generation_failed', {
         sessionId,
@@ -236,7 +310,28 @@ class ForgeSession extends EventEmitter {
    * @returns {Object|null} Session state info
    */
   getStatus(sessionId) {
-    const session = this.sessions.get(sessionId);
+    let session = this.sessions.get(sessionId);
+
+    // Fallback: check DB for sessions from previous server runs
+    if (!session && this._dbReady) {
+      try {
+        const row = forge3dDb.getSession(sessionId);
+        if (row) {
+          return {
+            id: row.id,
+            type: row.type,
+            state: row.state,
+            progress: row.state === 'complete' ? { stage: 'complete', percent: 100 } : { stage: null, percent: 0 },
+            createdAt: new Date(row.created_at).getTime(),
+            startedAt: row.started_at ? new Date(row.started_at).getTime() : null,
+            completedAt: row.completed_at ? new Date(row.completed_at).getTime() : null,
+            error: row.error,
+            hasResult: !!row.result_path
+          };
+        }
+      } catch (_e) { /* non-fatal */ }
+    }
+
     if (!session) return null;
 
     return {
@@ -281,6 +376,21 @@ class ForgeSession extends EventEmitter {
     const session = this.sessions.get(sessionId);
     if (!session || session.state !== SESSION_STATES.COMPLETE) return null;
     return session.result;
+  }
+
+  /**
+   * Persist session state to database.
+   * @param {string} sessionId
+   * @param {string} state
+   * @param {string} [error]
+   */
+  _persistState(sessionId, state, error = null) {
+    if (!this._dbReady) return;
+    try {
+      forge3dDb.updateSession(sessionId, { state, error });
+    } catch (err) {
+      console.warn(`[FORGE] Session persist failed (non-fatal): ${err.message}`);
+    }
   }
 
   /**

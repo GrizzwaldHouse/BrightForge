@@ -32,6 +32,11 @@ export function createServer(options = {}) {
   const app = express();
   const store = new SessionStore({ timeoutMs: options.sessionTimeout || 30 * 60 * 1000 });
 
+  // TODO(phase8-critical): ModelBridge is NOT started here on purpose.
+  // Python takes 30s+ to start (model loading), so we use lazy-init in forge3d routes.
+  // The bridge starts on first forge3d tab visit via ensureInit() in routes/forge3d.js.
+  // If eager startup is needed, add: import modelBridge; modelBridge.start().catch(console.error);
+
   console.log('[SERVER] Creating Express server...');
 
   // Middleware

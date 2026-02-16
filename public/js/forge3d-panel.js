@@ -10,11 +10,18 @@
 
 import { Forge3DViewer } from './forge3d-viewer.js';
 
+// TODO(phase8-medium): VRAM poll interval adapts to generation state.
+// Active generation: 5s for responsive feedback.
+// Idle: 10s to reduce network chatter.
+const VRAM_POLL_ACTIVE = 5000;
+const VRAM_POLL_IDLE = 10000;
+
 class Forge3DPanel {
   constructor() {
     this.viewer = null;
     this.currentProject = null;
     this.pollInterval = null;
+    this.vramInterval = null;
     this.activeSessionId = null;
     this.initialized = false;
   }
@@ -159,6 +166,7 @@ class Forge3DPanel {
       this.activeSessionId = data.sessionId;
       this._showStatus(`Queued (session: ${data.sessionId}). Generating...`, 'info');
       this._startPolling(data.sessionId);
+      this._startVramPolling(VRAM_POLL_ACTIVE); // Speed up during generation
 
     } catch (err) {
       this._showStatus(`Error: ${err.message}`, 'error');
@@ -233,6 +241,7 @@ class Forge3DPanel {
           this.pollInterval = null;
           this._showStatus(`Generation failed: ${status.error}`, 'error');
           this._setGenerating(false);
+          this._startVramPolling(VRAM_POLL_IDLE);
         } else {
           const stage = status.progress?.stage || status.state;
           const pct = status.progress?.percent || 0;
@@ -252,6 +261,7 @@ class Forge3DPanel {
     this._showStatus('Generation complete! Loading preview...', 'success');
     this._setGenerating(false);
     this._updateProgress(100);
+    this._startVramPolling(VRAM_POLL_IDLE); // Slow down after generation
 
     // Load model into viewer
     if (this.viewer) {
@@ -437,11 +447,13 @@ class Forge3DPanel {
   }
 
   /**
-   * Start VRAM polling.
+   * Start VRAM polling with adaptive interval.
+   * @param {number} [interval] - Poll interval in ms
    */
-  _startVramPolling() {
+  _startVramPolling(interval = VRAM_POLL_IDLE) {
+    if (this.vramInterval) clearInterval(this.vramInterval);
     this._updateVram();
-    setInterval(() => this._updateVram(), 10000);
+    this.vramInterval = setInterval(() => this._updateVram(), interval);
   }
 
   /**
@@ -513,15 +525,10 @@ class Forge3DPanel {
    */
   async downloadAsset(assetId) {
     try {
-      const res = await fetch(`/api/forge3d/projects/${document.getElementById('forge3d-project-select').value}/assets`);
-      const data = await res.json();
-      const asset = data.assets.find((a) => a.id === assetId);
-      if (!asset) return;
-
-      // Trigger download via hidden link
+      // Use dedicated asset download endpoint (reads file_path from DB)
       const a = document.createElement('a');
-      a.href = `/api/forge3d/download/${assetId}`;
-      a.download = asset.name;
+      a.href = `/api/forge3d/assets/${assetId}/download`;
+      a.download = '';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

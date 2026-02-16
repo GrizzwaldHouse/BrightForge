@@ -46,11 +46,12 @@ class ModelBridge extends EventEmitter {
     this.baseUrl = `http://${this.host}:${this.port}`;
     this.pythonProcess = null;
     this.healthInterval = null;
-    this.state = 'stopped'; // stopped | starting | running | error
+    this.state = 'stopped'; // stopped | starting | running | error | unavailable
     this.restartCount = 0;
     this.lastHealthCheck = null;
     this.startTime = null;
     this.consecutiveHealthFailures = 0;
+    this.unavailableReason = null;
   }
 
   /**
@@ -63,7 +64,24 @@ class ModelBridge extends EventEmitter {
       return true;
     }
 
+    if (this.state === 'unavailable') {
+      console.log(`[BRIDGE] Server unavailable: ${this.unavailableReason}`);
+      return false;
+    }
+
     this.state = 'starting';
+
+    // TODO(phase8-critical): Pre-flight environment checks before spawning Python.
+    // Validates: Python 3.10+, CUDA GPU, required packages (fastapi, diffusers, trimesh).
+    // On failure: sets state to 'unavailable' with clear reason, skips spawn.
+    const envCheck = await this._checkEnvironment();
+    if (!envCheck.ready) {
+      this.state = 'unavailable';
+      this.unavailableReason = envCheck.issues.join('; ');
+      console.error(`[BRIDGE] Environment not ready: ${this.unavailableReason}`);
+      this.emit('error', new Error(`Environment check failed: ${this.unavailableReason}`));
+      return false;
+    }
 
     // Try a range of ports starting from the configured port
     const startPort = this.port;
@@ -437,16 +455,98 @@ class ModelBridge extends EventEmitter {
    * Get bridge info for API consumers.
    */
   getInfo() {
-    return {
+    const info = {
       state: this.state,
       baseUrl: this.baseUrl,
       restartCount: this.restartCount,
       uptime: this.startTime ? Date.now() - this.startTime : 0,
       lastHealthCheck: this.lastHealthCheck
     };
+    if (this.state === 'unavailable' && this.unavailableReason) {
+      info.unavailableReason = this.unavailableReason;
+    }
+    return info;
   }
 
   // --- Internal Helpers ---
+
+  /**
+   * Pre-flight check: verify Python, CUDA, and required packages are available.
+   * @returns {Promise<{ready: boolean, issues: string[]}>}
+   */
+  async _checkEnvironment() {
+    const issues = [];
+
+    // Check Python version (3.10+)
+    try {
+      const pyVersion = await this._runCommand('python', ['--version']);
+      const match = pyVersion.match(/Python (\d+)\.(\d+)/);
+      if (match) {
+        const [, major, minor] = match.map(Number);
+        if (major < 3 || (major === 3 && minor < 10)) {
+          issues.push(`Python ${major}.${minor} found, need 3.10+`);
+        } else {
+          console.log(`[BRIDGE] Python ${major}.${minor} detected`);
+        }
+      } else {
+        issues.push('Could not parse Python version');
+      }
+    } catch (_e) {
+      issues.push('Python not found in PATH');
+    }
+
+    // Check CUDA availability
+    try {
+      const cudaCheck = await this._runCommand('python', [
+        '-c', 'import torch; print(torch.cuda.is_available())'
+      ]);
+      if (cudaCheck.trim() !== 'True') {
+        issues.push('CUDA not available (torch.cuda.is_available() = False)');
+      } else {
+        console.log('[BRIDGE] CUDA GPU detected');
+      }
+    } catch (_e) {
+      issues.push('PyTorch not installed or CUDA check failed');
+    }
+
+    // Check required Python packages
+    try {
+      await this._runCommand('python', [
+        '-c', 'import fastapi, diffusers, trimesh, PIL'
+      ]);
+      console.log('[BRIDGE] Required Python packages verified');
+    } catch (_e) {
+      issues.push('Missing Python packages (need: fastapi, diffusers, trimesh, Pillow)');
+    }
+
+    return { ready: issues.length === 0, issues };
+  }
+
+  /**
+   * Run a command and return stdout.
+   * @param {string} cmd - Command to run
+   * @param {string[]} args - Arguments
+   * @returns {Promise<string>} stdout
+   */
+  _runCommand(cmd, args) {
+    return new Promise((resolve, reject) => {
+      const proc = spawn(cmd, args, {
+        cwd: PYTHON_DIR,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true,
+        timeout: 15000
+      });
+      let stdout = '';
+      let stderr = '';
+      proc.stdout.on('data', (d) => { stdout += d.toString(); });
+      proc.stderr.on('data', (d) => { stderr += d.toString(); });
+      proc.on('close', (code) => {
+        if (code === 0) resolve(stdout);
+        else reject(new Error(stderr || `Exit code ${code}`));
+      });
+      proc.on('error', reject);
+    });
+  }
 
   _ensureRunning() {
     if (this.state !== 'running') {

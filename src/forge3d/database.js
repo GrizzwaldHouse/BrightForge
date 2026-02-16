@@ -79,6 +79,31 @@ const MIGRATIONS = [
       CREATE INDEX IF NOT EXISTS idx_history_status ON generation_history(status);
       CREATE INDEX IF NOT EXISTS idx_history_created ON generation_history(created_at);
     `
+  },
+  {
+    version: 2,
+    description: 'Add sessions table for persistence + retry_count to generation_history',
+    sql: `
+      CREATE TABLE IF NOT EXISTS sessions (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        state TEXT NOT NULL DEFAULT 'idle',
+        prompt TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        started_at TEXT,
+        completed_at TEXT,
+        result_path TEXT,
+        result_type TEXT,
+        file_size INTEGER,
+        error TEXT,
+        metadata TEXT DEFAULT '{}'
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_sessions_state ON sessions(state);
+      CREATE INDEX IF NOT EXISTS idx_sessions_created ON sessions(created_at);
+
+      ALTER TABLE generation_history ADD COLUMN retry_count INTEGER DEFAULT 0;
+    `
   }
 ];
 
@@ -398,6 +423,58 @@ class Forge3DDatabase {
       totalProjects,
       totalAssets
     };
+  }
+
+  // --- Sessions (Phase 8 persistence) ---
+
+  createSession(data) {
+    this.db.prepare(
+      'INSERT INTO sessions (id, type, state, prompt) VALUES (?, ?, ?, ?)'
+    ).run(data.id, data.type, data.state || 'idle', data.prompt || null);
+  }
+
+  getSession(id) {
+    return this.db.prepare('SELECT * FROM sessions WHERE id = ?').get(id) || null;
+  }
+
+  updateSession(id, updates) {
+    const fields = [];
+    const values = [];
+
+    if (updates.state !== undefined) {
+      fields.push('state = ?');
+      values.push(updates.state);
+    }
+    if (updates.error !== undefined) {
+      fields.push('error = ?');
+      values.push(updates.error);
+    }
+    if (updates.resultPath !== undefined) {
+      fields.push('result_path = ?');
+      values.push(updates.resultPath);
+    }
+    if (updates.resultType !== undefined) {
+      fields.push('result_type = ?');
+      values.push(updates.resultType);
+    }
+    if (updates.state === 'complete' || updates.state === 'failed') {
+      fields.push('completed_at = datetime(\'now\')');
+    }
+    if (updates.state && updates.state.startsWith('generating')) {
+      fields.push('started_at = datetime(\'now\')');
+    }
+
+    if (fields.length === 0) return;
+    values.push(id);
+    this.db.prepare(
+      `UPDATE sessions SET ${fields.join(', ')} WHERE id = ?`
+    ).run(...values);
+  }
+
+  listSessions(options = {}) {
+    let sql = 'SELECT * FROM sessions ORDER BY created_at DESC';
+    sql += ` LIMIT ${options.limit || 50}`;
+    return this.db.prepare(sql).all();
   }
 
   /**

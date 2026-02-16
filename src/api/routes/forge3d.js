@@ -38,6 +38,8 @@
  */
 
 import express from 'express';
+import { existsSync } from 'fs';
+import { extname } from 'path';
 import errorHandler from '../../core/error-handler.js';
 import telemetryBus from '../../core/telemetry-bus.js';
 import modelBridge from '../../forge3d/model-bridge.js';
@@ -48,13 +50,22 @@ import modelDownloader from '../../forge3d/model-downloader.js';
 
 const router = express.Router();
 
-// Initialize project manager, queue, and model downloader on first request
+// Initialize project manager, queue, model downloader, and bridge on first request.
+// Lazy-init pattern: Python server takes 30s+ to start, so we don't block Express boot.
+// Bridge starts on first forge3d tab visit (GET /bridge, /projects, /generate, etc.).
 let initialized = false;
 function ensureInit() {
   if (!initialized) {
     projectManager.init();
     generationQueue.init();
     modelDownloader.initialize();
+
+    // Start Python inference bridge (fire-and-forget — logs errors internally)
+    modelBridge.start().catch((err) => {
+      console.error(`[ROUTE] ModelBridge startup failed: ${err.message}`);
+      errorHandler.report('bridge_error', err, { endpoint: 'ensureInit' });
+    });
+
     initialized = true;
   }
 }
@@ -333,6 +344,33 @@ router.delete('/assets/:id', (req, res) => {
       return res.status(404).json({ error: err.message });
     }
     errorHandler.report('forge3d_error', err, { endpoint: 'delete_asset', assetId: req.params.id });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/forge3d/assets/:id/download
+ * Download an asset file by asset ID (reads file_path from database).
+ */
+router.get('/assets/:id/download', (req, res) => {
+  ensureInit();
+  try {
+    const asset = projectManager.getAsset(req.params.id);
+    if (!asset) {
+      return res.status(404).json({ error: 'Asset not found' });
+    }
+    if (!asset.file_path) {
+      return res.status(404).json({ error: 'Asset has no file' });
+    }
+    if (!existsSync(asset.file_path)) {
+      return res.status(404).json({ error: 'Asset file missing from disk' });
+    }
+
+    const ext = extname(asset.file_path);
+    const filename = asset.name.endsWith(ext) ? asset.name : `${asset.name}${ext}`;
+    res.download(asset.file_path, filename);
+  } catch (err) {
+    errorHandler.report('forge3d_error', err, { endpoint: 'download_asset', assetId: req.params.id });
     res.status(500).json({ error: err.message });
   }
 });

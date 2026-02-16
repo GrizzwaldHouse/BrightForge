@@ -20,7 +20,8 @@
  */
 
 import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import { dirname, join } from 'path';
+import { readdirSync, statSync, unlinkSync, existsSync } from 'fs';
 import { EventEmitter } from 'events';
 import telemetryBus from '../core/telemetry-bus.js';
 import forge3dDb from './database.js';
@@ -29,6 +30,14 @@ import modelBridge from './model-bridge.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// TODO(phase8-high): Queue retry and rate-limiting constants.
+// MAX_RETRIES: failed jobs re-enqueue up to this many times before permanent failure.
+// MAX_QUEUE_SIZE: reject new jobs with 429 when queue exceeds this size.
+const MAX_RETRIES = 2;
+const MAX_QUEUE_SIZE = 20;
+const TEMP_DIR = join(__dirname, '../../data/temp');
+const TEMP_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
 
 class GenerationQueue extends EventEmitter {
   constructor() {
@@ -45,6 +54,7 @@ class GenerationQueue extends EventEmitter {
   init() {
     forge3dDb.open();
     this._recoverIncomplete();
+    this._cleanupTempFiles();
     this._listenForBridgeCrash();
     console.log('[QUEUE] GenerationQueue initialized');
   }
@@ -106,6 +116,12 @@ class GenerationQueue extends EventEmitter {
    * @returns {Object} Queued job info
    */
   enqueue(params) {
+    // Rate limiting: reject if queue is full
+    const currentSize = this._getQueuePosition() + (this.processing ? 1 : 0);
+    if (currentSize >= MAX_QUEUE_SIZE) {
+      throw new Error(`Queue full (${currentSize}/${MAX_QUEUE_SIZE}). Try again later.`);
+    }
+
     const histId = forge3dDb.createHistoryEntry({
       projectId: params.projectId || null,
       type: params.type,
@@ -213,6 +229,38 @@ class GenerationQueue extends EventEmitter {
   }
 
   /**
+   * Clean up orphaned temp files older than TEMP_MAX_AGE_MS.
+   * Called on init() to remove leftovers from crashed generations.
+   */
+  _cleanupTempFiles() {
+    if (!existsSync(TEMP_DIR)) return;
+
+    try {
+      const files = readdirSync(TEMP_DIR);
+      const cutoff = Date.now() - TEMP_MAX_AGE_MS;
+      let cleaned = 0;
+
+      for (const file of files) {
+        if (file === '.gitkeep') continue;
+        const filePath = join(TEMP_DIR, file);
+        try {
+          const stat = statSync(filePath);
+          if (stat.mtimeMs < cutoff) {
+            unlinkSync(filePath);
+            cleaned++;
+          }
+        } catch (_e) { /* skip files we can't stat */ }
+      }
+
+      if (cleaned > 0) {
+        console.log(`[QUEUE] Cleaned up ${cleaned} orphaned temp file(s)`);
+      }
+    } catch (err) {
+      console.warn(`[QUEUE] Temp cleanup failed (non-fatal): ${err.message}`);
+    }
+  }
+
+  /**
    * Get position of next queued job.
    */
   _getQueuePosition() {
@@ -295,18 +343,44 @@ class GenerationQueue extends EventEmitter {
     } catch (err) {
       console.error(`[QUEUE] Job ${job.id} failed: ${err.message}`);
 
-      forge3dDb.updateHistoryEntry(job.id, {
-        status: 'failed',
-        errorMessage: err.message
-      });
+      // Retry logic: re-enqueue if under MAX_RETRIES
+      const entry = forge3dDb.getHistoryEntry(job.id);
+      const retryCount = entry?.retry_count || 0;
 
-      telemetryBus.emit('forge3d_job_failed', {
-        jobId: job.id,
-        type: job.type,
-        error: err.message
-      });
+      if (retryCount < MAX_RETRIES) {
+        console.log(`[QUEUE] Retrying job ${job.id} (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+        forge3dDb.updateHistoryEntry(job.id, {
+          status: 'queued',
+          errorMessage: `Retry ${retryCount + 1}: ${err.message}`
+        });
+        // Increment retry_count directly
+        forge3dDb.db.prepare(
+          'UPDATE generation_history SET retry_count = ? WHERE id = ?'
+        ).run(retryCount + 1, job.id);
 
-      this.emit('failed', { jobId: job.id, error: err.message });
+        telemetryBus.emit('forge3d_job_retry', {
+          jobId: job.id,
+          type: job.type,
+          attempt: retryCount + 1,
+          error: err.message
+        });
+      } else {
+        forge3dDb.updateHistoryEntry(job.id, {
+          status: 'failed',
+          errorMessage: retryCount > 0
+            ? `Failed after ${retryCount} retries: ${err.message}`
+            : err.message
+        });
+
+        telemetryBus.emit('forge3d_job_failed', {
+          jobId: job.id,
+          type: job.type,
+          error: err.message,
+          retries: retryCount
+        });
+
+        this.emit('failed', { jobId: job.id, error: err.message });
+      }
     }
 
     this.processing = false;
