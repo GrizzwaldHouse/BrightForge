@@ -23,11 +23,12 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { mkdirSync, existsSync } from 'fs';
 import { randomUUID } from 'crypto';
+import forge3dConfig from './config-loader.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const DEFAULT_DB_PATH = join(__dirname, '../../data/forge3d.db');
+const DEFAULT_DB_PATH = forge3dConfig.resolvePath(forge3dConfig.database.path);
 
 // Schema migrations
 const MIGRATIONS = [
@@ -130,8 +131,8 @@ class Forge3DDatabase {
     this.db = new Database(this.dbPath);
 
     // Enable WAL mode for concurrent reads
-    this.db.pragma('journal_mode = WAL');
-    this.db.pragma('busy_timeout = 5000');
+    this.db.pragma('journal_mode = ' + forge3dConfig.database.journal_mode);
+    this.db.pragma('busy_timeout = ' + forge3dConfig.database.busy_timeout_ms);
     this.db.pragma('foreign_keys = ON');
 
     // Run migrations
@@ -203,7 +204,7 @@ class Forge3DDatabase {
   // --- Projects ---
 
   createProject(name, description = '') {
-    const id = randomUUID().slice(0, 12);
+    const id = randomUUID().slice(0, forge3dConfig.session.id_length);
     this.db.prepare(
       'INSERT INTO projects (id, name, description) VALUES (?, ?, ?)'
     ).run(id, name, description);
@@ -255,7 +256,7 @@ class Forge3DDatabase {
   // --- Assets ---
 
   createAsset(projectId, data) {
-    const id = randomUUID().slice(0, 12);
+    const id = randomUUID().slice(0, forge3dConfig.session.id_length);
     const metadata = typeof data.metadata === 'string' ? data.metadata : JSON.stringify(data.metadata || {});
 
     this.db.prepare(
@@ -298,7 +299,7 @@ class Forge3DDatabase {
   // --- Generation History ---
 
   createHistoryEntry(data) {
-    const id = randomUUID().slice(0, 12);
+    const id = randomUUID().slice(0, forge3dConfig.session.id_length);
     const metadata = typeof data.metadata === 'string' ? data.metadata : JSON.stringify(data.metadata || {});
 
     this.db.prepare(

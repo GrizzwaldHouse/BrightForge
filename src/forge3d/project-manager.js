@@ -23,11 +23,13 @@ import { fileURLToPath } from 'url';
 import { dirname, join, resolve } from 'path';
 import { mkdirSync, existsSync, writeFileSync, unlinkSync, readdirSync, statSync, rmSync } from 'fs';
 import forge3dDb from './database.js';
+import forge3dConfig from './config-loader.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const OUTPUT_DIR = join(__dirname, '../../data/output');
+const OUTPUT_DIR = forge3dConfig.resolvePath(forge3dConfig.project.output_dir);
+const SANITIZE_RE = new RegExp(forge3dConfig.project.sanitize_pattern, 'g');
 
 class ProjectManager {
   constructor() {
@@ -73,7 +75,7 @@ class ProjectManager {
     }
 
     // Sanitize name for directory safety
-    const safeName = name.replace(/[<>:"/\\|?*]/g, '_').trim();
+    const safeName = name.replace(SANITIZE_RE, '_').trim();
     if (safeName.length === 0) {
       throw new Error('Project name contains only invalid characters');
     }
@@ -102,7 +104,7 @@ class ProjectManager {
     if (!project) throw new Error(`Project not found: ${id}`);
 
     if (updates.name) {
-      updates.name = updates.name.replace(/[<>:"/\\|?*]/g, '_').trim();
+      updates.name = updates.name.replace(SANITIZE_RE, '_').trim();
     }
 
     return forge3dDb.updateProject(id, updates);
@@ -146,7 +148,7 @@ class ProjectManager {
     this._validatePath(projectDir);
     mkdirSync(projectDir, { recursive: true });
 
-    const safeName = data.name.replace(/[<>:"/\\|?*]/g, '_');
+    const safeName = data.name.replace(SANITIZE_RE, '_');
     const filePath = join(projectDir, `${safeName}${data.extension}`);
     this._validatePath(filePath);
 

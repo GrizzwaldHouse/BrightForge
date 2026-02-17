@@ -1,0 +1,98 @@
+# Forge3D Configuration
+# All values can be adjusted without code changes.
+# Node.js modules load this via src/forge3d/config-loader.js
+
+python_server:
+  default_port: 8001
+  default_host: "127.0.0.1"
+  port_range_start: 8001
+  port_range_end: 8010
+  startup_timeout_ms: 30000
+  startup_poll_ms: 1000
+  max_restart_attempts: 3
+  restart_cooldown_ms: 5000
+  shutdown_grace_ms: 5000
+  command_timeout_ms: 15000
+
+health_check:
+  interval_ms: 10000
+  timeout_ms: 5000
+  max_consecutive_failures: 3
+
+generation:
+  timeout_ms: 180000
+  full_pipeline_multiplier: 2
+  max_image_size_bytes: 20971520  # 20 MB
+  min_prompt_length: 3
+  max_prompt_length: 2000
+  download_timeout_ms: 30000
+
+database:
+  path: "data/forge3d.db"
+  journal_mode: "WAL"
+  busy_timeout_ms: 5000
+
+project:
+  output_dir: "data/output"
+  sanitize_pattern: "[<>:\"/\\\\|?*]"
+
+queue:
+  process_interval_ms: 100
+  max_size: 20
+  max_retries: 2
+  temp_dir: "data/temp"
+  temp_max_age_ms: 3600000  # 1 hour
+
+api:
+  raw_body_limit: "20mb"
+  history_default_limit: 50
+
+session:
+  id_length: 12
+  default_list_limit: 20
+  cleanup_max_age_ms: 3600000  # 1 hour
+  progress:
+    image_start_pct: 10
+    mesh_start_pct: 10
+    mesh_end_pct: 100
+    mesh_after_image_pct: 80
+
+viewer:
+  default_width: 600
+  default_height: 400
+  background_color: "0x1a1a2e"
+  camera:
+    fov: 45
+    near: 0.1
+    far: 1000
+    default_position: [3, 2, 3]
+  frame_distance_multiplier: 1.5
+  frame_position_offsets: [0.7, 0.5, 0.7]
+  orbit_controls:
+    damping_factor: 0.05
+    min_distance: 0.5
+    max_distance: 50
+  lights:
+    ambient:
+      color: "0x888fff"
+      intensity: 0.5
+    directional:
+      color: "0xffffff"
+      intensity: 1.0
+      position: [5, 10, 7]
+    fill:
+      color: "0x8888ff"
+      intensity: 0.3
+      position: [-5, 3, -5]
+  grid:
+    size: 10
+    divisions: 20
+    color1: "0x3a3a54"
+    color2: "0x252941"
+
+ui:
+  generation_polling_ms: 2000
+  vram_polling_ms: 10000
+  vram_thresholds:
+    ok_pct: 70
+    warn_pct: 85

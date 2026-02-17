@@ -1,0 +1,56 @@
+# Forge3D Python Inference Server Configuration
+# All values can be adjusted without code changes.
+# Loaded by inference_server.py and model_manager.py
+
+server:
+  default_port: 8001
+  default_host: "127.0.0.1"
+
+paths:
+  output_dir: "data/output"
+  temp_dir: "data/temp"
+  models_dir: "data/models"
+
+models:
+  instantmesh:
+    repo_id: "TencentARC/InstantMesh"
+    required_vram_gb: 6.0
+    input_dimensions: [256, 256]
+    inference_steps: 75
+    size_mb: 1500
+  sdxl:
+    repo_id: "stabilityai/stable-diffusion-xl-base-1.0"
+    required_vram_gb: 8.0
+    guidance_scale: 7.5
+    memory_optimization: "attention_slicing"
+
+vram:
+  buffer_gb: 2.0
+  generation_count_before_restart: 20
+
+generation:
+  accepted_mime_types:
+    - "image/png"
+    - "image/jpeg"
+    - "image/webp"
+  max_upload_size_bytes: 20971520  # 20 MB
+  max_image_dimension: 4096
+  min_image_dimension: 512
+  min_steps: 10
+  max_steps: 100
+  min_prompt_length: 3
+  max_prompt_length: 2000
+
+cleanup:
+  temp_file_max_age_hours: 24
+
+environment:
+  min_python_version: [3, 10]
+  min_vram_gb: 8
+
+setup:
+  install_timeout_seconds: 600
+  model_download_timeout_seconds: 1800
+
+validation:
+  min_mesh_file_size_bytes: 100

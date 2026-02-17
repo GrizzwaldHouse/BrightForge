@@ -24,18 +24,53 @@ class Forge3DPanel {
     this.vramInterval = null;
     this.activeSessionId = null;
     this.initialized = false;
+    this._config = null;
+  }
+
+  /**
+   * Fetch viewer and UI configuration from the server.
+   * Silently falls back to defaults if the request fails.
+   */
+  async _loadConfig() {
+    try {
+      const res = await fetch('/api/forge3d/config');
+      if (res.ok) {
+        this._config = await res.json();
+        console.log('[FORGE3D-PANEL] Config loaded from server');
+      }
+    } catch (_e) {
+      console.warn('[FORGE3D-PANEL] Could not load config, using defaults');
+    }
+  }
+
+  /**
+   * Read a nested config value with a default fallback.
+   * @param {string} path - Dot-separated key path (e.g. 'ui.vram_polling_ms')
+   * @param {*} defaultVal - Value to return when path is missing
+   */
+  _cfg(path, defaultVal) {
+    if (!this._config) return defaultVal;
+    const parts = path.split('.');
+    let val = this._config;
+    for (const p of parts) {
+      if (val == null || typeof val !== 'object') return defaultVal;
+      val = val[p];
+    }
+    return val != null ? val : defaultVal;
   }
 
   /**
    * Initialize the panel when tab is activated.
    */
-  init() {
+  async init() {
     if (this.initialized) return;
 
     const panel = document.getElementById('forge3d-panel');
     if (!panel) return;
 
-    this.viewer = new Forge3DViewer('forge3d-viewport');
+    await this._loadConfig();
+
+    this.viewer = new Forge3DViewer('forge3d-viewport', this._cfg('viewer', {}));
 
     this._bindEvents();
     this._loadProjects();
@@ -139,8 +174,9 @@ class Forge3DPanel {
     const projectSelect = document.getElementById('forge3d-project-select');
     const projectId = projectSelect?.value || null;
 
-    if ((type === 'image' || type === 'full') && (!prompt || prompt.length < 3)) {
-      this._showStatus('Enter a prompt (at least 3 characters)', 'error');
+    const minPromptLen = this._cfg('generation.min_prompt_length', 3);
+    if ((type === 'image' || type === 'full') && (!prompt || prompt.length < minPromptLen)) {
+      this._showStatus(`Enter a prompt (at least ${minPromptLen} characters)`, 'error');
       return;
     }
 
@@ -186,8 +222,10 @@ class Forge3DPanel {
       return;
     }
 
-    if (file.size > 20 * 1024 * 1024) {
-      this._showStatus('Image too large (max 20 MB)', 'error');
+    const maxBytes = this._cfg('generation.max_image_size_bytes', 20 * 1024 * 1024);
+    if (file.size > maxBytes) {
+      const maxMb = (maxBytes / (1024 * 1024)).toFixed(0);
+      this._showStatus(`Image too large (max ${maxMb} MB)`, 'error');
       return;
     }
 
@@ -225,6 +263,7 @@ class Forge3DPanel {
   _startPolling(sessionId) {
     if (this.pollInterval) clearInterval(this.pollInterval);
 
+    const pollMs = this._cfg('ui.generation_polling_ms', 2000);
     this.pollInterval = setInterval(async () => {
       try {
         const res = await fetch(`/api/forge3d/status/${sessionId}`);
@@ -251,7 +290,7 @@ class Forge3DPanel {
       } catch (_err) {
         // Network error, keep polling
       }
-    }, 2000);
+    }, pollMs);
   }
 
   /**
@@ -448,12 +487,13 @@ class Forge3DPanel {
 
   /**
    * Start VRAM polling with adaptive interval.
-   * @param {number} [interval] - Poll interval in ms
+   * @param {number} [interval] - Poll interval in ms; defaults to config or VRAM_POLL_IDLE
    */
-  _startVramPolling(interval = VRAM_POLL_IDLE) {
+  _startVramPolling(interval = null) {
+    const ms = interval !== null ? interval : this._cfg('ui.vram_polling_ms', VRAM_POLL_IDLE);
     if (this.vramInterval) clearInterval(this.vramInterval);
     this._updateVram();
-    this.vramInterval = setInterval(() => this._updateVram(), interval);
+    this.vramInterval = setInterval(() => this._updateVram(), ms);
   }
 
   /**
@@ -479,9 +519,11 @@ class Forge3DPanel {
         vramText.textContent = `${used.toFixed(1)} / ${total.toFixed(1)} GB`;
 
         // Color coding
-        if (pct < 70) {
+        const okPct = this._cfg('ui.vram_thresholds.ok_pct', 70);
+        const warnPct = this._cfg('ui.vram_thresholds.warn_pct', 85);
+        if (pct < okPct) {
           vramBar.className = 'vram-fill vram-ok';
-        } else if (pct < 85) {
+        } else if (pct < warnPct) {
           vramBar.className = 'vram-fill vram-warn';
         } else {
           vramBar.className = 'vram-fill vram-danger';

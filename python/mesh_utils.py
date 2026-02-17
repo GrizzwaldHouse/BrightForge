@@ -4,10 +4,24 @@ ForgePipeline Mesh Utilities
 Basic mesh validation and info extraction for generated GLB files.
 """
 
+import os
 import logging
+import yaml
 from pathlib import Path
 
 logger = logging.getLogger('forge3d.mesh_utils')
+
+# Load configuration
+_config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.yaml')
+try:
+    with open(_config_path) as _f:
+        CONFIG = yaml.safe_load(_f)
+except Exception:
+    CONFIG = {}
+
+def _cfg(section, key, default=None):
+    """Get a config value with fallback to default."""
+    return CONFIG.get(section, {}).get(key, default)
 
 
 def validate_mesh(file_path):
@@ -37,7 +51,8 @@ def validate_mesh(file_path):
     result['file_size_bytes'] = file_path.stat().st_size
 
     # Minimum file size check (GLB header is 12 bytes)
-    if result['file_size_bytes'] < 100:
+    min_size = _cfg('validation', 'min_mesh_file_size_bytes', 100)
+    if result['file_size_bytes'] < min_size:
         result['errors'].append(f'File too small ({result["file_size_bytes"]} bytes)')
         return result
 

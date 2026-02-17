@@ -1,7 +1,7 @@
 {
   "name": "brightforge",
-  "version": "3.1.0-alpha",
-  "description": "BrightForge - Hybrid developer coding + design agent with local LLMs, cloud fallback, and AI-powered image generation",
+  "version": "4.0.0-alpha",
+  "description": "BrightForge - Hybrid developer coding + design + 3D generation agent with local LLMs, cloud fallback, and GPU-accelerated mesh generation",
   "main": "bin/brightforge.js",
   "type": "module",
   "bin": {
@@ -39,7 +39,8 @@
     "test-forge-db": "node src/forge3d/database.js --test",
     "test-project-manager": "node src/forge3d/project-manager.js --test",
     "test-queue": "node src/forge3d/generation-queue.js --test",
-    "test-downloader": "node src/forge3d/model-downloader.js --test"
+    "test-downloader": "node src/forge3d/model-downloader.js --test",
+    "test-config": "node src/forge3d/config-loader.js --test"
   },
   "keywords": [
     "coding-agent",

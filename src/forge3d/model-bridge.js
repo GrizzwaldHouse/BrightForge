@@ -23,26 +23,18 @@ import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { EventEmitter } from 'events';
+import forge3dConfig from './config-loader.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const PYTHON_DIR = join(__dirname, '../../python');
-const DEFAULT_PORT = 8001;
-const DEFAULT_HOST = '127.0.0.1';
-const HEALTH_CHECK_INTERVAL = 10000; // 10 sec
-const STARTUP_TIMEOUT = 30000; // 30 sec
-const GENERATION_TIMEOUT = 180000; // 180 sec
-const MAX_RESTART_ATTEMPTS = 3;
-const RESTART_COOLDOWN = 5000; // 5 sec
-const MAX_IMAGE_SIZE = 20 * 1024 * 1024; // 20 MB (matches Python limit)
-const MAX_HEALTH_FAILURES = 3; // Kill + restart after N consecutive failures
 
 class ModelBridge extends EventEmitter {
   constructor(options = {}) {
     super();
-    this.host = options.host || DEFAULT_HOST;
-    this.port = options.port || DEFAULT_PORT;
+    this.host = options.host || forge3dConfig.pythonServer.default_host;
+    this.port = options.port || forge3dConfig.pythonServer.default_port;
     this.baseUrl = `http://${this.host}:${this.port}`;
     this.pythonProcess = null;
     this.healthInterval = null;
@@ -85,7 +77,7 @@ class ModelBridge extends EventEmitter {
 
     // Try a range of ports starting from the configured port
     const startPort = this.port;
-    const endPort = startPort + 9; // Try up to 10 ports
+    const endPort = forge3dConfig.pythonServer.port_range_end;
 
     for (let port = startPort; port <= endPort; port++) {
       this.port = port;
@@ -130,7 +122,7 @@ class ModelBridge extends EventEmitter {
 
     if (this.pythonProcess) {
       this.pythonProcess.kill('SIGTERM');
-      // Give it 5 seconds to shut down gracefully
+      // Give it time to shut down gracefully
       await new Promise((resolve) => {
         const timeout = setTimeout(() => {
           if (this.pythonProcess) {
@@ -138,7 +130,7 @@ class ModelBridge extends EventEmitter {
             this.pythonProcess.kill('SIGKILL');
           }
           resolve();
-        }, 5000);
+        }, forge3dConfig.pythonServer.shutdown_grace_ms);
 
         if (this.pythonProcess) {
           this.pythonProcess.on('exit', () => {
@@ -216,7 +208,7 @@ class ModelBridge extends EventEmitter {
   async _waitForStartup() {
     const start = Date.now();
 
-    while (Date.now() - start < STARTUP_TIMEOUT) {
+    while (Date.now() - start < forge3dConfig.pythonServer.startup_timeout_ms) {
       try {
         const health = await this._fetchWithTimeout(`${this.baseUrl}/health`, 3000);
         if (health && health.status === 'healthy') {
@@ -228,23 +220,23 @@ class ModelBridge extends EventEmitter {
       await new Promise((r) => setTimeout(r, 1000));
     }
 
-    throw new Error(`Python server did not start within ${STARTUP_TIMEOUT / 1000}s`);
+    throw new Error(`Python server did not start within ${forge3dConfig.pythonServer.startup_timeout_ms / 1000}s`);
   }
 
   /**
    * Auto-restart on crash.
    */
   async _attemptRestart() {
-    if (this.restartCount >= MAX_RESTART_ATTEMPTS) {
-      console.error(`[BRIDGE] Max restart attempts (${MAX_RESTART_ATTEMPTS}) reached. Giving up.`);
+    if (this.restartCount >= forge3dConfig.pythonServer.max_restart_attempts) {
+      console.error(`[BRIDGE] Max restart attempts (${forge3dConfig.pythonServer.max_restart_attempts}) reached. Giving up.`);
       this.emit('restart_failed');
       return;
     }
 
     this.restartCount++;
-    console.log(`[BRIDGE] Attempting restart ${this.restartCount}/${MAX_RESTART_ATTEMPTS} in ${RESTART_COOLDOWN / 1000}s...`);
+    console.log(`[BRIDGE] Attempting restart ${this.restartCount}/${forge3dConfig.pythonServer.max_restart_attempts} in ${forge3dConfig.pythonServer.restart_cooldown_ms / 1000}s...`);
 
-    await new Promise((r) => setTimeout(r, RESTART_COOLDOWN));
+    await new Promise((r) => setTimeout(r, forge3dConfig.pythonServer.restart_cooldown_ms));
     await this.start();
   }
 
@@ -256,7 +248,7 @@ class ModelBridge extends EventEmitter {
     this.consecutiveHealthFailures = 0;
     this.healthInterval = setInterval(async () => {
       try {
-        const health = await this._fetchWithTimeout(`${this.baseUrl}/health`, 5000);
+        const health = await this._fetchWithTimeout(`${this.baseUrl}/health`, forge3dConfig.healthCheck.timeout_ms);
         this.consecutiveHealthFailures = 0;
         this.lastHealthCheck = {
           timestamp: Date.now(),
@@ -271,11 +263,11 @@ class ModelBridge extends EventEmitter {
           status: 'error',
           error: err.message
         };
-        console.warn(`[BRIDGE] Health check failed (${this.consecutiveHealthFailures}/${MAX_HEALTH_FAILURES}): ${err.message}`);
+        console.warn(`[BRIDGE] Health check failed (${this.consecutiveHealthFailures}/${forge3dConfig.healthCheck.max_consecutive_failures}): ${err.message}`);
 
         // After N consecutive failures, kill and restart
-        if (this.consecutiveHealthFailures >= MAX_HEALTH_FAILURES) {
-          console.error(`[BRIDGE] ${MAX_HEALTH_FAILURES} consecutive health failures — killing Python process`);
+        if (this.consecutiveHealthFailures >= forge3dConfig.healthCheck.max_consecutive_failures) {
+          console.error(`[BRIDGE] ${forge3dConfig.healthCheck.max_consecutive_failures} consecutive health failures — killing Python process`);
           this._stopHealthChecks();
           if (this.pythonProcess) {
             this.pythonProcess.kill('SIGKILL');
@@ -286,7 +278,7 @@ class ModelBridge extends EventEmitter {
           this._attemptRestart();
         }
       }
-    }, HEALTH_CHECK_INTERVAL);
+    }, forge3dConfig.healthCheck.interval_ms);
   }
 
   _stopHealthChecks() {
@@ -312,8 +304,8 @@ class ModelBridge extends EventEmitter {
     if (!imageBuffer || imageBuffer.length === 0) {
       throw new Error('Image buffer is empty');
     }
-    if (imageBuffer.length > MAX_IMAGE_SIZE) {
-      throw new Error(`Image too large: ${(imageBuffer.length / (1024 * 1024)).toFixed(1)} MB (max ${MAX_IMAGE_SIZE / (1024 * 1024)} MB)`);
+    if (imageBuffer.length > forge3dConfig.generation.max_image_size_bytes) {
+      throw new Error(`Image too large: ${(imageBuffer.length / (1024 * 1024)).toFixed(1)} MB (max ${forge3dConfig.generation.max_image_size_bytes / (1024 * 1024)} MB)`);
     }
 
     console.log(`[BRIDGE] Requesting mesh generation (${imageBuffer.length} bytes)...`);
@@ -325,7 +317,7 @@ class ModelBridge extends EventEmitter {
     const response = await this._fetchRaw(`${this.baseUrl}/generate/mesh`, {
       method: 'POST',
       body: formData,
-      signal: AbortSignal.timeout(GENERATION_TIMEOUT)
+      signal: AbortSignal.timeout(forge3dConfig.generation.timeout_ms)
     });
 
     if (!response.ok) {
@@ -364,7 +356,7 @@ class ModelBridge extends EventEmitter {
     const response = await this._fetchRaw(`${this.baseUrl}/generate/image`, {
       method: 'POST',
       body: formData,
-      signal: AbortSignal.timeout(GENERATION_TIMEOUT)
+      signal: AbortSignal.timeout(forge3dConfig.generation.timeout_ms)
     });
 
     if (!response.ok) {
@@ -401,7 +393,7 @@ class ModelBridge extends EventEmitter {
     const response = await this._fetchRaw(`${this.baseUrl}/generate/full`, {
       method: 'POST',
       body: formData,
-      signal: AbortSignal.timeout(GENERATION_TIMEOUT * 2) // Full pipeline gets double timeout
+      signal: AbortSignal.timeout(forge3dConfig.generation.timeout_ms * forge3dConfig.generation.full_pipeline_multiplier)
     });
 
     if (!response.ok) {
@@ -425,7 +417,7 @@ class ModelBridge extends EventEmitter {
 
     const response = await this._fetchRaw(
       `${this.baseUrl}/download/${jobId}/${filename}`,
-      { signal: AbortSignal.timeout(30000) }
+      { signal: AbortSignal.timeout(forge3dConfig.generation.download_timeout_ms) }
     );
 
     if (!response.ok) {
@@ -440,7 +432,7 @@ class ModelBridge extends EventEmitter {
    * @returns {Promise<Object>} Health data
    */
   async getHealth() {
-    return this._fetchWithTimeout(`${this.baseUrl}/health`, 5000);
+    return this._fetchWithTimeout(`${this.baseUrl}/health`, forge3dConfig.healthCheck.timeout_ms);
   }
 
   /**
@@ -448,7 +440,7 @@ class ModelBridge extends EventEmitter {
    * @returns {Promise<Object>} Status data with VRAM info
    */
   async getStatus() {
-    return this._fetchWithTimeout(`${this.baseUrl}/status`, 5000);
+    return this._fetchWithTimeout(`${this.baseUrl}/status`, forge3dConfig.healthCheck.timeout_ms);
   }
 
   /**
@@ -534,7 +526,7 @@ class ModelBridge extends EventEmitter {
         cwd: PYTHON_DIR,
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsHide: true,
-        timeout: 15000
+        timeout: forge3dConfig.pythonServer.command_timeout_ms
       });
       let stdout = '';
       let stderr = '';
@@ -588,6 +580,20 @@ if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(pr
   const info = bridge.getInfo();
   console.assert(info.state === 'stopped', 'Info state should be stopped');
   console.assert(info.uptime === 0, 'Uptime should be 0');
+  console.assert(bridge.consecutiveHealthFailures === 0, 'Health failures should be 0');
+
+  // Test image validation (empty buffer)
+  try {
+    await bridge.generateMesh(Buffer.alloc(0));
+    console.assert(false, 'Should have thrown for empty buffer');
+  } catch (e) {
+    // Empty buffer throws before _ensureRunning since validation is first
+    // but _ensureRunning comes first in the code, so it will fail on state check
+    console.assert(
+      e.message.includes('not running') || e.message === 'Image buffer is empty',
+      'Should reject empty buffer or not-running state'
+    );
+  }
 
   console.log('[BRIDGE] Self-test passed');
   process.exit(0);

@@ -14,20 +14,33 @@ import subprocess
 import argparse
 import shutil
 import hashlib
+import yaml
 from pathlib import Path
 
+# Load configuration
+_config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.yaml')
+try:
+    with open(_config_path) as _f:
+        CONFIG = yaml.safe_load(_f)
+except Exception:
+    CONFIG = {}
 
-# Minimum requirements
-MIN_PYTHON = (3, 10)
-MIN_VRAM_GB = 8
-MODELS_DIR_DEFAULT = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'models')
+def _cfg(section, key, default=None):
+    """Get a config value with fallback to default."""
+    return CONFIG.get(section, {}).get(key, default)
+
+# Minimum requirements (from config with defaults)
+_min_python_raw = CONFIG.get('environment', {}).get('min_python_version', [3, 10])
+MIN_PYTHON = tuple(_min_python_raw)
+MIN_VRAM_GB = CONFIG.get('environment', {}).get('min_vram_gb', 8)
+MODELS_DIR_DEFAULT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'models')
 
 # Model registry: name -> (repo_id, subfolder, expected_size_mb)
 MODELS = {
     'instantmesh': {
-        'repo_id': 'TencentARC/InstantMesh',
+        'repo_id': CONFIG.get('models', {}).get('instantmesh', {}).get('repo_id', 'TencentARC/InstantMesh'),
         'description': 'Single-image to 3D mesh generation',
-        'size_mb': 1500,
+        'size_mb': CONFIG.get('models', {}).get('instantmesh', {}).get('size_mb', 1500),
     },
 }
 
@@ -153,10 +166,11 @@ def install_requirements():
     print_info('This may take several minutes (PyTorch is ~2.5 GB)...')
 
     try:
+        install_timeout = _cfg('setup', 'install_timeout_seconds', 600)
         result = subprocess.run(
             [sys.executable, '-m', 'pip', 'install', '-r', req_file,
              '--extra-index-url', 'https://download.pytorch.org/whl/cu124'],
-            capture_output=False, text=True, timeout=600
+            capture_output=False, text=True, timeout=install_timeout
         )
         if result.returncode != 0:
             print_fail('pip install failed. Check output above for errors.')
@@ -166,7 +180,7 @@ def install_requirements():
         return True
 
     except subprocess.TimeoutExpired:
-        print_fail('Installation timed out after 10 minutes')
+        print_fail(f'Installation timed out after {_cfg("setup", "install_timeout_seconds", 600)} seconds')
         return False
     except Exception as e:
         print_fail(f'Installation failed: {e}')
@@ -228,13 +242,14 @@ def download_models(models_dir):
         print_info(f'  Description: {info["description"]}')
 
         try:
+            download_timeout = _cfg('setup', 'model_download_timeout_seconds', 1800)
             result = subprocess.run(
                 [sys.executable, '-c',
                  f'from huggingface_hub import snapshot_download; '
                  f'snapshot_download("{info["repo_id"]}", '
                  f'local_dir=r"{model_dir}", '
                  f'ignore_patterns=["*.md", "*.txt", "examples/*"])'],
-                capture_output=False, text=True, timeout=1800  # 30 min max
+                capture_output=False, text=True, timeout=download_timeout
             )
 
             if result.returncode != 0:
@@ -246,7 +261,7 @@ def download_models(models_dir):
             print_ok(f'{name}: Downloaded successfully')
 
         except subprocess.TimeoutExpired:
-            print_fail(f'{name}: Download timed out (30 min)')
+            print_fail(f'{name}: Download timed out ({_cfg("setup", "model_download_timeout_seconds", 1800)} seconds)')
         except Exception as e:
             print_fail(f'{name}: Download error: {e}')
 

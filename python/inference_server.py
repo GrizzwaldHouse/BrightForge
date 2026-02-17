@@ -32,6 +32,7 @@ import time
 import logging
 import tempfile
 import argparse
+import yaml
 from pathlib import Path
 from contextlib import asynccontextmanager
 
@@ -40,6 +41,18 @@ from fastapi.responses import FileResponse, JSONResponse
 import uvicorn
 
 from model_manager import model_manager, ModelState
+
+# Load configuration
+_config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.yaml')
+try:
+    with open(_config_path) as _f:
+        CONFIG = yaml.safe_load(_f)
+except Exception:
+    CONFIG = {}
+
+def _cfg(section, key, default=None):
+    """Get a config value with fallback to default."""
+    return CONFIG.get(section, {}).get(key, default)
 
 # Resolve CUDA OOM exception type (safe import — works even without torch)
 try:
@@ -60,8 +73,8 @@ logger = logging.getLogger('forge3d.server')
 
 # Output directory
 BASE_DIR = Path(__file__).parent.parent
-OUTPUT_DIR = BASE_DIR / 'data' / 'output'
-TEMP_DIR = BASE_DIR / 'data' / 'temp'
+OUTPUT_DIR = BASE_DIR / _cfg('paths', 'output_dir', 'data/output')
+TEMP_DIR = BASE_DIR / _cfg('paths', 'temp_dir', 'data/temp')
 
 
 @asynccontextmanager
@@ -73,7 +86,7 @@ async def lifespan(app):
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Clean up old temp files (>24 hours)
+    # Clean up old temp files older than configured max age
     cleanup_temp_files()
 
     # Log GPU info
@@ -103,7 +116,9 @@ app = FastAPI(
 )
 
 
-def cleanup_temp_files(max_age_hours=24):
+def cleanup_temp_files(max_age_hours=None):
+    if max_age_hours is None:
+        max_age_hours = _cfg('cleanup', 'temp_file_max_age_hours', 24)
     """Remove temp files older than max_age_hours."""
     if not TEMP_DIR.exists():
         return
@@ -167,12 +182,14 @@ async def generate_mesh(
     logger.info(f'[SERVER] Mesh generation request: job={job_id}, file={image.filename}')
 
     # Validate file type
-    if image.content_type and image.content_type not in ('image/png', 'image/jpeg', 'image/webp'):
+    accepted_types = _cfg('generation', 'accepted_mime_types', ['image/png', 'image/jpeg', 'image/webp'])
+    if image.content_type and image.content_type not in accepted_types:
         raise HTTPException(400, f'Unsupported image type: {image.content_type}. Use PNG, JPG, or WebP.')
 
-    # Validate file size (max 20MB)
+    # Validate file size
+    max_upload_bytes = _cfg('generation', 'max_upload_size_bytes', 20 * 1024 * 1024)
     contents = await image.read()
-    if len(contents) > 20 * 1024 * 1024:
+    if len(contents) > max_upload_bytes:
         raise HTTPException(400, 'Image too large. Maximum 20 MB.')
 
     # Save upload to temp
@@ -187,8 +204,9 @@ async def generate_mesh(
         img = PILImage.open(temp_image)
 
         # Validate dimensions
-        if max(img.size) > 4096:
-            raise HTTPException(400, f'Image too large: {img.size}. Maximum 4096x4096.')
+        max_dim = _cfg('generation', 'max_image_dimension', 4096)
+        if max(img.size) > max_dim:
+            raise HTTPException(400, f'Image too large: {img.size}. Maximum {max_dim}x{max_dim}.')
 
         result = model_manager.generate_mesh(img, output_path)
 
@@ -246,15 +264,19 @@ async def generate_image(
     if width < 512 or width > 2048 or height < 512 or height > 2048:
         raise HTTPException(400, 'Dimensions must be between 512 and 2048')
 
-    if steps < 10 or steps > 100:
-        raise HTTPException(400, 'Steps must be between 10 and 100')
+    min_steps = _cfg('generation', 'min_steps', 10)
+    max_steps = _cfg('generation', 'max_steps', 100)
+    if steps < min_steps or steps > max_steps:
+        raise HTTPException(400, f'Steps must be between {min_steps} and {max_steps}')
 
     # Validate prompt
-    if not prompt or len(prompt.strip()) < 3:
-        raise HTTPException(400, 'Prompt must be at least 3 characters')
+    min_prompt = _cfg('generation', 'min_prompt_length', 3)
+    max_prompt = _cfg('generation', 'max_prompt_length', 2000)
+    if not prompt or len(prompt.strip()) < min_prompt:
+        raise HTTPException(400, f'Prompt must be at least {min_prompt} characters')
 
-    if len(prompt) > 2000:
-        raise HTTPException(400, 'Prompt must be under 2000 characters')
+    if len(prompt) > max_prompt:
+        raise HTTPException(400, f'Prompt must be under {max_prompt} characters')
 
     output_path = OUTPUT_DIR / f'{job_id}.png'
 
@@ -312,11 +334,13 @@ async def generate_full(
     logger.info(f'[SERVER] Full pipeline request: job={job_id}, prompt="{prompt[:80]}"')
 
     # Validate prompt
-    if not prompt or len(prompt.strip()) < 3:
-        raise HTTPException(400, 'Prompt must be at least 3 characters')
+    min_prompt = _cfg('generation', 'min_prompt_length', 3)
+    max_prompt = _cfg('generation', 'max_prompt_length', 2000)
+    if not prompt or len(prompt.strip()) < min_prompt:
+        raise HTTPException(400, f'Prompt must be at least {min_prompt} characters')
 
-    if len(prompt) > 2000:
-        raise HTTPException(400, 'Prompt must be under 2000 characters')
+    if len(prompt) > max_prompt:
+        raise HTTPException(400, f'Prompt must be under {max_prompt} characters')
 
     output_dir = OUTPUT_DIR / job_id
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -393,8 +417,10 @@ async def download_file(job_id: str, filename: str):
 
 def main():
     parser = argparse.ArgumentParser(description='ForgePipeline Inference Server')
-    parser.add_argument('--port', type=int, default=8001, help='Server port (default: 8001)')
-    parser.add_argument('--host', default='127.0.0.1', help='Bind address (default: 127.0.0.1)')
+    default_port = _cfg('server', 'default_port', 8001)
+    default_host = _cfg('server', 'default_host', '127.0.0.1')
+    parser.add_argument('--port', type=int, default=default_port, help=f'Server port (default: {default_port})')
+    parser.add_argument('--host', default=default_host, help=f'Bind address (default: {default_host})')
     parser.add_argument('--reload', action='store_true', help='Auto-reload on code changes')
     args = parser.parse_args()
 

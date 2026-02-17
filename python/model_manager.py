@@ -10,13 +10,27 @@ Models:
 """
 
 import gc
+import os
 import time
 import threading
 import logging
+import yaml
 from pathlib import Path
 from enum import Enum
 
 logger = logging.getLogger('forge3d.model_manager')
+
+# Load configuration
+_config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.yaml')
+try:
+    with open(_config_path) as _f:
+        CONFIG = yaml.safe_load(_f)
+except Exception:
+    CONFIG = {}
+
+def _cfg(section, key, default=None):
+    """Get a config value with fallback to default."""
+    return CONFIG.get(section, {}).get(key, default)
 
 
 class ModelType(str, Enum):
@@ -40,9 +54,13 @@ class ModelManager:
     Provides mutex-protected generation to prevent race conditions.
     """
 
-    def __init__(self, models_dir='data/models', vram_buffer_gb=2.0):
-        self.models_dir = Path(models_dir)
-        self.vram_buffer_gb = vram_buffer_gb
+    def __init__(self, models_dir=None, vram_buffer_gb=None):
+        _default_models_dir = _cfg('paths', 'models_dir', 'data/models')
+        self.models_dir = Path(models_dir if models_dir is not None else _default_models_dir)
+        self.vram_buffer_gb = (
+            vram_buffer_gb if vram_buffer_gb is not None
+            else CONFIG.get('vram', {}).get('buffer_gb', 2.0)
+        )
 
         # Model state tracking
         self._models = {
@@ -57,7 +75,8 @@ class ModelManager:
         # Stats
         self.generation_count = 0
         self.total_generation_time = 0.0
-        self._restart_threshold = 20  # Restart Python after N generations to prevent VRAM fragmentation
+        # Restart Python after N generations to prevent VRAM fragmentation
+        self._restart_threshold = CONFIG.get('vram', {}).get('generation_count_before_restart', 20)
 
     def get_vram_info(self):
         """Get current VRAM usage info."""
@@ -177,7 +196,8 @@ class ModelManager:
             self._unload_all()
             self._clear_vram()
 
-            if not self._check_vram_budget(6.0):
+            instantmesh_vram = CONFIG.get('models', {}).get('instantmesh', {}).get('required_vram_gb', 6.0)
+            if not self._check_vram_budget(instantmesh_vram):
                 logger.error('[MODEL] Not enough VRAM for InstantMesh')
                 return False
 
@@ -187,12 +207,13 @@ class ModelManager:
             try:
                 from diffusers import DiffusionPipeline
 
+                instantmesh_repo = CONFIG.get('models', {}).get('instantmesh', {}).get('repo_id', 'TencentARC/InstantMesh')
                 model_path = self.models_dir / 'instantmesh'
                 if not model_path.exists():
                     # Fall back to downloading from hub
                     logger.info('[MODEL] Model not cached locally, loading from HuggingFace...')
                     pipeline = DiffusionPipeline.from_pretrained(
-                        'TencentARC/InstantMesh',
+                        instantmesh_repo,
                         torch_dtype=torch.float16,
                         trust_remote_code=True,
                     )
@@ -239,7 +260,8 @@ class ModelManager:
             self._unload_all()
             self._clear_vram()
 
-            if not self._check_vram_budget(8.0):
+            sdxl_vram = CONFIG.get('models', {}).get('sdxl', {}).get('required_vram_gb', 8.0)
+            if not self._check_vram_budget(sdxl_vram):
                 logger.error('[MODEL] Not enough VRAM for SDXL')
                 return False
 
@@ -249,8 +271,9 @@ class ModelManager:
             try:
                 from diffusers import StableDiffusionXLPipeline, DPMSolverMultistepScheduler
 
+                sdxl_repo = CONFIG.get('models', {}).get('sdxl', {}).get('repo_id', 'stabilityai/stable-diffusion-xl-base-1.0')
                 pipeline = StableDiffusionXLPipeline.from_pretrained(
-                    'stabilityai/stable-diffusion-xl-base-1.0',
+                    sdxl_repo,
                     torch_dtype=torch.float16,
                     variant='fp16',
                     use_safetensors=True,
@@ -316,10 +339,12 @@ class ModelManager:
                 image = image_data.convert('RGB')
 
             # Resize to model's expected input
-            image = image.resize((256, 256), Image.LANCZOS)
+            input_dims = CONFIG.get('models', {}).get('instantmesh', {}).get('input_dimensions', [256, 256])
+            image = image.resize(tuple(input_dims), Image.LANCZOS)
 
             pipeline = info['pipeline']
-            result = pipeline(image, num_inference_steps=75)
+            instantmesh_steps = CONFIG.get('models', {}).get('instantmesh', {}).get('inference_steps', 75)
+            result = pipeline(image, num_inference_steps=instantmesh_steps)
 
             # Extract mesh and save as GLB
             output_path = Path(output_path)
@@ -395,12 +420,13 @@ class ModelManager:
             logger.info(f'[MODEL] Generating image: "{prompt[:80]}..."')
 
             pipeline = info['pipeline']
+            sdxl_guidance = CONFIG.get('models', {}).get('sdxl', {}).get('guidance_scale', 7.5)
             result = pipeline(
                 prompt=prompt,
                 width=width,
                 height=height,
                 num_inference_steps=steps,
-                guidance_scale=7.5,
+                guidance_scale=sdxl_guidance,
             )
 
             image = result.images[0]

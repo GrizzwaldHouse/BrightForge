@@ -47,6 +47,7 @@ import forgeSession from '../../forge3d/forge-session.js';
 import projectManager from '../../forge3d/project-manager.js';
 import generationQueue from '../../forge3d/generation-queue.js';
 import modelDownloader from '../../forge3d/model-downloader.js';
+import forge3dConfig from '../../forge3d/config-loader.js';
 
 const router = express.Router();
 
@@ -87,7 +88,7 @@ function ensureInit() {
  *   type: 'mesh'
  *   projectId: string (optional)
  */
-router.post('/generate', express.raw({ type: 'image/*', limit: '20mb' }), async (req, res) => {
+router.post('/generate', express.raw({ type: 'image/*', limit: forge3dConfig.api.raw_body_limit }), async (req, res) => {
   ensureInit();
   console.log('[ROUTE] POST /api/forge3d/generate');
 
@@ -105,7 +106,7 @@ router.post('/generate', express.raw({ type: 'image/*', limit: '20mb' }), async 
         return res.status(400).json({ error: 'Invalid type. Must be mesh, image, or full.' });
       }
 
-      if ((type === 'image' || type === 'full') && (!prompt || prompt.trim().length < 3)) {
+      if ((type === 'image' || type === 'full') && (!prompt || prompt.trim().length < forge3dConfig.generation.min_prompt_length)) {
         return res.status(400).json({ error: 'Prompt required (at least 3 characters).' });
       }
 
@@ -389,7 +390,7 @@ router.get('/history', (req, res) => {
       projectId: req.query.projectId,
       status: req.query.status,
       type: req.query.type,
-      limit: parseInt(req.query.limit) || 50
+      limit: parseInt(req.query.limit) || forge3dConfig.api.history_default_limit
     });
     res.json({ history });
   } catch (err) {
@@ -573,6 +574,14 @@ router.get('/models/status', (_req, res) => {
     errorHandler.report('forge3d_error', err, { endpoint: 'models_status' });
     res.status(500).json({ error: err.message });
   }
+});
+
+/**
+ * GET /api/forge3d/config
+ * Return client-safe config (viewer + UI + generation limits).
+ */
+router.get('/config', (_req, res) => {
+  res.json(forge3dConfig.getClientConfig());
 });
 
 export default router;

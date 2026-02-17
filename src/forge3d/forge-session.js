@@ -25,6 +25,7 @@ import { fileURLToPath } from 'url';
 import telemetryBus from '../core/telemetry-bus.js';
 import modelBridge from './model-bridge.js';
 import forge3dDb from './database.js';
+import forge3dConfig from './config-loader.js';
 
 const SESSION_STATES = {
   IDLE: 'idle',
@@ -92,7 +93,7 @@ class ForgeSession extends EventEmitter {
    * @returns {string} Session ID
    */
   create(params) {
-    const id = randomUUID().slice(0, 12);
+    const id = randomUUID().slice(0, forge3dConfig.session.id_length);
 
     const session = {
       id,
@@ -227,7 +228,7 @@ class ForgeSession extends EventEmitter {
    */
   async _runMesh(session) {
     session.state = SESSION_STATES.GENERATING_MESH;
-    session.progress = { stage: 'mesh', percent: 10 };
+    session.progress = { stage: 'mesh', percent: forge3dConfig.session.progress.mesh_start_pct };
     this.emit('progress', { sessionId: session.id, progress: session.progress });
 
     const result = await modelBridge.generateMesh(
@@ -236,7 +237,7 @@ class ForgeSession extends EventEmitter {
       session.id
     );
 
-    session.progress = { stage: 'mesh', percent: 100 };
+    session.progress = { stage: 'mesh', percent: forge3dConfig.session.progress.mesh_end_pct };
     return {
       type: 'mesh',
       meshBuffer: result.buffer,
@@ -250,7 +251,7 @@ class ForgeSession extends EventEmitter {
    */
   async _runImage(session) {
     session.state = SESSION_STATES.GENERATING_IMAGE;
-    session.progress = { stage: 'image', percent: 10 };
+    session.progress = { stage: 'image', percent: forge3dConfig.session.progress.image_start_pct };
     this.emit('progress', { sessionId: session.id, progress: session.progress });
 
     const result = await modelBridge.generateImage(session.prompt, {
@@ -258,7 +259,7 @@ class ForgeSession extends EventEmitter {
       jobId: session.id
     });
 
-    session.progress = { stage: 'image', percent: 100 };
+    session.progress = { stage: 'image', percent: forge3dConfig.session.progress.mesh_end_pct };
     return {
       type: 'image',
       imageBuffer: result.buffer,
@@ -273,7 +274,7 @@ class ForgeSession extends EventEmitter {
   async _runFull(session) {
     // Stage 1: Image generation
     session.state = SESSION_STATES.GENERATING_IMAGE;
-    session.progress = { stage: 'image', percent: 10 };
+    session.progress = { stage: 'image', percent: forge3dConfig.session.progress.image_start_pct };
     this.emit('progress', { sessionId: session.id, progress: session.progress });
 
     const fullResult = await modelBridge.generateFull(session.prompt, {
@@ -283,7 +284,7 @@ class ForgeSession extends EventEmitter {
 
     // Stage 2 happened server-side; update progress
     session.state = SESSION_STATES.GENERATING_MESH;
-    session.progress = { stage: 'mesh', percent: 80 };
+    session.progress = { stage: 'mesh', percent: forge3dConfig.session.progress.mesh_after_image_pct };
     this.emit('progress', { sessionId: session.id, progress: session.progress });
 
     // Download the generated files
@@ -352,7 +353,7 @@ class ForgeSession extends EventEmitter {
    * @param {number} [limit=20] - Maximum sessions to return
    * @returns {Array} Session summaries, newest first
    */
-  list(limit = 20) {
+  list(limit = forge3dConfig.session.default_list_limit) {
     const sessions = Array.from(this.sessions.values())
       .sort((a, b) => b.createdAt - a.createdAt)
       .slice(0, limit);
@@ -397,7 +398,7 @@ class ForgeSession extends EventEmitter {
    * Clean up old sessions from memory.
    * @param {number} [maxAge=3600000] - Max age in ms (default 1 hour)
    */
-  cleanup(maxAge = 3600000) {
+  cleanup(maxAge = forge3dConfig.session.cleanup_max_age_ms) {
     const cutoff = Date.now() - maxAge;
     let count = 0;
 

@@ -27,17 +27,12 @@ import telemetryBus from '../core/telemetry-bus.js';
 import forge3dDb from './database.js';
 import forgeSession from './forge-session.js';
 import modelBridge from './model-bridge.js';
+import forge3dConfig from './config-loader.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// TODO(phase8-high): Queue retry and rate-limiting constants.
-// MAX_RETRIES: failed jobs re-enqueue up to this many times before permanent failure.
-// MAX_QUEUE_SIZE: reject new jobs with 429 when queue exceeds this size.
-const MAX_RETRIES = 2;
-const MAX_QUEUE_SIZE = 20;
-const TEMP_DIR = join(__dirname, '../../data/temp');
-const TEMP_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
+const TEMP_DIR = forge3dConfig.resolvePath(forge3dConfig.queue.temp_dir);
 
 class GenerationQueue extends EventEmitter {
   constructor() {
@@ -118,8 +113,8 @@ class GenerationQueue extends EventEmitter {
   enqueue(params) {
     // Rate limiting: reject if queue is full
     const currentSize = this._getQueuePosition() + (this.processing ? 1 : 0);
-    if (currentSize >= MAX_QUEUE_SIZE) {
-      throw new Error(`Queue full (${currentSize}/${MAX_QUEUE_SIZE}). Try again later.`);
+    if (currentSize >= forge3dConfig.queue.max_size) {
+      throw new Error(`Queue full (${currentSize}/${forge3dConfig.queue.max_size}). Try again later.`);
     }
 
     const histId = forge3dDb.createHistoryEntry({
@@ -237,7 +232,7 @@ class GenerationQueue extends EventEmitter {
 
     try {
       const files = readdirSync(TEMP_DIR);
-      const cutoff = Date.now() - TEMP_MAX_AGE_MS;
+      const cutoff = Date.now() - forge3dConfig.queue.temp_max_age_ms;
       let cleaned = 0;
 
       for (const file of files) {
@@ -276,7 +271,7 @@ class GenerationQueue extends EventEmitter {
     this._processTimer = setTimeout(() => {
       this._processTimer = null;
       this._processNext();
-    }, 100);
+    }, forge3dConfig.queue.process_interval_ms);
   }
 
   /**
@@ -347,8 +342,8 @@ class GenerationQueue extends EventEmitter {
       const entry = forge3dDb.getHistoryEntry(job.id);
       const retryCount = entry?.retry_count || 0;
 
-      if (retryCount < MAX_RETRIES) {
-        console.log(`[QUEUE] Retrying job ${job.id} (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+      if (retryCount < forge3dConfig.queue.max_retries) {
+        console.log(`[QUEUE] Retrying job ${job.id} (attempt ${retryCount + 1}/${forge3dConfig.queue.max_retries})`);
         forge3dDb.updateHistoryEntry(job.id, {
           status: 'queued',
           errorMessage: `Retry ${retryCount + 1}: ${err.message}`
