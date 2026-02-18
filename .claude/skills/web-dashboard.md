@@ -45,6 +45,10 @@ Express server at `src/api/server.js` via `createServer()` factory. Port 3847 (c
 
 ## Styling
 
-- Dark theme: `public/css/dashboard.css`
-- Card-based layout with consistent spacing
-- CSS custom properties for theme colors
+- Dark theme: `public/css/dashboard.css` (base tokens + global layout)
+- Component-scoped CSS: `forge3d.css`, `system-health.css`, `file-browser.css`, `design-viewer.css`
+- All colors/spacing via CSS custom properties — see `ui-design-system.md` skill for full reference
+- Design principles from [cowork-skills/design-system](https://github.com/GrizzwaldHouse/cowork-skills):
+  - 8px spacing grid, WCAG AA contrast, consistent border-radius (6px inputs, 8px cards)
+  - Color palette: Startup/Modern Tech adapted for dark mode
+  - Typography: system sans-serif + monospace for code only

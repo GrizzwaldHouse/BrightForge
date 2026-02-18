@@ -1,0 +1,3 @@
+[submodule ".claude/cowork-skills"]
+	path = .claude/cowork-skills
+	url = https://github.com/GrizzwaldHouse/cowork-skills.git
