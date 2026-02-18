@@ -11,3 +11,4 @@ desktop/icons/*.png
 desktop/icons/*.ico
 desktop/icons/*.icns
 output/designs/*.html
+data/
