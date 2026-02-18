@@ -1,6 +1,7 @@
 /**
  * File Browser Component Styles
  * Dark theme styling for searchable project folder selector
+ * Uses dashboard.css custom properties
  */
 
 .file-browser {
@@ -10,47 +11,48 @@
 
 .search-container {
   display: flex;
-  gap: 8px;
+  gap: var(--spacing-sm);
   align-items: center;
 }
 
 .search-input {
   flex: 1;
-  padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
-  color: #e0e0e0;
-  font-size: 13px;
-  font-family: 'Consolas', 'Courier New', monospace;
-  transition: border-color 0.2s ease, background 0.2s ease;
+  padding: var(--spacing-sm) 0.75rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  font-family: var(--font-mono);
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
 
 .search-input:focus {
   outline: none;
-  border-color: var(--color-primary, #00d4ff);
-  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--accent-primary);
+  background: var(--bg-secondary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
 }
 
 .search-input::placeholder {
-  color: #666;
+  color: var(--text-dim);
 }
 
 .browse-btn {
-  padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
-  color: #e0e0e0;
+  padding: var(--spacing-sm) 0.75rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
   cursor: pointer;
-  font-size: 16px;
-  transition: all 0.2s ease;
+  font-size: 1rem;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
   flex-shrink: 0;
 }
 
 .browse-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: var(--color-primary, #00d4ff);
+  background: var(--bg-hover);
+  border-color: var(--accent-primary);
   transform: scale(1.05);
 }
 
@@ -64,14 +66,16 @@
   top: calc(100% + 4px);
   left: 0;
   right: 0;
-  background: #2a2a2a;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
   max-height: 300px;
   overflow-y: auto;
   z-index: 1000;
   animation: slideDown 0.15s ease;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-light) var(--bg-primary);
 }
 
 .dropdown.hidden {
@@ -91,14 +95,14 @@
 
 /* Section headers */
 .section-header {
-  padding: 8px 12px;
-  font-size: 11px;
+  padding: var(--spacing-sm) 0.75rem;
+  font-size: 0.6875rem;
   font-weight: 600;
-  color: #888;
+  color: var(--text-dim);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
   position: sticky;
   top: 0;
   z-index: 1;
@@ -106,42 +110,42 @@
 
 .recent-list,
 .results-list {
-  padding: 4px 0;
+  padding: var(--spacing-xs) 0;
 }
 
 /* Project items */
 .project-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) 0.75rem;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.2s ease;
   user-select: none;
 }
 
 .project-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-hover);
 }
 
 .project-item.selected {
-  background: rgba(0, 212, 255, 0.15);
-  border-left: 2px solid var(--color-primary, #00d4ff);
+  background: rgba(37, 99, 235, 0.15);
+  border-left: 2px solid var(--accent-primary);
 }
 
 .project-item.selected:hover {
-  background: rgba(0, 212, 255, 0.2);
+  background: rgba(37, 99, 235, 0.22);
 }
 
 .project-icon {
-  font-size: 14px;
+  font-size: 0.875rem;
   flex-shrink: 0;
 }
 
 .project-path {
-  font-size: 12px;
-  color: #e0e0e0;
-  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -149,18 +153,18 @@
 }
 
 .project-path mark {
-  background: rgba(255, 255, 0, 0.3);
-  color: #ffeb3b;
+  background: rgba(245, 158, 11, 0.25);
+  color: var(--accent-amber);
   padding: 0 2px;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
   font-weight: 600;
 }
 
 .empty-state {
-  padding: 16px 12px;
+  padding: var(--spacing-md) 0.75rem;
   text-align: center;
-  color: #666;
-  font-size: 12px;
+  color: var(--text-dim);
+  font-size: 0.75rem;
   font-style: italic;
 }
 
@@ -170,28 +174,22 @@
 }
 
 .dropdown::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--bg-primary);
 }
 
 .dropdown::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
+  background: var(--border);
+  border-radius: var(--radius-sm);
 }
 
 .dropdown::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.15);
-}
-
-/* Firefox scrollbar */
-.dropdown {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.1) rgba(255, 255, 255, 0.02);
+  background: var(--border-light);
 }
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .search-input {
-    font-size: 14px;
+    font-size: 0.875rem;
   }
 
   .dropdown {
@@ -199,7 +197,7 @@
   }
 
   .browse-btn {
-    padding: 6px 10px;
-    font-size: 14px;
+    padding: 0.375rem 0.625rem;
+    font-size: 0.875rem;
   }
 }

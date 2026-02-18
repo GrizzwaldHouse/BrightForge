@@ -1,6 +1,7 @@
 /**
- * LLCApp Dashboard - System Health Styles
+ * BrightForge Dashboard - System Health Styles
  * Dark theme styling for health monitoring panel
+ * Uses dashboard.css custom properties
  */
 
 /* Health Grid Layout */
@@ -34,17 +35,18 @@
 
 /* Provider Card */
 .provider-card {
-  background: #1e1e1e;
-  border: 1px solid #333;
-  border-radius: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   padding: var(--spacing-md);
-  transition: all 0.3s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .provider-card:hover {
+  background: var(--bg-hover);
   border-color: var(--accent-primary);
-  box-shadow: 0 4px 16px rgba(0, 217, 255, 0.1);
-  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 
 .provider-header {
@@ -53,7 +55,7 @@
   justify-content: space-between;
   margin-bottom: var(--spacing-md);
   padding-bottom: var(--spacing-sm);
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid var(--border);
 }
 
 .provider-name {
@@ -64,25 +66,25 @@
 }
 
 .success-rate {
-  font-size: 0.9rem;
+  font-size: 0.875rem;
   font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 12px;
+  padding: var(--spacing-xs) 0.625rem;
+  border-radius: var(--radius-xl);
 }
 
 .success-rate.high {
-  background: rgba(0, 255, 100, 0.15);
-  color: #00ff64;
+  background: rgba(22, 163, 74, 0.15);
+  color: var(--success);
 }
 
 .success-rate.medium {
-  background: rgba(255, 200, 0, 0.15);
-  color: #ffc800;
+  background: rgba(217, 119, 6, 0.15);
+  color: var(--warning);
 }
 
 .success-rate.low {
-  background: rgba(255, 60, 60, 0.15);
-  color: #ff3c3c;
+  background: rgba(220, 38, 38, 0.15);
+  color: var(--error);
 }
 
 .provider-stats {
@@ -112,9 +114,9 @@
 
 /* Chart Card */
 .chart-card {
-  background: #1e1e1e;
-  border: 1px solid #333;
-  border-radius: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   padding: var(--spacing-lg);
 }
 
@@ -165,41 +167,41 @@
 }
 
 .percentile-label.p50 {
-  color: #00d9ff;
+  color: var(--accent-light);
 }
 
 .percentile-label.p95 {
-  color: #ffc800;
+  color: var(--warning);
 }
 
 .percentile-label.p99 {
-  color: #ff3c3c;
+  color: var(--error);
 }
 
 .bar-container {
   height: 20px;
-  background: #0f0f0f;
-  border-radius: 4px;
+  background: var(--bg-primary);
+  border-radius: var(--radius-sm);
   overflow: hidden;
   position: relative;
 }
 
 .bar {
   height: 100%;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   transition: width 0.5s ease;
 }
 
 .bar.p50 {
-  background: linear-gradient(90deg, #00d9ff, #00a8cc);
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-light));
 }
 
 .bar.p95 {
-  background: linear-gradient(90deg, #ffc800, #ff9800);
+  background: linear-gradient(90deg, var(--warning), var(--accent-amber));
 }
 
 .bar.p99 {
-  background: linear-gradient(90deg, #ff3c3c, #d32f2f);
+  background: linear-gradient(90deg, var(--error), #b91c1c);
 }
 
 .latency-value {
@@ -211,9 +213,9 @@
 
 /* Stats Card */
 .stats-card {
-  background: #1e1e1e;
-  border: 1px solid #333;
-  border-radius: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   padding: var(--spacing-lg);
 }
 
@@ -251,9 +253,9 @@
 
 /* Activity Card */
 .activity-card {
-  background: #1e1e1e;
-  border: 1px solid #333;
-  border-radius: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   padding: var(--spacing-lg);
 }
 
@@ -276,22 +278,22 @@
   display: flex;
   gap: var(--spacing-md);
   padding: var(--spacing-sm) var(--spacing-md);
-  background: #252525;
+  background: var(--bg-secondary);
   border-left: 3px solid transparent;
-  border-radius: 4px;
-  transition: all 0.2s ease;
+  border-radius: var(--radius-sm);
+  transition: background 0.2s ease;
 }
 
 .activity-item:hover {
-  background: #2a2a2a;
+  background: var(--bg-hover);
 }
 
 .activity-item.status-success {
-  border-left-color: #00ff64;
+  border-left-color: var(--success);
 }
 
 .activity-item.status-error {
-  border-left-color: #ff3c3c;
+  border-left-color: var(--error);
 }
 
 .activity-time {
@@ -328,7 +330,7 @@
 
 .activity-error {
   font-size: 0.8rem;
-  color: #ff3c3c;
+  color: var(--error);
   font-family: var(--font-mono);
 }
 

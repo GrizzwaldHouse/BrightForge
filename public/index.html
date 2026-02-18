@@ -4,50 +4,26 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BrightForge - Coding Agent Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/dashboard.css">
   <link rel="stylesheet" href="/css/system-health.css">
   <link rel="stylesheet" href="/css/file-browser.css">
   <link rel="stylesheet" href="/css/design-viewer.css">
   <link rel="stylesheet" href="/css/forge3d.css">
-  <style>
-    /* Error indicator badge */
-    .error-indicator {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 4px 8px;
-      border-radius: 12px;
-      background: rgba(255, 60, 60, 0.15);
-      cursor: pointer;
-      transition: all 0.3s ease;
-    }
-    .error-indicator.hidden { display: none; }
-    .error-indicator.pulse {
-      animation: error-pulse 1.5s ease-in-out infinite;
-    }
-    .error-icon { font-size: 14px; }
-    .error-count {
-      font-size: 12px;
-      font-weight: bold;
-      color: #ff4444;
-    }
-    @keyframes error-pulse {
-      0%, 100% { background: rgba(255, 60, 60, 0.15); }
-      50% { background: rgba(255, 60, 60, 0.35); }
-    }
-  </style>
 </head>
 <body>
   <div id="app">
     <header class="topbar">
       <h1 class="logo">BrightForge</h1>
       <div class="topbar-right">
-        <span id="error-indicator" class="error-indicator hidden" title="Recent errors">
+        <span id="error-indicator" class="error-indicator hidden" title="Recent errors" aria-label="Recent errors">
           <span class="error-icon">⚠️</span>
           <span id="error-count" class="error-count">0</span>
         </span>
         <span id="health-status" class="status-badge">●</span>
-        <button id="settings-btn" class="icon-btn" title="Settings">⚙️</button>
+        <button id="settings-btn" class="icon-btn" title="Settings" aria-label="Settings">⚙️</button>
       </div>
     </header>
 
@@ -211,7 +187,7 @@
 
                 <div class="forge3d-input-group">
                   <label for="forge3d-project-select">Save to Project</label>
-                  <div style="display: flex; gap: 4px;">
+                  <div class="forge3d-project-row">
                     <select id="forge3d-project-select" style="flex: 1;">
                       <option value="">No project</option>
                     </select>

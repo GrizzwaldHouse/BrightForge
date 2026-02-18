@@ -23,7 +23,7 @@ class SessionManager {
       console.log('[SESSION] Loaded sessions:', this.sessions.length);
     } catch (error) {
       console.error('[SESSION] Failed to load sessions:', error);
-      this.container.innerHTML = '<li style="color: var(--text-dim); padding: 1rem;">Failed to load sessions</li>';
+      this.container.innerHTML = '<li class="session-error">Failed to load sessions</li>';
     }
   }
 
@@ -80,7 +80,7 @@ class SessionManager {
    */
   render() {
     if (this.sessions.length === 0) {
-      this.container.innerHTML = '<li style="color: var(--text-dim); padding: 1rem; text-align: center;">No sessions yet</li>';
+      this.container.innerHTML = '<li class="session-empty">No sessions yet</li>';
       return;
     }
 

@@ -48,7 +48,7 @@ class PlanViewer {
     const html = `
       <div class="plan-header">
         <h3 class="plan-title">Review Plan</h3>
-        ${assistantMessage ? `<p style="color: var(--text-secondary); margin-bottom: 1rem;">${this.escapeHtml(assistantMessage)}</p>` : ''}
+        ${assistantMessage ? `<p class="plan-description">${this.escapeHtml(assistantMessage)}</p>` : ''}
         <div class="plan-meta">
           ${plan.complexity ? `<div class="plan-meta-item">
             <span>Complexity:</span>
@@ -87,7 +87,7 @@ class PlanViewer {
    */
   renderOperations(operations) {
     if (!operations || operations.length === 0) {
-      return '<p style="color: var(--text-secondary);">No file operations in this plan.</p>';
+      return '<p class="plan-empty">No file operations in this plan.</p>';
     }
 
     return operations.map(op => this.renderOperation(op)).join('');

@@ -139,8 +139,8 @@ export class FileBrowser {
     const recentList = this.dropdown.querySelector('.recent-list');
     const searchResults = this.dropdown.querySelector('.search-results');
 
-    searchResults.style.display = 'none';
-    this.dropdown.querySelector('.recent-section').style.display = 'block';
+    searchResults.classList.add('hidden');
+    this.dropdown.querySelector('.recent-section').classList.remove('hidden');
 
     if (this.recentProjects.length === 0) {
       recentList.innerHTML = '<div class="empty-state">No recent projects</div>';
@@ -164,15 +164,15 @@ export class FileBrowser {
     const resultsList = this.dropdown.querySelector('.results-list');
     const searchResults = this.dropdown.querySelector('.search-results');
 
-    searchResults.style.display = 'block';
+    searchResults.classList.remove('hidden');
 
     if (matches.length === 0) {
       resultsList.innerHTML = '<div class="empty-state">No matches found</div>';
-      this.dropdown.querySelector('.recent-section').style.display = 'none';
+      this.dropdown.querySelector('.recent-section').classList.add('hidden');
       return;
     }
 
-    this.dropdown.querySelector('.recent-section').style.display = 'block';
+    this.dropdown.querySelector('.recent-section').classList.remove('hidden');
     resultsList.innerHTML = matches.slice(0, 20).map((path, idx) => `
       <div class="project-item ${idx === 0 ? 'selected' : ''}" data-path="${this._escapeHtml(path)}">
         <span class="project-icon">🔍</span>
