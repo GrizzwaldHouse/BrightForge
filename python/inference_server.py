@@ -5,24 +5,15 @@ FastAPI server for AI-powered 3D mesh generation.
 Bridges Node.js BrightForge with Python GPU inference.
 
 Endpoints:
-  POST /generate/mesh   - Image -> GLB mesh
+  POST /generate/mesh   - Image -> GLB mesh (+ optional FBX)
   POST /generate/image  - Text prompt -> PNG image
-  POST /generate/full   - Text prompt -> Image -> GLB mesh (two-stage)
+  POST /generate/full   - Text prompt -> Image -> GLB mesh + FBX (two-stage)
+  POST /convert/glb-to-fbx - Convert existing GLB to FBX
+  GET  /convert/status  - FBX converter availability
   GET  /health          - GPU status, model loaded state
   GET  /status          - VRAM usage, current operation
 
 Usage: python python/inference_server.py [--port 8001] [--host 127.0.0.1]
-
-STATUS: Complete. CUDA OOM handling, temp file cleanup, path validation.
-        Not yet tested with actual GPU inference (requires model downloads).
-
-TODO(P0): End-to-end test with InstantMesh + SDXL models on real GPU
-TODO(P1): Add TripoSR as alternative to InstantMesh (MIT license, similar API)
-TODO(P1): Add CPU fallback mode (slow but works without CUDA)
-TODO(P1): Add configurable generation parameters per request (steps, guidance_scale)
-TODO(P1): Add model version tracking in response headers
-TODO(P2): Add request queue visualization endpoint
-TODO(P2): Add generation caching (same prompt+seed = same output)
 """
 
 import os
@@ -36,11 +27,12 @@ import yaml
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, Query, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 import uvicorn
 
 from model_manager import model_manager, ModelState
+from fbx_converter import fbx_converter
 
 # Load configuration
 _config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.yaml')
@@ -170,16 +162,17 @@ async def status():
 async def generate_mesh(
     image: UploadFile = File(...),
     job_id: str = Form(default=None),
+    format: str = Query(default='file', description='Response format: "file" (raw GLB) or "json" (metadata with download paths)'),
 ):
     """Generate 3D mesh from uploaded image.
 
     Accepts: PNG, JPG image file
-    Returns: GLB mesh file
+    Returns: GLB mesh file (default) or JSON with download paths (?format=json)
     """
     if job_id is None:
         job_id = generate_job_id()
 
-    logger.info(f'[SERVER] Mesh generation request: job={job_id}, file={image.filename}')
+    logger.info(f'[SERVER] Mesh generation request: job={job_id}, file={image.filename}, format={format}')
 
     # Validate file type
     accepted_types = _cfg('generation', 'accepted_mime_types', ['image/png', 'image/jpeg', 'image/webp'])
@@ -213,7 +206,26 @@ async def generate_mesh(
         if not result['success']:
             raise HTTPException(500, f'Generation failed: {result.get("error")}')
 
-        # Return the GLB file
+        # JSON response mode (used by Node.js ModelBridge)
+        if format == 'json':
+            response_data = {
+                'success': True,
+                'job_id': job_id,
+                'glb_path': f'/download/{job_id}/{job_id}.glb',
+                'generation_time': result['generation_time'],
+                'file_size_bytes': result['file_size_bytes'],
+            }
+            # Include FBX path if conversion succeeded
+            if result.get('fbx_path'):
+                fbx_filename = Path(result['fbx_path']).name
+                response_data['fbx_path'] = f'/download/{job_id}/{fbx_filename}'
+                response_data['fbx_size_bytes'] = result.get('fbx_size_bytes', 0)
+            else:
+                response_data['fbx_path'] = None
+                response_data['fbx_size_bytes'] = 0
+            return JSONResponse(response_data)
+
+        # Default: return raw GLB file (backward compatible)
         return FileResponse(
             str(output_path),
             media_type='model/gltf-binary',
@@ -358,7 +370,7 @@ async def generate_full(
                 f'Pipeline failed at stage "{result.get("stage")}": {result.get("error")}'
             )
 
-        return JSONResponse({
+        response_data = {
             'success': True,
             'job_id': job_id,
             'total_time': result['total_time'],
@@ -366,7 +378,15 @@ async def generate_full(
             'mesh_path': f'/download/{job_id}/generated_mesh.glb',
             'stages': result['stages'],
             'vram_after': result['vram_after'],
-        })
+        }
+        # Include FBX path if conversion succeeded
+        if result.get('fbx_path'):
+            fbx_filename = Path(result['fbx_path']).name
+            response_data['fbx_path'] = f'/download/{job_id}/{fbx_filename}'
+        else:
+            response_data['fbx_path'] = None
+
+        return JSONResponse(response_data)
 
     except HTTPException:
         raise
@@ -380,6 +400,68 @@ async def generate_full(
     finally:
         # Clean up stale temp files between generations
         cleanup_temp_files()
+
+
+@app.post('/convert/glb-to-fbx')
+async def convert_glb_to_fbx(
+    file: UploadFile = File(...),
+    job_id: str = Form(default=None),
+):
+    """Convert an existing GLB file to FBX format.
+
+    Accepts: GLB mesh file
+    Returns: FBX file
+    """
+    if job_id is None:
+        job_id = generate_job_id()
+
+    logger.info(f'[SERVER] FBX conversion request: job={job_id}, file={file.filename}')
+
+    if not fbx_converter.is_available():
+        raise HTTPException(503, 'FBX conversion not available. Install pyassimp or Blender.')
+
+    contents = await file.read()
+    max_upload_bytes = _cfg('generation', 'max_upload_size_bytes', 20 * 1024 * 1024)
+    if len(contents) > max_upload_bytes:
+        raise HTTPException(400, 'File too large. Maximum 20 MB.')
+
+    temp_glb = TEMP_DIR / f'{job_id}_convert.glb'
+    temp_glb.write_bytes(contents)
+
+    fbx_path = OUTPUT_DIR / f'{job_id}.fbx'
+
+    try:
+        result = fbx_converter.convert_glb_to_fbx(str(temp_glb), str(fbx_path))
+
+        if not result['success']:
+            raise HTTPException(500, f'Conversion failed: {result.get("error")}')
+
+        return FileResponse(
+            str(fbx_path),
+            media_type='application/octet-stream',
+            filename=f'{job_id}.fbx',
+            headers={
+                'X-Job-Id': job_id,
+                'X-Conversion-Time': str(result['conversion_time']),
+                'X-File-Size': str(result['file_size_bytes']),
+                'X-Backend': result['backend'],
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f'[SERVER] FBX conversion error: {e}')
+        raise HTTPException(500, f'Internal error: {str(e)}')
+    finally:
+        if temp_glb.exists():
+            temp_glb.unlink()
+
+
+@app.get('/convert/status')
+async def convert_status():
+    """Check FBX converter availability and backend info."""
+    return fbx_converter.get_status()
 
 
 @app.get('/download/{job_id}/{filename}')
@@ -407,6 +489,7 @@ async def download_file(job_id: str, filename: str):
     media_types = {
         '.glb': 'model/gltf-binary',
         '.gltf': 'model/gltf+json',
+        '.fbx': 'application/octet-stream',
         '.png': 'image/png',
         '.jpg': 'image/jpeg',
     }

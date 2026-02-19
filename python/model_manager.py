@@ -374,12 +374,35 @@ class ModelManager:
             vram = self.get_vram_info()
             logger.info(f'[MODEL] Mesh generated in {elapsed:.1f}s -> {output_path}')
 
+            # FBX conversion (non-fatal if it fails)
+            fbx_path_result = None
+            fbx_size = 0
+            try:
+                from fbx_converter import fbx_converter
+                if fbx_converter.is_available():
+                    fbx_out = output_path.with_suffix('.fbx')
+                    fbx_result = fbx_converter.convert_glb_to_fbx(str(output_path), str(fbx_out))
+                    if fbx_result['success']:
+                        fbx_path_result = str(fbx_out)
+                        fbx_size = fbx_result.get('file_size_bytes', 0)
+                        logger.info(f'[MODEL] FBX exported: {fbx_out} ({fbx_size} bytes)')
+                    else:
+                        logger.warning(f'[MODEL] FBX conversion failed (non-fatal): {fbx_result.get("error")}')
+                else:
+                    logger.info('[MODEL] FBX converter not available, skipping FBX export')
+            except ImportError:
+                logger.info('[MODEL] fbx_converter module not found, skipping FBX export')
+            except Exception as fbx_err:
+                logger.warning(f'[MODEL] FBX conversion error (non-fatal): {fbx_err}')
+
             return {
                 'success': True,
                 'output_path': str(output_path),
+                'fbx_path': fbx_path_result,
                 'generation_time': round(elapsed, 2),
                 'vram_after': vram,
                 'file_size_bytes': output_path.stat().st_size,
+                'fbx_size_bytes': fbx_size,
             }
 
         except Exception as e:
@@ -525,6 +548,7 @@ class ModelManager:
             result['total_time'] = round(total_time, 2)
             result['image_path'] = str(image_path)
             result['mesh_path'] = str(mesh_path)
+            result['fbx_path'] = stage2.get('fbx_path')
             result['vram_after'] = self.get_vram_info()
 
             logger.info(f'[MODEL] Full pipeline complete in {total_time:.1f}s')

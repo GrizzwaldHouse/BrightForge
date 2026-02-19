@@ -1,17 +1,20 @@
 /**
  * Forge3D Routes - API endpoints for 3D generation
  *
- * 19 endpoints for generation, projects, assets, queue, models:
+ * 21 endpoints for generation, projects, assets, queue, models, FBX:
  *
  * POST /api/forge3d/generate        - Start generation (image or text)
  * GET  /api/forge3d/status/:id      - Check generation progress
- * GET  /api/forge3d/download/:id    - Download .glb or .png file
+ * GET  /api/forge3d/download/:id    - Download .glb/.png/.fbx file (?format=fbx)
  * GET  /api/forge3d/projects        - List projects
  * POST /api/forge3d/projects        - Create project
  * GET  /api/forge3d/projects/:id    - Get project details
  * DELETE /api/forge3d/projects/:id  - Delete project
  * GET  /api/forge3d/projects/:id/assets - List assets
  * DELETE /api/forge3d/assets/:id    - Delete asset
+ * GET  /api/forge3d/assets/:id/download - Download asset (?format=fbx)
+ * POST /api/forge3d/convert         - Convert existing GLB asset to FBX
+ * GET  /api/forge3d/fbx-status      - FBX converter availability
  * GET  /api/forge3d/history         - Generation history
  * GET  /api/forge3d/stats           - Aggregate stats
  * GET  /api/forge3d/bridge          - Python bridge status
@@ -48,6 +51,7 @@ import projectManager from '../../forge3d/project-manager.js';
 import generationQueue from '../../forge3d/generation-queue.js';
 import modelDownloader from '../../forge3d/model-downloader.js';
 import forge3dConfig from '../../forge3d/config-loader.js';
+import forge3dDb from '../../forge3d/database.js';
 
 const router = express.Router();
 
@@ -140,6 +144,7 @@ router.post('/generate', express.raw({ type: 'image/*', limit: forge3dConfig.api
               projectManager.saveAsset(projectId, {
                 ...assetData,
                 buffer: result.meshBuffer,
+                fbxBuffer: result.fbxBuffer || null,
                 extension: '.glb'
               });
             } else if (result.imageBuffer) {
@@ -221,6 +226,7 @@ router.get('/status/:id', (req, res) => {
 /**
  * GET /api/forge3d/download/:id
  * Download generated file.
+ * Query params: format=fbx (download FBX instead of default GLB/PNG)
  */
 router.get('/download/:id', (req, res) => {
   const result = forgeSession.getResult(req.params.id);
@@ -228,6 +234,19 @@ router.get('/download/:id', (req, res) => {
     return res.status(404).json({ error: 'No completed result for this session' });
   }
 
+  const format = req.query.format;
+
+  // FBX download requested
+  if (format === 'fbx') {
+    if (result.fbxBuffer) {
+      res.set('Content-Type', 'application/octet-stream');
+      res.set('Content-Disposition', `attachment; filename="${req.params.id}.fbx"`);
+      return res.send(result.fbxBuffer);
+    }
+    return res.status(404).json({ error: 'No FBX data available for this session' });
+  }
+
+  // Default: GLB or PNG
   if (result.meshBuffer) {
     res.set('Content-Type', 'model/gltf-binary');
     res.set('Content-Disposition', `attachment; filename="${req.params.id}.glb"`);
@@ -352,6 +371,7 @@ router.delete('/assets/:id', (req, res) => {
 /**
  * GET /api/forge3d/assets/:id/download
  * Download an asset file by asset ID (reads file_path from database).
+ * Query params: format=fbx (download FBX instead of default)
  */
 router.get('/assets/:id/download', (req, res) => {
   ensureInit();
@@ -360,6 +380,22 @@ router.get('/assets/:id/download', (req, res) => {
     if (!asset) {
       return res.status(404).json({ error: 'Asset not found' });
     }
+
+    const format = req.query.format;
+
+    // FBX download requested
+    if (format === 'fbx') {
+      if (!asset.fbx_path) {
+        return res.status(404).json({ error: 'No FBX file for this asset' });
+      }
+      if (!existsSync(asset.fbx_path)) {
+        return res.status(404).json({ error: 'FBX file missing from disk' });
+      }
+      const fbxFilename = asset.name.replace(/\.[^.]+$/, '.fbx');
+      return res.download(asset.fbx_path, fbxFilename);
+    }
+
+    // Default: GLB/PNG
     if (!asset.file_path) {
       return res.status(404).json({ error: 'Asset has no file' });
     }
@@ -373,6 +409,80 @@ router.get('/assets/:id/download', (req, res) => {
   } catch (err) {
     errorHandler.report('forge3d_error', err, { endpoint: 'download_asset', assetId: req.params.id });
     res.status(500).json({ error: err.message });
+  }
+});
+
+// --- FBX Conversion ---
+
+/**
+ * POST /api/forge3d/convert
+ * Convert an existing GLB asset to FBX.
+ * Body: { assetId: string }
+ */
+router.post('/convert', async (req, res) => {
+  ensureInit();
+  const { assetId } = req.body;
+
+  if (!assetId) {
+    return res.status(400).json({ error: 'assetId is required' });
+  }
+
+  try {
+    const asset = projectManager.getAsset(assetId);
+    if (!asset) {
+      return res.status(404).json({ error: 'Asset not found' });
+    }
+
+    if (asset.fbx_path && existsSync(asset.fbx_path)) {
+      return res.json({ status: 'already_converted', fbx_path: asset.fbx_path });
+    }
+
+    if (!asset.file_path || !existsSync(asset.file_path)) {
+      return res.status(404).json({ error: 'GLB file missing from disk' });
+    }
+
+    // Read GLB and send to Python for conversion
+    const { readFileSync } = await import('fs');
+    const glbBuffer = readFileSync(asset.file_path);
+    const result = await modelBridge.convertToFbx(glbBuffer, assetId);
+
+    // Save FBX file alongside GLB
+    const fbxPath = asset.file_path.replace(/\.glb$/i, '.fbx');
+    const { writeFileSync } = await import('fs');
+    writeFileSync(fbxPath, result.buffer);
+
+    // Update asset record in DB
+    forge3dDb.db.prepare(
+      'UPDATE assets SET fbx_path = ?, fbx_size = ? WHERE id = ?'
+    ).run(fbxPath, result.buffer.length, assetId);
+
+    res.json({
+      status: 'converted',
+      fbx_size: result.buffer.length,
+      conversion_time: result.metadata.conversionTime,
+      backend: result.metadata.backend
+    });
+  } catch (err) {
+    console.error(`[ROUTE] FBX conversion error: ${err.message}`);
+    errorHandler.report('forge3d_error', err, { endpoint: 'convert', assetId });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/forge3d/fbx-status
+ * Check FBX converter availability.
+ */
+router.get('/fbx-status', async (_req, res) => {
+  ensureInit();
+  try {
+    if (modelBridge.state !== 'running') {
+      return res.json({ available: false, reason: 'Python server not running' });
+    }
+    const status = await modelBridge.getFbxStatus();
+    res.json(status);
+  } catch (err) {
+    res.json({ available: false, reason: err.message });
   }
 });
 

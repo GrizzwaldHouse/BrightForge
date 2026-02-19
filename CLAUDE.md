@@ -48,6 +48,10 @@ npm run test-forge-db      # src/forge3d/database.js --test
 npm run test-project-manager # src/forge3d/project-manager.js --test
 npm run test-queue         # src/forge3d/generation-queue.js --test
 
+# Integration and Monitoring
+npm run test-integration   # node src/forge3d/test-suite.js
+npm run monitor           # node src/forge3d/monitor.js
+
 # Lint
 npm run lint
 npm run lint:fix

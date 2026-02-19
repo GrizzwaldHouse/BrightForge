@@ -105,6 +105,14 @@ const MIGRATIONS = [
 
       ALTER TABLE generation_history ADD COLUMN retry_count INTEGER DEFAULT 0;
     `
+  },
+  {
+    version: 3,
+    description: 'Add FBX export columns to assets table',
+    sql: `
+      ALTER TABLE assets ADD COLUMN fbx_path TEXT;
+      ALTER TABLE assets ADD COLUMN fbx_size INTEGER DEFAULT 0;
+    `
   }
 ];
 
@@ -260,8 +268,8 @@ class Forge3DDatabase {
     const metadata = typeof data.metadata === 'string' ? data.metadata : JSON.stringify(data.metadata || {});
 
     this.db.prepare(
-      'INSERT INTO assets (id, project_id, name, type, file_path, thumbnail_path, file_size, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(id, projectId, data.name, data.type, data.filePath || null, data.thumbnailPath || null, data.fileSize || 0, metadata);
+      'INSERT INTO assets (id, project_id, name, type, file_path, thumbnail_path, file_size, metadata, fbx_path, fbx_size) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(id, projectId, data.name, data.type, data.filePath || null, data.thumbnailPath || null, data.fileSize || 0, metadata, data.fbxPath || null, data.fbxSize || 0);
 
     // Update project timestamp
     this.db.prepare('UPDATE projects SET updated_at = datetime(\'now\') WHERE id = ?').run(projectId);

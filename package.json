@@ -40,7 +40,9 @@
     "test-project-manager": "node src/forge3d/project-manager.js --test",
     "test-queue": "node src/forge3d/generation-queue.js --test",
     "test-downloader": "node src/forge3d/model-downloader.js --test",
-    "test-config": "node src/forge3d/config-loader.js --test"
+    "test-config": "node src/forge3d/config-loader.js --test",
+    "test-monitor": "node src/forge3d/monitor.js --test",
+    "test-fbx-converter": "python python/fbx_converter.py --test"
   },
   "keywords": [
     "coding-agent",

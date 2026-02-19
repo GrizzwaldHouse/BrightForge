@@ -146,7 +146,7 @@ master_agent:
   # Diff applier configuration
   diff_applier:
     backup_enabled: true
-    backup_suffix: ".llcapp-backup"
+    backup_suffix: ".brightforge-backup"
     max_backups: 5
 
     conflict_resolution: "interactive"  # interactive | auto | manual

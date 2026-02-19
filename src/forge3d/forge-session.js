@@ -240,9 +240,11 @@ class ForgeSession extends EventEmitter {
     session.progress = { stage: 'mesh', percent: forge3dConfig.session.progress.mesh_end_pct };
     return {
       type: 'mesh',
-      meshBuffer: result.buffer,
-      generationTime: parseFloat(result.headers.generationTime) || 0,
-      fileSize: parseInt(result.headers.fileSize) || result.buffer.length
+      meshBuffer: result.glbBuffer,
+      fbxBuffer: result.fbxBuffer || null,
+      generationTime: result.metadata.generationTime || 0,
+      fileSize: result.metadata.fileSize || result.glbBuffer.length,
+      fbxFileSize: result.metadata.fbxFileSize || 0
     };
   }
 
@@ -287,18 +289,16 @@ class ForgeSession extends EventEmitter {
     session.progress = { stage: 'mesh', percent: forge3dConfig.session.progress.mesh_after_image_pct };
     this.emit('progress', { sessionId: session.id, progress: session.progress });
 
-    // Download the generated files
-    const [imageBuffer, meshBuffer] = await Promise.all([
-      modelBridge.downloadFile(session.id, 'generated_image.png'),
-      modelBridge.downloadFile(session.id, 'generated_mesh.glb')
-    ]);
+    // Download the generated image (GLB + FBX already downloaded by generateFull)
+    const imageBuffer = await modelBridge.downloadFile(session.id, 'generated_image.png');
 
     session.progress = { stage: 'complete', percent: 100 };
 
     return {
       type: 'full',
       imageBuffer,
-      meshBuffer,
+      meshBuffer: fullResult.glbBuffer,
+      fbxBuffer: fullResult.fbxBuffer || null,
       totalTime: fullResult.total_time,
       stages: fullResult.stages,
       vramAfter: fullResult.vram_after

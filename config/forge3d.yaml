@@ -90,6 +90,11 @@ viewer:
     color1: "0x3a3a54"
     color2: "0x252941"
 
+fbx_export:
+  enabled: true
+  auto_convert: true
+  coordinate_system: "unreal"
+
 ui:
   generation_polling_ms: 2000
   vram_polling_ms: 10000

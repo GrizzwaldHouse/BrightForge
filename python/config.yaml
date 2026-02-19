@@ -54,3 +54,10 @@ setup:
 
 validation:
   min_mesh_file_size_bytes: 100
+
+fbx_export:
+  enabled: true
+  preferred_backend: "assimp"  # assimp | blender | auto
+  blender_path: null  # auto-detect from PATH if null
+  scale_factor: 100.0  # meters -> centimeters for Unreal
+  coordinate_system: "unreal"  # unreal (Z-up, cm) | default

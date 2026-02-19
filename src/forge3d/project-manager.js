@@ -136,6 +136,7 @@ class ProjectManager {
    * @param {string} data.type - 'mesh' | 'image' | 'full'
    * @param {Buffer} data.buffer - File contents
    * @param {string} data.extension - File extension (.glb, .png)
+   * @param {Buffer} [data.fbxBuffer] - FBX file contents (optional)
    * @param {Object} [data.metadata] - Additional metadata
    * @returns {Object} Created asset record
    */
@@ -154,11 +155,24 @@ class ProjectManager {
 
     writeFileSync(filePath, data.buffer);
 
+    // Write FBX file alongside GLB if available
+    let fbxPath = null;
+    let fbxSize = 0;
+    if (data.fbxBuffer) {
+      fbxPath = join(projectDir, `${safeName}.fbx`);
+      this._validatePath(fbxPath);
+      writeFileSync(fbxPath, data.fbxBuffer);
+      fbxSize = data.fbxBuffer.length;
+      console.log(`[PROJECT] FBX saved: ${fbxSize} bytes`);
+    }
+
     const asset = forge3dDb.createAsset(projectId, {
       name: `${safeName}${data.extension}`,
       type: data.type,
       filePath,
       fileSize: data.buffer.length,
+      fbxPath,
+      fbxSize,
       metadata: data.metadata || {}
     });
 
@@ -184,6 +198,10 @@ class ProjectManager {
     }
     if (asset.thumbnail_path && existsSync(asset.thumbnail_path)) {
       unlinkSync(asset.thumbnail_path);
+    }
+    // Delete FBX file if present
+    if (asset.fbx_path && existsSync(asset.fbx_path)) {
+      unlinkSync(asset.fbx_path);
     }
 
     forge3dDb.deleteAsset(id);

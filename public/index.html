@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BrightForge - Coding Agent Dashboard</title>
+  <title>BrightForge - Creative Studio</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/dashboard.css">
   <link rel="stylesheet" href="/css/system-health.css">
   <link rel="stylesheet" href="/css/file-browser.css">
@@ -16,41 +16,62 @@
 <body>
   <div id="app">
     <header class="topbar">
-      <h1 class="logo">BrightForge</h1>
+      <div class="logo-container">
+        <i data-lucide="zap" class="logo-icon"></i>
+        <h1 class="logo">BrightForge</h1>
+      </div>
       <div class="topbar-right">
         <span id="error-indicator" class="error-indicator hidden" title="Recent errors" aria-label="Recent errors">
-          <span class="error-icon">⚠️</span>
+          <i data-lucide="alert-triangle" class="error-icon"></i>
           <span id="error-count" class="error-count">0</span>
         </span>
-        <span id="health-status" class="status-badge">●</span>
-        <button id="settings-btn" class="icon-btn" title="Settings" aria-label="Settings">⚙️</button>
+        <button id="settings-btn" class="icon-btn" title="Settings" aria-label="Settings">
+          <i data-lucide="settings"></i>
+        </button>
+        <div class="user-avatar">
+          <span class="status-dot" id="health-status"></span>
+          <img src="https://ui-avatars.com/api/?name=User&background=2563EB&color=fff" alt="User">
+        </div>
       </div>
     </header>
 
     <div class="layout">
       <aside class="sidebar">
-        <button id="new-session-btn" class="btn btn-primary">+ New Session</button>
+        <div class="sidebar-header">
+          <button id="new-session-btn" class="btn btn-primary btn-block">
+            <i data-lucide="plus"></i> New Session
+          </button>
+        </div>
 
         <div class="sidebar-section">
-          <h3>Sessions</h3>
+          <h3>
+            <i data-lucide="history" class="section-icon"></i> Recent Sessions
+          </h3>
           <ul id="session-list" class="session-list">
             <!-- Sessions populated by JS -->
           </ul>
         </div>
 
         <div class="sidebar-section">
-          <h3>Providers</h3>
+          <h3>
+            <i data-lucide="cpu" class="section-icon"></i> Providers
+          </h3>
           <ul id="provider-list" class="provider-list">
-            <!-- Providers populated by JS -->
+            <!-- Providers populated by JS ?? -->
           </ul>
         </div>
 
-        <div class="sidebar-section">
-          <h3>Budget</h3>
-          <div id="budget-info" class="budget-info">
-            <span class="budget-remaining">$1.00 remaining</span>
-            <div class="budget-bar">
-              <div class="budget-fill" style="width: 100%"></div>
+        <div class="sidebar-footer">
+          <div class="budget-card">
+            <div class="budget-header">
+              <i data-lucide="credit-card" class="budget-icon"></i>
+              <span>Daily Budget</span>
+            </div>
+            <div id="budget-info" class="budget-info">
+              <span class="budget-remaining">$1.00 remaining</span>
+              <div class="budget-bar">
+                <div class="budget-fill" style="width: 100%"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -58,19 +79,32 @@
 
       <main class="main-content">
         <div class="tab-bar">
-          <button class="tab active" data-tab="chat">Chat</button>
-          <button class="tab" data-tab="design">Design</button>
-          <button class="tab" data-tab="forge3d">Forge 3D</button>
-          <button class="tab" data-tab="health">System Health</button>
-          <button class="tab" data-tab="sessions">Sessions</button>
+          <button class="tab active" data-tab="chat">
+            <i data-lucide="message-square"></i> Chat
+          </button>
+          <button class="tab" data-tab="design">
+            <i data-lucide="palette"></i> Design
+          </button>
+          <button class="tab" data-tab="forge3d">
+            <i data-lucide="box"></i> Forge 3D
+          </button>
+          <button class="tab" data-tab="health">
+            <i data-lucide="activity"></i> Health
+          </button>
+          <button class="tab" data-tab="sessions">
+            <i data-lucide="list"></i> All Sessions
+          </button>
         </div>
 
         <div class="tab-panel active" data-panel="chat">
           <div class="chat-panel">
             <div id="chat-messages" class="chat-messages">
               <div class="welcome-message">
+                <div class="welcome-icon">
+                  <i data-lucide="sparkles"></i>
+                </div>
                 <h2>Welcome to BrightForge</h2>
-                <p>Enter a coding task below to get started. The agent will analyze your project and generate a plan.</p>
+                <p>Your hybrid AI creative studio. Describe a task to begin.</p>
               </div>
             </div>
 
@@ -79,13 +113,17 @@
             </div>
 
             <div class="chat-input-bar">
-              <div class="project-path">
-                <label>Project:</label>
+              <div class="project-selector">
+                <i data-lucide="folder" class="folder-icon"></i>
                 <div id="project-root-container"></div>
               </div>
               <div class="input-row">
-                <input type="text" id="chat-input" placeholder="Describe a coding task..." autofocus>
-                <button id="send-btn" class="btn btn-send">Send</button>
+                <div class="input-wrapper">
+                  <input type="text" id="chat-input" placeholder="Describe a coding or design task..." autofocus>
+                  <button id="send-btn" class="btn-icon-primary" title="Send">
+                    <i data-lucide="arrow-right"></i>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -98,26 +136,38 @@
         <div class="tab-panel" data-panel="design">
           <div id="design-panel">
             <div class="design-header">
-              <h2>AI Design Generation</h2>
-              <p>Generate complete HTML designs with AI-powered images and layouts</p>
+              <div class="header-content">
+                <h2>AI Design Generation</h2>
+                <p>Generate complete HTML designs with AI-powered images and layouts</p>
+              </div>
+              <i data-lucide="palette" class="header-icon-large"></i>
             </div>
 
             <div class="design-input-section">
               <div class="input-group">
-                <label for="design-prompt">Design Brief:</label>
+                <label for="design-prompt">
+                  <i data-lucide="type"></i> Design Brief
+                </label>
                 <textarea id="design-prompt" placeholder="Describe the design you want to create... (e.g., &quot;Create a landing page for a coffee shop with a hero image and menu section&quot;)"></textarea>
               </div>
 
               <div class="input-group">
-                <label for="design-style">Style:</label>
-                <select id="design-style">
-                  <option value="default">Default - Clean & Professional</option>
-                  <option value="blue-glass">Blue Glass - 3D Glassmorphism</option>
-                  <option value="dark-industrial">Dark Industrial - Bold & Technical</option>
-                </select>
+                <label for="design-style">
+                  <i data-lucide="droplet"></i> Style
+                </label>
+                <div class="select-wrapper">
+                  <select id="design-style">
+                    <option value="default">Default - Clean & Professional</option>
+                    <option value="blue-glass">Blue Glass - 3D Glassmorphism</option>
+                    <option value="dark-industrial">Dark Industrial - Bold & Technical</option>
+                  </select>
+                  <i data-lucide="chevron-down" class="select-arrow"></i>
+                </div>
               </div>
 
-              <button id="generate-design-btn" class="btn btn-primary">Generate Design</button>
+              <button id="generate-design-btn" class="btn btn-primary btn-large">
+                <i data-lucide="wand-2"></i> Generate Design
+              </button>
 
               <div id="design-status" class="status"></div>
             </div>
@@ -126,8 +176,12 @@
               <div class="preview-header">
                 <h3>Design Preview</h3>
                 <div class="preview-actions">
-                  <button id="approve-design-btn" class="btn btn-success" disabled>Export Design</button>
-                  <button id="cancel-design-btn" class="btn btn-secondary" disabled>Cancel</button>
+                  <button id="approve-design-btn" class="btn btn-success" disabled>
+                    <i data-lucide="download"></i> Export
+                  </button>
+                  <button id="cancel-design-btn" class="btn btn-secondary" disabled>
+                    <i data-lucide="x"></i> Cancel
+                  </button>
                 </div>
               </div>
 
@@ -143,8 +197,8 @@
             <div class="forge3d-viewport-wrapper">
               <div id="forge3d-viewport"></div>
               <div class="forge3d-viewport-toolbar">
-                <button id="forge3d-wireframe-btn" title="Toggle wireframe">Wireframe</button>
-                <button id="forge3d-reset-btn" title="Reset camera">Reset</button>
+                <button id="forge3d-wireframe-btn" title="Toggle wireframe"><i data-lucide="grid"></i></button>
+                <button id="forge3d-reset-btn" title="Reset camera"><i data-lucide="refresh-cw"></i></button>
               </div>
             </div>
 
@@ -152,7 +206,7 @@
             <div class="forge3d-controls">
               <!-- VRAM Monitor -->
               <div class="forge3d-section">
-                <h3>GPU / VRAM</h3>
+                <h3><i data-lucide="cpu"></i> GPU / VRAM</h3>
                 <div class="forge3d-vram">
                   <div class="forge3d-vram-bar-wrapper">
                     <div id="forge3d-vram-bar" class="vram-fill vram-ok" style="width: 0%"></div>
@@ -163,14 +217,17 @@
 
               <!-- Generation Controls -->
               <div class="forge3d-section">
-                <h3>Generate</h3>
+                <h3><i data-lucide="wand-2"></i> Generate</h3>
                 <div class="forge3d-input-group">
                   <label for="forge3d-type">Type</label>
-                  <select id="forge3d-type">
-                    <option value="full">Text to 3D (Full Pipeline)</option>
-                    <option value="image">Text to Image (SDXL)</option>
-                    <option value="mesh">Image to Mesh</option>
-                  </select>
+                  <div class="select-wrapper">
+                    <select id="forge3d-type">
+                      <option value="full">Text to 3D (Full Pipeline)</option>
+                      <option value="image">Text to Image (SDXL)</option>
+                      <option value="mesh">Image to Mesh</option>
+                    </select>
+                    <i data-lucide="chevron-down" class="select-arrow"></i>
+                  </div>
                 </div>
 
                 <div id="forge3d-prompt-group" class="forge3d-input-group">
@@ -181,21 +238,29 @@
                 <div id="forge3d-upload-group" class="forge3d-input-group hidden">
                   <div id="forge3d-upload-area" class="forge3d-upload-area">
                     <input type="file" id="forge3d-upload" accept="image/*">
-                    Drop image here or click to upload
+                    <i data-lucide="upload-cloud" class="upload-icon"></i>
+                    <span>Drop image here or click to upload</span>
                   </div>
                 </div>
 
                 <div class="forge3d-input-group">
                   <label for="forge3d-project-select">Save to Project</label>
                   <div class="forge3d-project-row">
-                    <select id="forge3d-project-select" style="flex: 1;">
-                      <option value="">No project</option>
-                    </select>
-                    <button id="forge3d-create-project-btn" class="btn-small" title="New project">+</button>
+                    <div class="select-wrapper" style="flex: 1;">
+                      <select id="forge3d-project-select">
+                        <option value="">No project</option>
+                      </select>
+                      <i data-lucide="chevron-down" class="select-arrow"></i>
+                    </div>
+                    <button id="forge3d-create-project-btn" class="btn-small icon-only" title="New project">
+                      <i data-lucide="plus"></i>
+                    </button>
                   </div>
                 </div>
 
-                <button id="forge3d-generate-btn" class="forge3d-generate-btn">Generate</button>
+                <button id="forge3d-generate-btn" class="forge3d-generate-btn">
+                  <i data-lucide="play"></i> Generate
+                </button>
                 <div class="forge3d-progress">
                   <div id="forge3d-progress-bar" class="forge3d-progress-bar"></div>
                 </div>
@@ -204,18 +269,18 @@
 
               <!-- Stats -->
               <div class="forge3d-section">
-                <h3>Stats</h3>
+                <h3><i data-lucide="bar-chart-2"></i> Stats</h3>
                 <div id="forge3d-stats" class="forge3d-stats">
                   <div class="stat-item"><span class="stat-value">0</span><span class="stat-label">Total</span></div>
-                  <div class="stat-item"><span class="stat-value">0</span><span class="stat-label">Completed</span></div>
-                  <div class="stat-item"><span class="stat-value">0%</span><span class="stat-label">Fail Rate</span></div>
-                  <div class="stat-item"><span class="stat-value">0s</span><span class="stat-label">Avg Time</span></div>
+                  <div class="stat-item"><span class="stat-value">0</span><span class="stat-label">Done</span></div>
+                  <div class="stat-item"><span class="stat-value">0%</span><span class="stat-label">Fail</span></div>
+                  <div class="stat-item"><span class="stat-value">0s</span><span class="stat-label">Avg</span></div>
                 </div>
               </div>
 
               <!-- Queue -->
               <div class="forge3d-section">
-                <h3>Queue</h3>
+                <h3><i data-lucide="list"></i> Queue</h3>
                 <div id="forge3d-queue-list" class="forge3d-queue">
                   <div class="queue-empty">No recent jobs</div>
                 </div>
@@ -223,7 +288,7 @@
 
               <!-- Asset Gallery -->
               <div class="forge3d-section">
-                <h3>Assets</h3>
+                <h3><i data-lucide="image"></i> Assets</h3>
                 <div id="forge3d-gallery" class="forge3d-gallery">
                   <div class="gallery-empty">Select a project to view assets</div>
                 </div>
@@ -246,11 +311,26 @@
   <script src="https://cdn.jsdelivr.net/npm/three@0.171.0/build/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.171.0/examples/js/controls/OrbitControls.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.171.0/examples/js/loaders/GLTFLoader.js"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
 
   <script type="module" src="/js/app.js"></script>
   <script type="module" src="/js/forge3d-panel.js"></script>
   <script type="module" src="/js/system-health.js"></script>
+  
+  <!-- Init Icons -->
   <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      
+      // Re-run icons when tabs change (in case of dynamic content, though mostly static)
+      const observer = new MutationObserver(() => {
+        lucide.createIcons();
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+    });
+
     // Error indicator polling (observer feedback in dashboard)
     (function() {
       const indicator = document.getElementById('error-indicator');
@@ -272,42 +352,25 @@
             indicator.classList.add('hidden');
             indicator.classList.remove('pulse');
           }
-
-          // Show tooltip with latest error
-          if (data.errors && data.errors.length > 0) {
-            const latest = data.errors[0];
-            indicator.title = `${count} recent error(s)\nLatest: ${latest.category} - ${latest.message}`;
-          }
-
+          
           lastCount = count;
         } catch {
-          // Server not available, hide indicator
           indicator.classList.add('hidden');
         }
       }
 
-      // Click to show diagnostics
       indicator.addEventListener('click', async () => {
         try {
           const res = await fetch('/api/errors/diagnostics');
           if (!res.ok) return;
           const diag = await res.json();
-          alert(
-            `System Diagnostics\n\n` +
-            `Uptime: ${diag.uptime}s\n` +
-            `Memory: ${diag.memory.heapUsed} / ${diag.memory.heapTotal}\n` +
-            `Total Errors: ${diag.errors.total}\n` +
-            `Categories: ${JSON.stringify(diag.errors.byCategory)}\n\n` +
-            `Node: ${diag.nodeVersion} (${diag.platform})`
-          );
+          alert(JSON.stringify(diag, null, 2));
         } catch (e) {
           alert('Could not load diagnostics: ' + e.message);
         }
       });
 
-      // Poll every 5 seconds
       setInterval(pollErrors, 5000);
-      // Initial poll after 2 seconds
       setTimeout(pollErrors, 2000);
     })();
   </script>

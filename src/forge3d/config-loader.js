@@ -112,6 +112,12 @@ class Forge3DConfig {
       grid: { size: 10, divisions: 20, color1: '0x3a3a54', color2: '0x252941' }
     });
 
+    this.fbxExport = this._section('fbx_export', {
+      enabled: true,
+      auto_convert: true,
+      coordinate_system: 'unreal'
+    });
+
     this.ui = this._section('ui', {
       generation_polling_ms: 2000,
       vram_polling_ms: 10000,

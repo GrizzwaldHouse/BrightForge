@@ -411,7 +411,8 @@ class Forge3DPanel {
             <span class="gallery-size">${this._formatSize(asset.file_size)}</span>
           </div>
           <div class="gallery-actions">
-            <button class="btn-small" onclick="window.forge3dPanel.downloadAsset('${asset.id}')">Download</button>
+            <button class="btn-small" onclick="window.forge3dPanel.downloadAsset('${asset.id}')">GLB</button>
+            ${asset.fbx_path ? `<button class="btn-small" onclick="window.forge3dPanel.downloadAsset('${asset.id}', 'fbx')">FBX</button>` : `<button class="btn-small btn-muted" onclick="window.forge3dPanel.convertToFbx('${asset.id}')">Convert FBX</button>`}
             <button class="btn-small btn-danger" onclick="window.forge3dPanel.deleteAsset('${asset.id}')">Delete</button>
           </div>
         </div>
@@ -563,19 +564,46 @@ class Forge3DPanel {
   }
 
   /**
-   * Download an asset.
+   * Download an asset (GLB or FBX).
+   * @param {string} assetId
+   * @param {string} [format] - 'fbx' for FBX download, default is GLB/PNG
    */
-  async downloadAsset(assetId) {
+  async downloadAsset(assetId, format = null) {
     try {
-      // Use dedicated asset download endpoint (reads file_path from DB)
+      const url = format
+        ? `/api/forge3d/assets/${assetId}/download?format=${format}`
+        : `/api/forge3d/assets/${assetId}/download`;
       const a = document.createElement('a');
-      a.href = `/api/forge3d/assets/${assetId}/download`;
+      a.href = url;
       a.download = '';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
     } catch (_err) {
       this._showStatus('Download failed', 'error');
+    }
+  }
+
+  /**
+   * Convert an existing GLB asset to FBX.
+   */
+  async convertToFbx(assetId) {
+    this._showStatus('Converting to FBX...', 'info');
+    try {
+      const res = await fetch('/api/forge3d/convert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assetId })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(err.error || res.statusText);
+      }
+      const data = await res.json();
+      this._showStatus(`FBX converted (${data.backend}, ${data.conversion_time}s)`, 'success');
+      this._loadAssets();
+    } catch (err) {
+      this._showStatus(`FBX conversion failed: ${err.message}`, 'error');
     }
   }
 

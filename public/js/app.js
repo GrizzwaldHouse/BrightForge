@@ -404,23 +404,34 @@ class App {
       const statusSpan = document.createElement('span');
       statusSpan.className = 'provider-status';
 
+      const icon = document.createElement('i');
+
       // info is { enabled, available } from /api/health
       const avail = typeof info === 'object' ? info.available : info;
+
       if (avail === 'available' || avail === 'configured' || avail === true) {
         statusSpan.classList.add('online');
-        statusSpan.textContent = '🟢';
+        icon.setAttribute('data-lucide', 'check-circle-2');
       } else if (avail === 'no_api_key' || avail === 'unknown') {
         statusSpan.classList.add('degraded');
-        statusSpan.textContent = '🟡';
+        icon.setAttribute('data-lucide', 'alert-circle');
       } else {
         statusSpan.classList.add('offline');
-        statusSpan.textContent = '🔴';
+        icon.setAttribute('data-lucide', 'x-circle');
       }
 
+      // Icon styling via CSS preferred, but inline for safety
+      icon.style.width = '14px';
+      icon.style.height = '14px';
+
+      statusSpan.appendChild(icon);
       item.appendChild(nameSpan);
       item.appendChild(statusSpan);
       list.appendChild(item);
     });
+
+    // Explicitly trigger icon render
+    if (window.lucide) window.lucide.createIcons();
   }
 
   /**

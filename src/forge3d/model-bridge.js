@@ -291,11 +291,11 @@ class ModelBridge extends EventEmitter {
   // --- HTTP Client Methods ---
 
   /**
-   * Generate a 3D mesh from an image.
+   * Generate a 3D mesh from an image (JSON mode with GLB + FBX paths).
    * @param {Buffer} imageBuffer - Image file bytes
    * @param {string} filename - Original filename
    * @param {string} [jobId] - Optional job ID
-   * @returns {Promise<{buffer: Buffer, headers: Object}>} GLB file buffer and response headers
+   * @returns {Promise<{glbBuffer: Buffer, fbxBuffer: Buffer|null, metadata: Object}>}
    */
   async generateMesh(imageBuffer, filename = 'input.png', jobId = null) {
     this._ensureRunning();
@@ -314,7 +314,7 @@ class ModelBridge extends EventEmitter {
     formData.append('image', new Blob([imageBuffer]), filename);
     if (jobId) formData.append('job_id', jobId);
 
-    const response = await this._fetchRaw(`${this.baseUrl}/generate/mesh`, {
+    const response = await this._fetchRaw(`${this.baseUrl}/generate/mesh?format=json`, {
       method: 'POST',
       body: formData,
       signal: AbortSignal.timeout(forge3dConfig.generation.timeout_ms)
@@ -325,15 +325,34 @@ class ModelBridge extends EventEmitter {
       throw new Error(`Mesh generation failed: ${err.detail || err.error || response.statusText}`);
     }
 
-    const buffer = Buffer.from(await response.arrayBuffer());
-    const headers = {
-      jobId: response.headers.get('x-job-id'),
-      generationTime: response.headers.get('x-generation-time'),
-      fileSize: response.headers.get('x-file-size')
+    const result = await response.json();
+    const metadata = {
+      jobId: result.job_id,
+      generationTime: result.generation_time,
+      fileSize: result.file_size_bytes,
+      fbxFileSize: result.fbx_size_bytes || 0
     };
 
-    console.log(`[BRIDGE] Mesh generated: ${buffer.length} bytes in ${headers.generationTime}s`);
-    return { buffer, headers };
+    // Download GLB
+    const glbBuffer = await this.downloadFile(
+      result.job_id,
+      `${result.job_id}.glb`
+    );
+
+    // Download FBX if available (non-fatal)
+    let fbxBuffer = null;
+    if (result.fbx_path) {
+      try {
+        const fbxFilename = result.fbx_path.split('/').pop();
+        fbxBuffer = await this.downloadFile(result.job_id, fbxFilename);
+        console.log(`[BRIDGE] FBX downloaded: ${fbxBuffer.length} bytes`);
+      } catch (fbxErr) {
+        console.warn(`[BRIDGE] FBX download failed (non-fatal): ${fbxErr.message}`);
+      }
+    }
+
+    console.log(`[BRIDGE] Mesh generated: ${glbBuffer.length} bytes in ${metadata.generationTime}s`);
+    return { glbBuffer, fbxBuffer, metadata };
   }
 
   /**
@@ -379,7 +398,7 @@ class ModelBridge extends EventEmitter {
    * Full text-to-3D pipeline (SDXL -> InstantMesh).
    * @param {string} prompt - Text description
    * @param {Object} [options] - steps, jobId
-   * @returns {Promise<Object>} Pipeline result with image and mesh paths
+   * @returns {Promise<Object>} Pipeline result with image and mesh paths + buffers
    */
   async generateFull(prompt, options = {}) {
     this._ensureRunning();
@@ -402,8 +421,71 @@ class ModelBridge extends EventEmitter {
     }
 
     const result = await response.json();
+
+    // Download GLB mesh
+    const glbBuffer = await this.downloadFile(result.job_id, 'generated_mesh.glb');
+    result.glbBuffer = glbBuffer;
+
+    // Download FBX if available (non-fatal)
+    result.fbxBuffer = null;
+    if (result.fbx_path) {
+      try {
+        const fbxFilename = result.fbx_path.split('/').pop();
+        result.fbxBuffer = await this.downloadFile(result.job_id, fbxFilename);
+        console.log(`[BRIDGE] FBX downloaded: ${result.fbxBuffer.length} bytes`);
+      } catch (fbxErr) {
+        console.warn(`[BRIDGE] FBX download failed (non-fatal): ${fbxErr.message}`);
+      }
+    }
+
     console.log(`[BRIDGE] Full pipeline complete in ${result.total_time}s`);
     return result;
+  }
+
+  /**
+   * Convert an existing GLB buffer to FBX format.
+   * @param {Buffer} glbBuffer - GLB file bytes
+   * @param {string} [jobId] - Optional job ID
+   * @returns {Promise<{buffer: Buffer, metadata: Object}>} FBX file buffer
+   */
+  async convertToFbx(glbBuffer, jobId = null) {
+    this._ensureRunning();
+    console.log(`[BRIDGE] Requesting GLB->FBX conversion (${glbBuffer.length} bytes)...`);
+
+    const formData = new FormData();
+    formData.append('file', new Blob([glbBuffer]), 'mesh.glb');
+    if (jobId) formData.append('job_id', jobId);
+
+    const response = await this._fetchRaw(`${this.baseUrl}/convert/glb-to-fbx`, {
+      method: 'POST',
+      body: formData,
+      signal: AbortSignal.timeout(forge3dConfig.generation.timeout_ms)
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ detail: response.statusText }));
+      throw new Error(`FBX conversion failed: ${err.detail || err.error || response.statusText}`);
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const metadata = {
+      jobId: response.headers.get('x-job-id'),
+      conversionTime: response.headers.get('x-conversion-time'),
+      fileSize: response.headers.get('x-file-size'),
+      backend: response.headers.get('x-backend')
+    };
+
+    console.log(`[BRIDGE] FBX conversion complete: ${buffer.length} bytes in ${metadata.conversionTime}s (${metadata.backend})`);
+    return { buffer, metadata };
+  }
+
+  /**
+   * Check FBX converter availability.
+   * @returns {Promise<Object>} FBX converter status
+   */
+  async getFbxStatus() {
+    this._ensureRunning();
+    return this._fetchWithTimeout(`${this.baseUrl}/convert/status`, forge3dConfig.healthCheck.timeout_ms);
   }
 
   /**
