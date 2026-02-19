@@ -172,7 +172,10 @@ class FbxConverter:
             coord_system = _cfg('fbx_export', 'coordinate_system', 'unreal')
             if coord_system == 'unreal':
                 scale = _cfg('fbx_export', 'scale_factor', 100.0)
-                # Scale will be applied during export
+                # Scale vertices directly since pyassimp.export doesn't accept a scale param
+                for mesh in scene.meshes:
+                    for i in range(len(mesh.vertices)):
+                        mesh.vertices[i] = [v * scale for v in mesh.vertices[i]]
 
             # Export as FBX
             pyassimp.export(scene, fbx_path, file_type='fbx')
@@ -195,7 +198,6 @@ class FbxConverter:
     def _convert_via_trimesh(self, glb_path, fbx_path):
         """Fallback within assimp: use trimesh for conversion."""
         import trimesh
-        import numpy as np
 
         result = {
             'success': False,
