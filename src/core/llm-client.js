@@ -177,8 +177,8 @@ class UniversalLLMClient {
 
     // OpenRouter needs additional headers
     if (provider === 'openrouter') {
-      headers['HTTP-Referer'] = 'https://github.com/GrizzwaldHouse/LLCApp';
-      headers['X-Title'] = 'LLCApp Coding Agent';
+      headers['HTTP-Referer'] = 'https://github.com/GrizzwaldHouse/BrightForge';
+      headers['X-Title'] = 'BrightForge Coding Agent';
     }
 
     return headers;

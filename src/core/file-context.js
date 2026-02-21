@@ -233,7 +233,7 @@ if (process.argv.includes('--test')) {
   console.log('Testing File Context Scanner...\n');
 
   const testContext = new FileContext();
-  const projectRoot = 'C:\\Users\\daley\\Projects\\LLCApp';
+  const projectRoot = 'C:\\Users\\daley\\Projects\\BrightForge';
 
   console.log(`Scanning project: ${projectRoot}\n`);
 

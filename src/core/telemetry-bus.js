@@ -1,5 +1,5 @@
 /**
- * TelemetryBus - Observability event hub for LLCApp
+ * TelemetryBus - Observability event hub for BrightForge
  *
  * EventEmitter-based telemetry system tracking:
  * - LLM requests (provider, tokens, cost, latency)

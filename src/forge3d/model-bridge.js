@@ -63,9 +63,7 @@ class ModelBridge extends EventEmitter {
 
     this.state = 'starting';
 
-    // TODO(phase8-critical): Pre-flight environment checks before spawning Python.
-    // Validates: Python 3.10+, CUDA GPU, required packages (fastapi, diffusers, trimesh).
-    // On failure: sets state to 'unavailable' with clear reason, skips spawn.
+    // Pre-flight environment checks before spawning Python
     const envCheck = await this._checkEnvironment();
     if (!envCheck.ready) {
       this.state = 'unavailable';

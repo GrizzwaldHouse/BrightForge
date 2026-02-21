@@ -1,6 +1,6 @@
 {
   "name": "brightforge",
-  "version": "4.2.0-alpha",
+  "version": "4.2.0",
   "description": "BrightForge - Hybrid developer coding + design + 3D generation agent with local LLMs, cloud fallback, and GPU-accelerated mesh generation",
   "main": "bin/brightforge.js",
   "type": "module",

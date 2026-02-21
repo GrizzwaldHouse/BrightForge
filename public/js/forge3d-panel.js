@@ -10,9 +10,7 @@
 
 import { Forge3DViewer } from './forge3d-viewer.js';
 
-// TODO(phase8-medium): VRAM poll interval adapts to generation state.
-// Active generation: 5s for responsive feedback.
-// Idle: 10s to reduce network chatter.
+// VRAM poll interval adapts to generation state
 const VRAM_POLL_ACTIVE = 5000;
 const VRAM_POLL_IDLE = 10000;
 

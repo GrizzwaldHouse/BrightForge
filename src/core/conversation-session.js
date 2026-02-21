@@ -1,5 +1,5 @@
 /**
- * ConversationSession - Multi-Turn Chat Mode for LLCApp
+ * ConversationSession - Multi-Turn Chat Mode for BrightForge
  *
  * Manages stateful conversation sessions with:
  * - Multi-turn message history
@@ -242,7 +242,7 @@ export class ConversationSession {
    * @returns {Promise<void>}
    */
   async run() {
-    this.terminal.header('LLCApp Chat Mode');
+    this.terminal.header('BrightForge Chat Mode');
     this.terminal.log(`Project: ${this.projectRoot}`, 'info');
     this.terminal.log('Type a coding task, or /help for commands. /exit to quit.', 'info');
     console.log('');

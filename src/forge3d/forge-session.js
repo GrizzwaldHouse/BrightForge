@@ -38,11 +38,9 @@ const SESSION_STATES = {
 class ForgeSession extends EventEmitter {
   constructor() {
     super();
-    // TODO(phase8-high): Session persistence — hybrid in-memory + DB.
-    // Active sessions (idle/generating) stay in Map for fast access.
-    // Completed/failed sessions are persisted to the 'sessions' table (migration v2).
-    // On init(), recent completed sessions are loaded from DB into Map.
-    // On getStatus(), if not in Map, check DB (for sessions from previous server runs).
+    // Hybrid in-memory + DB persistence.
+    // Active sessions stay in Map; completed/failed persist to 'sessions' table.
+    // init() loads recent sessions from DB; getStatus() falls back to DB.
     this.sessions = new Map();
     this._dbReady = false;
   }
@@ -176,8 +174,7 @@ class ForgeSession extends EventEmitter {
       const duration = session.completedAt - session.startedAt;
       console.log(`[FORGE] Session ${sessionId} complete in ${duration}ms`);
 
-      // TODO(phase8-high): Emit Python performance metrics to TelemetryBus.
-      // Parse generation time from result and emit for dashboard trends.
+      // Emit Python performance metrics to TelemetryBus for dashboard trends
       if (result.generationTime) {
         telemetryBus.emit('forge3d_perf', {
           sessionId,

@@ -69,7 +69,7 @@ async function main() {
   const server = app.listen(port, () => {
     console.log('');
     console.log('  ╔══════════════════════════════════════╗');
-    console.log('  ║    BrightForge Server v3.1.0         ║');
+    console.log('  ║    BrightForge Server v4.2.0          ║');
     console.log('  ╚══════════════════════════════════════╝');
     console.log('');
     console.log(`  [SERVER] Listening on http://localhost:${port}`);
