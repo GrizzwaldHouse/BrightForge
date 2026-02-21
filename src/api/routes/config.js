@@ -76,6 +76,60 @@ export function configRoutes() {
   });
 
   /**
+   * GET /api/ready
+   * Kubernetes-style readiness probe - returns 200 if server is ready to accept traffic.
+   * Checks: server started, database accessible (if Forge3D used).
+   * Returns: { ready: true/false, checks: {...} }
+   */
+  router.get('/ready', async (req, res) => {
+    try {
+      const checks = {
+        server: 'ok',
+        database: 'not_checked',
+        python: 'not_checked'
+      };
+
+      // Check database (Forge3D) - non-blocking
+      try {
+        const dbPath = join(__dirname, '../../../data/forge3d.db');
+        if (existsSync(dbPath)) {
+          checks.database = 'ok';
+        } else {
+          checks.database = 'not_initialized';
+        }
+      } catch (_e) {
+        checks.database = 'error';
+      }
+
+      // Check Python server - non-blocking
+      try {
+        const pyRes = await fetch('http://127.0.0.1:8765/health', {
+          signal: AbortSignal.timeout(1000)
+        });
+        checks.python = pyRes.ok ? 'ok' : 'unhealthy';
+      } catch (_e) {
+        checks.python = 'offline';
+      }
+
+      const ready = checks.server === 'ok'; // Server always ready if it responds
+      const status = ready ? 200 : 503;
+
+      res.status(status).json({
+        ready,
+        checks,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      res.status(503).json({
+        ready: false,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
+  /**
    * GET /api/health
    * Health check with provider availability.
    * Returns: { status, providers, ollamaRunning, timestamp }

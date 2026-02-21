@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BrightForge Status</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      max-width: 800px;
+      width: 100%;
+      padding: 40px;
+    }
+    h1 {
+      color: #1a202c;
+      font-size: 32px;
+      margin-bottom: 10px;
+    }
+    .subtitle {
+      color: #718096;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+    .status-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .status-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 15px;
+    }
+    .status-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #2d3748;
+    }
+    .status-badge {
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .status-ok { background: #c6f6d5; color: #22543d; }
+    .status-warning { background: #feebc8; color: #7c2d12; }
+    .status-error { background: #fed7d7; color: #742a2a; }
+    .status-offline { background: #e2e8f0; color: #2d3748; }
+    .metric {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #f7fafc;
+    }
+    .metric:last-child { border-bottom: none; }
+    .metric-label {
+      color: #718096;
+      font-size: 14px;
+    }
+    .metric-value {
+      color: #2d3748;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .provider-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .provider-chip {
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      text-align: center;
+      border: 1px solid #e2e8f0;
+    }
+    .footer {
+      text-align: center;
+      color: #a0aec0;
+      font-size: 12px;
+      margin-top: 30px;
+    }
+    .footer a {
+      color: #667eea;
+      text-decoration: none;
+    }
+    .footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>BrightForge Status</h1>
+    <p class="subtitle">Real-time system health and metrics</p>
+
+    <!-- Overall Status -->
+    <div class="status-card">
+      <div class="status-header">
+        <div class="status-title">Overall Status</div>
+        <div class="status-badge status-ok" id="overall-status">Loading...</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Server Uptime</div>
+        <div class="metric-value" id="uptime">--</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Memory Usage</div>
+        <div class="metric-value" id="memory">--</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Version</div>
+        <div class="metric-value">v4.2.0</div>
+      </div>
+    </div>
+
+    <!-- Component Health -->
+    <div class="status-card">
+      <div class="status-header">
+        <div class="status-title">Component Health</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Node.js Server</div>
+        <div class="metric-value" id="server-status">--</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Forge3D Database</div>
+        <div class="metric-value" id="db-status">--</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Python Inference Server</div>
+        <div class="metric-value" id="python-status">--</div>
+      </div>
+    </div>
+
+    <!-- LLM Providers -->
+    <div class="status-card">
+      <div class="status-header">
+        <div class="status-title">LLM Providers</div>
+      </div>
+      <div class="provider-grid" id="providers">
+        <div class="provider-chip">Loading...</div>
+      </div>
+    </div>
+
+    <!-- Usage Stats -->
+    <div class="status-card">
+      <div class="status-header">
+        <div class="status-title">Usage Statistics</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">LLM Requests</div>
+        <div class="metric-value" id="llm-requests">--</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Plans Generated</div>
+        <div class="metric-value" id="plans-generated">--</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Budget Used</div>
+        <div class="metric-value" id="budget-used">--</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p>BrightForge &middot; <a href="/">Dashboard</a> &middot; <a href="/api/health">API Health</a> &middot; <a href="/api/metrics">Metrics</a></p>
+      <p style="margin-top: 10px;">Auto-refreshes every 10 seconds</p>
+    </div>
+  </div>
+
+  <script>
+    async function updateStatus() {
+      try {
+        // Fetch health data
+        const [health, metrics, ready] = await Promise.all([
+          fetch('/api/health').then(r => r.json()).catch(() => null),
+          fetch('/api/metrics').then(r => r.json()).catch(() => null),
+          fetch('/api/ready').then(r => r.json()).catch(() => null)
+        ]);
+
+        // Overall status
+        if (health && health.status === 'ok') {
+          document.getElementById('overall-status').textContent = 'Operational';
+          document.getElementById('overall-status').className = 'status-badge status-ok';
+        } else {
+          document.getElementById('overall-status').textContent = 'Degraded';
+          document.getElementById('overall-status').className = 'status-badge status-warning';
+        }
+
+        // Uptime
+        if (metrics && metrics.uptime) {
+          const hours = Math.floor(metrics.uptime / 3600);
+          const minutes = Math.floor((metrics.uptime % 3600) / 60);
+          document.getElementById('uptime').textContent = `${hours}h ${minutes}m`;
+        }
+
+        // Memory
+        if (metrics && metrics.memory) {
+          const usedMB = (metrics.memory.heapUsed / 1024 / 1024).toFixed(0);
+          const totalMB = (metrics.memory.heapTotal / 1024 / 1024).toFixed(0);
+          document.getElementById('memory').textContent = `${usedMB} / ${totalMB} MB`;
+        }
+
+        // Component health
+        document.getElementById('server-status').textContent = ready?.checks?.server === 'ok' ? '✓ OK' : '✗ Error';
+        document.getElementById('db-status').textContent = ready?.checks?.database === 'ok' ? '✓ OK' : ready?.checks?.database === 'not_initialized' ? '- Not Init' : '✗ Offline';
+        document.getElementById('python-status').textContent = ready?.checks?.python === 'ok' ? '✓ OK' : '✗ Offline';
+
+        // Providers
+        if (health && health.providers) {
+          const providersDiv = document.getElementById('providers');
+          providersDiv.innerHTML = '';
+          for (const [name, info] of Object.entries(health.providers)) {
+            const chip = document.createElement('div');
+            chip.className = 'provider-chip';
+            chip.textContent = name;
+            if (info.available === 'available') {
+              chip.style.background = '#c6f6d5';
+              chip.style.borderColor = '#9ae6b4';
+            } else if (info.available === 'configured') {
+              chip.style.background = '#feebc8';
+              chip.style.borderColor = '#fbd38d';
+            } else {
+              chip.style.background = '#fed7d7';
+              chip.style.borderColor = '#fc8181';
+            }
+            providersDiv.appendChild(chip);
+          }
+        }
+
+        // Usage stats
+        if (metrics && metrics.counters) {
+          document.getElementById('llm-requests').textContent = metrics.counters.llmRequests || 0;
+          document.getElementById('plans-generated').textContent = metrics.counters.plansGenerated || 0;
+        }
+        if (health && health.budget) {
+          const used = health.budget.used.toFixed(4);
+          const limit = health.budget.daily_limit.toFixed(2);
+          document.getElementById('budget-used').textContent = `$${used} / $${limit}`;
+        }
+
+      } catch (err) {
+        console.error('Status update failed:', err);
+      }
+    }
+
+    // Initial load
+    updateStatus();
+
+    // Refresh every 10 seconds
+    setInterval(updateStatus, 10000);
+  </script>
+</body>
+</html>

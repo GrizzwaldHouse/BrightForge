@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  # Node.js Web Server + Coding Agent
+  web:
+    build:
+      context: .
+      target: node-server
+    container_name: brightforge-web
+    ports:
+      - "3847:3847"
+    environment:
+      # LLM Provider API Keys (override in .env.docker)
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - CEREBRAS_API_KEY=${CEREBRAS_API_KEY:-}
+      - TOGETHER_API_KEY=${TOGETHER_API_KEY:-}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      # Server config
+      - PORT=3847
+      - NODE_ENV=production
+    volumes:
+      # Persist database and generated assets
+      - brightforge-data:/app/data
+      # Persist session logs
+      - brightforge-sessions:/app/sessions
+    depends_on:
+      - python
+    restart: unless-stopped
+    networks:
+      - brightforge
+
+  # Python Inference Server (GPU-accelerated 3D generation)
+  python:
+    build:
+      context: .
+      target: python-server
+    container_name: brightforge-python
+    ports:
+      - "8765:8765"
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Persist model cache (avoids re-downloading SDXL/InstantMesh on restart)
+      - huggingface-cache:/root/.cache/huggingface
+      # Persist generated outputs
+      - brightforge-data:/app/output
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    networks:
+      - brightforge
+
+volumes:
+  brightforge-data:
+    driver: local
+  brightforge-sessions:
+    driver: local
+  huggingface-cache:
+    driver: local
+
+networks:
+  brightforge:
+    driver: bridge
