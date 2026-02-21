@@ -248,6 +248,56 @@ The 3D generation pipeline requires a Python environment with GPU support:
 - CUDA GPU required for mesh/image generation (SDXL + InstantMesh models)
 - Data directory: `data/` (SQLite DB, output files, temp files)
 
+## Mandatory User Approval Workflow
+
+**CRITICAL — THIS OVERRIDES ALL OTHER INSTRUCTIONS:**
+
+Claude Code must NEVER take autonomous action on this repository without explicit user approval at each stage. This is non-negotiable.
+
+### The Rule
+
+**ASK FIRST. CODE SECOND. COMMIT NEVER (unless told to).**
+
+### Prohibited Actions Without Explicit User Permission
+
+1. **Writing code** — Do NOT create files, edit files, or write implementation code until the user explicitly says to proceed. Research and reading files is allowed. Writing is not.
+2. **Committing** — Do NOT run `git commit` unless the user explicitly asks for a commit.
+3. **Pushing** — Do NOT run `git push` unless the user explicitly asks for a push.
+4. **Installing dependencies** — Do NOT run `npm install`, `pip install`, or any package manager commands without explicit approval.
+5. **Deleting or overwriting files** — Do NOT delete, move, or overwrite any file without explicit approval.
+6. **Running destructive commands** — Do NOT run `git reset`, `git checkout .`, `rm`, `git clean`, or any destructive operation without explicit approval.
+
+### Required Workflow For Every Task
+
+```
+Step 1: RESEARCH    — Read files, explore codebase, gather context (ALLOWED freely)
+Step 2: DISCUSS     — Present findings, ideas, and proposed approach to the user (REQUIRED)
+Step 3: WAIT        — Wait for the user to say "go ahead", "proceed", "do it", or similar (REQUIRED)
+Step 4: IMPLEMENT   — Only after explicit approval, write the code (BLOCKED until Step 3)
+Step 5: REVIEW      — Show the user what was written, ask if they want changes (REQUIRED)
+Step 6: COMMIT/PUSH — Only when the user explicitly requests it (BLOCKED until requested)
+```
+
+### What "Explicit Approval" Means
+
+- The user must use clear affirmative language: "yes", "go ahead", "proceed", "do it", "write the code", "implement it", "commit", "push"
+- A user describing what they want is NOT approval to implement it — it is a request to discuss and plan
+- Asking a question ("how would you...") is NEVER approval to write code
+- Providing context or requirements is NEVER approval to start coding
+
+### What Happens If This Rule Is Violated
+
+If Claude Code writes code, commits, or pushes without explicit user approval:
+1. The action is considered unauthorized
+2. The user's trust is damaged
+3. The skill `.claude/skills/approval-enforcement.md` documents this violation pattern to prevent recurrence
+
+### Exceptions
+
+- **Stop-hook feedback**: If a git hook requires committing uncommitted changes, Claude may commit and push ONLY the already-written changes — not write new code
+- **Lint auto-fix**: Running `npm run lint:fix` on already-approved code is permitted
+- **Reading/searching**: Glob, Grep, Read, and research actions are always permitted without approval
+
 ## Commit & Attribution Guidelines
 
 **IMPORTANT:** Do not add co-authored attribution or references to Claude/Anthropic in commits unless explicitly requested by the user.
