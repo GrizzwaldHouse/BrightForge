@@ -57,7 +57,11 @@ export class SessionStore {
       const now = Date.now();
       for (const [id, session] of this.sessions) {
         if (now - session.lastActivity > this.timeoutMs) {
-          console.log(`[STORE] Cleaning up idle session: ${id.slice(0, 8)}`);
+          try {
+            console.log(`[STORE] Cleaning up idle session: ${id.slice(0, 8)}`);
+          } catch (e) {
+            // Silently ignore log failures (EPIPE)
+          }
           this.sessions.delete(id);
         }
       }

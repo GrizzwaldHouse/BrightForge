@@ -20,6 +20,9 @@ trimesh==4.6.6
 # FBX conversion (GLB -> FBX for Unreal Engine)
 pyassimp>=5.3.0
 
+# Material extraction (GLB texture parsing)
+pygltflib>=1.16
+
 # Image handling
 Pillow==11.1.0
 

@@ -118,6 +118,12 @@ class Forge3DConfig {
       coordinate_system: 'unreal'
     });
 
+    this.materials = this._section('materials', {
+      extract_on_convert: true,
+      default_preset: 'ue5-standard',
+      texture_output_dir: 'textures'
+    });
+
     this.ui = this._section('ui', {
       generation_polling_ms: 2000,
       vram_polling_ms: 10000,

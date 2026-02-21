@@ -413,6 +413,7 @@ class Forge3DPanel {
           <div class="gallery-actions">
             <button class="btn-small" onclick="window.forge3dPanel.downloadAsset('${asset.id}')">GLB</button>
             ${asset.fbx_path ? `<button class="btn-small" onclick="window.forge3dPanel.downloadAsset('${asset.id}', 'fbx')">FBX</button>` : `<button class="btn-small btn-muted" onclick="window.forge3dPanel.convertToFbx('${asset.id}')">Convert FBX</button>`}
+            ${asset.has_materials ? '<span class="badge badge-material">Materials</span>' : `<button class="btn-small btn-muted" onclick="window.forge3dPanel.extractMaterials('${asset.id}')">Extract Materials</button>`}
             <button class="btn-small btn-danger" onclick="window.forge3dPanel.deleteAsset('${asset.id}')">Delete</button>
           </div>
         </div>
@@ -604,6 +605,29 @@ class Forge3DPanel {
       this._loadAssets();
     } catch (err) {
       this._showStatus(`FBX conversion failed: ${err.message}`, 'error');
+    }
+  }
+
+  /**
+   * Extract PBR materials from an asset's GLB file.
+   */
+  async extractMaterials(assetId) {
+    this._showStatus('Extracting materials...', 'info');
+    try {
+      const res = await fetch(`/api/forge3d/assets/${assetId}/extract-materials`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(err.error || res.statusText);
+      }
+      const data = await res.json();
+      this._showStatus(`Materials extracted (${data.textures?.length || 0} textures)`, 'success');
+      this._loadAssets();
+    } catch (err) {
+      this._showStatus(`Material extraction failed: ${err.message}`, 'error');
     }
   }
 

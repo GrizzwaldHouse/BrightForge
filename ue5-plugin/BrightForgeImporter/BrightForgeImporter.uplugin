@@ -1,0 +1,23 @@
+{
+    "FileVersion": 3,
+    "Version": 1,
+    "VersionName": "1.0",
+    "FriendlyName": "BrightForge Importer",
+    "Description": "Import 3D assets from BrightForge Forge3D pipeline into Unreal Engine",
+    "Category": "Content",
+    "CreatedBy": "Marcus Daley",
+    "CreatedByURL": "https://github.com/GrizzwaldHouse",
+    "DocsURL": "",
+    "MarketplaceURL": "",
+    "CanContainContent": true,
+    "IsBetaVersion": true,
+    "IsExperimentalVersion": false,
+    "Installed": false,
+    "Modules": [
+        {
+            "Name": "BrightForgeImporter",
+            "Type": "Editor",
+            "LoadingPhase": "Default"
+        }
+    ]
+}

@@ -21,9 +21,10 @@
 
 import { fileURLToPath } from 'url';
 import { dirname, join, resolve } from 'path';
-import { mkdirSync, existsSync, writeFileSync, unlinkSync, readdirSync, statSync, rmSync } from 'fs';
 import forge3dDb from './database.js';
 import forge3dConfig from './config-loader.js';
+import modelBridge from './model-bridge.js';
+import { readFileSync, mkdirSync, existsSync, writeFileSync, unlinkSync, readdirSync, statSync, rmSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -137,6 +138,7 @@ class ProjectManager {
    * @param {Buffer} data.buffer - File contents
    * @param {string} data.extension - File extension (.glb, .png)
    * @param {Buffer} [data.fbxBuffer] - FBX file contents (optional)
+   * @param {Buffer} [data.thumbnailBuffer] - Thumbnail PNG bytes (optional)
    * @param {Object} [data.metadata] - Additional metadata
    * @returns {Object} Created asset record
    */
@@ -166,6 +168,15 @@ class ProjectManager {
       console.log(`[PROJECT] FBX saved: ${fbxSize} bytes`);
     }
 
+    // Write thumbnail PNG if available
+    let thumbnailPath = null;
+    if (data.thumbnailBuffer) {
+      thumbnailPath = join(projectDir, `${safeName}_thumb.png`);
+      this._validatePath(thumbnailPath);
+      writeFileSync(thumbnailPath, data.thumbnailBuffer);
+      console.log(`[PROJECT] Thumbnail saved: ${data.thumbnailBuffer.length} bytes`);
+    }
+
     const asset = forge3dDb.createAsset(projectId, {
       name: `${safeName}${data.extension}`,
       type: data.type,
@@ -173,6 +184,7 @@ class ProjectManager {
       fileSize: data.buffer.length,
       fbxPath,
       fbxSize,
+      thumbnailPath,
       metadata: data.metadata || {}
     });
 
@@ -186,6 +198,47 @@ class ProjectManager {
 
   listAssets(projectId) {
     return forge3dDb.listAssets(projectId);
+  }
+
+  // --- Operations ---
+
+  /**
+   * Convert an existing mesh asset to FBX.
+   * @param {string} assetId - Asset to convert
+   * @returns {Promise<Object>} Updated asset record
+   */
+  async convertAssetToFbx(assetId) {
+    const asset = this.getAsset(assetId);
+    if (!asset || asset.type !== 'mesh') {
+      throw new Error('Valid mesh asset required');
+    }
+
+    if (!asset.file_path || !existsSync(asset.file_path)) {
+      throw new Error(`Original mesh file not found: ${asset.file_path}`);
+    }
+
+    // Skip if already exists
+    if (asset.fbx_path && existsSync(asset.fbx_path)) {
+      return asset;
+    }
+
+    const glbBuffer = readFileSync(asset.file_path);
+    const { buffer: fbxBuffer } = await modelBridge.convertToFbx(glbBuffer, asset.id);
+
+    const projectDir = dirname(asset.file_path);
+    const baseName = asset.name.replace(/\.[^/.]+$/, '');
+    const fbxPath = join(projectDir, `${baseName}.fbx`);
+    this._validatePath(fbxPath);
+
+    writeFileSync(fbxPath, fbxBuffer);
+
+    // Update database (direct call since updateAsset doesn't handle paths yet)
+    forge3dDb.db.prepare(
+      'UPDATE assets SET fbx_path = ?, fbx_size = ? WHERE id = ?'
+    ).run(fbxPath, fbxBuffer.length, asset.id);
+
+    console.log(`[PROJECT] FBX generated and saved for asset: ${asset.id}`);
+    return this.getAsset(assetId);
   }
 
   deleteAsset(id) {

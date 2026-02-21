@@ -145,6 +145,7 @@ router.post('/generate', express.raw({ type: 'image/*', limit: forge3dConfig.api
                 ...assetData,
                 buffer: result.meshBuffer,
                 fbxBuffer: result.fbxBuffer || null,
+                thumbnailBuffer: result.thumbnailBuffer || null,
                 extension: '.glb'
               });
             } else if (result.imageBuffer) {
@@ -187,7 +188,7 @@ router.post('/generate', express.raw({ type: 'image/*', limit: forge3dConfig.api
         filename: 'upload.png'
       });
 
-      forgeSession.run(sessionId).catch(() => {});
+      forgeSession.run(sessionId).catch(() => { });
 
       endTimer({ sessionId, type: 'mesh' });
       return res.status(202).json({
@@ -483,6 +484,87 @@ router.get('/fbx-status', async (_req, res) => {
     res.json(status);
   } catch (err) {
     res.json({ available: false, reason: err.message });
+  }
+});
+
+// --- Materials ---
+
+/**
+ * GET /api/forge3d/material-presets
+ * Get available material presets from the Python server.
+ */
+router.get('/material-presets', async (_req, res) => {
+  ensureInit();
+  try {
+    if (modelBridge.state !== 'running') {
+      return res.status(503).json({ error: 'Python server not running' });
+    }
+    const presets = await modelBridge.getMaterialPresets();
+    res.json({ presets });
+  } catch (err) {
+    console.error(`[ROUTE] Material presets error: ${err.message}`);
+    errorHandler.report('forge3d_error', err, { endpoint: 'material_presets' });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/forge3d/assets/:id/extract-materials
+ * Extract PBR materials from an asset's GLB file.
+ * Body: { preset: 'ue5-standard' }
+ */
+router.post('/assets/:id/extract-materials', async (req, res) => {
+  ensureInit();
+  const assetId = req.params.id;
+  const { preset } = req.body || {};
+
+  console.log(`[ROUTE] POST /api/forge3d/assets/${assetId}/extract-materials`);
+  const endTimer = telemetryBus.startTimer('forge3d_api_extract_materials');
+
+  try {
+    const asset = forge3dDb.getAsset(assetId);
+    if (!asset) {
+      endTimer({ error: 'not_found' });
+      return res.status(404).json({ error: 'Asset not found' });
+    }
+
+    if (!asset.file_path || !existsSync(asset.file_path)) {
+      endTimer({ error: 'no_glb' });
+      return res.status(400).json({ error: 'No GLB file available for this asset' });
+    }
+
+    if (modelBridge.state !== 'running') {
+      endTimer({ error: 'bridge_offline' });
+      return res.status(503).json({ error: 'Python server not running' });
+    }
+
+    const { readFileSync } = await import('fs');
+    const glbBuffer = readFileSync(asset.file_path);
+    const result = await modelBridge.extractMaterials(glbBuffer, preset || 'ue5-standard');
+
+    // Update asset record in DB
+    forge3dDb.db.prepare(
+      'UPDATE assets SET material_data = ?, has_materials = 1 WHERE id = ?'
+    ).run(JSON.stringify(result.manifest), assetId);
+
+    telemetryBus.emit('forge3d', {
+      event: 'materials_extracted',
+      assetId,
+      preset: preset || 'ue5-standard',
+      textureCount: result.textures.length
+    });
+
+    endTimer({ assetId, success: true });
+    res.json({
+      success: true,
+      manifest: result.manifest,
+      textures: result.textures
+    });
+  } catch (err) {
+    console.error(`[ROUTE] Material extraction error: ${err.message}`);
+    errorHandler.report('forge3d_error', err, { endpoint: 'extract_materials', assetId });
+    endTimer({ error: err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 

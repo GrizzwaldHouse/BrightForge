@@ -113,6 +113,14 @@ const MIGRATIONS = [
       ALTER TABLE assets ADD COLUMN fbx_path TEXT;
       ALTER TABLE assets ADD COLUMN fbx_size INTEGER DEFAULT 0;
     `
+  },
+  {
+    version: 4,
+    description: 'Add material extraction columns to assets table',
+    sql: `
+      ALTER TABLE assets ADD COLUMN material_data TEXT DEFAULT '{}';
+      ALTER TABLE assets ADD COLUMN has_materials INTEGER DEFAULT 0;
+    `
   }
 ];
 

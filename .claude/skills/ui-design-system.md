@@ -1,170 +1,214 @@
 ---
 name: BrightForge UI Design System
-description: Design tokens, color palette, typography, spacing, and component patterns for the BrightForge web dashboard. Reference this when modifying any CSS or HTML in public/.
+description: Design tokens, color palette, typography, spacing, layout, and accessibility rules for the BrightForge web dashboard. Auto-loaded for any CSS/HTML task in public/.
+user-invocable: false
 ---
 
 # BrightForge UI Design System
 
-Based on [cowork-skills/design-system](https://github.com/GrizzwaldHouse/cowork-skills) Professional/Corporate palette, adapted for the BrightForge dark-theme dashboard.
+Comprehensive design system for the BrightForge Creative Studio dark-theme dashboard. Based on [cowork-skills/design-system](https://github.com/GrizzwaldHouse/cowork-skills) principles, adapted for BrightForge's "Nano Banana" aesthetic.
 
 ## Design Tokens (CSS Custom Properties)
 
-All tokens are defined in `public/css/dashboard.css` `:root`. Always use variables, never hardcode colors.
+All tokens are defined in `public/css/dashboard.css` `:root`. **Always use variables, never hardcode colors.**
 
-### Color Palette — Professional/Corporate
+### Surfaces — Dark Mode
 
 ```css
-/* Surfaces (dark mode — Slate scale) */
---bg-primary: #0F172A;       /* slate-900 — page background */
---bg-secondary: #1E293B;     /* slate-800 — sidebar, topbar, panels */
---bg-tertiary: #334155;      /* slate-700 — elevated/active states */
---bg-card: #1E293B;          /* slate-800 — card backgrounds */
---bg-hover: #334155;         /* slate-700 — hover states */
+--bg-app: #09090b;          /* Page background — extremely dark */
+--bg-sidebar: #0F1116;      /* Sidebar background */
+--bg-card: #141820;         /* Card / panel surface */
+--bg-card-hover: #1E232E;   /* Hovered card state */
+--glass-panel: rgba(20, 24, 32, 0.7);  /* Glassmorphic overlay */
+--glass-border: rgba(255, 255, 255, 0.08);  /* Glass edge */
+```
 
-/* Text */
---text-primary: #F1F5F9;     /* slate-100 */
---text-secondary: #94A3B8;   /* slate-400 */
---text-dim: #64748B;         /* slate-500 */
+### Text
 
-/* Brand */
---accent-primary: #2563EB;   /* blue-600 — primary action, links, active tabs */
---accent-secondary: #1E40AF; /* blue-800 — user message bg */
---accent-light: #3B82F6;     /* blue-500 — hover highlights */
---accent-amber: #F59E0B;     /* amber-500 — secondary accent, CTA */
+```css
+--text-primary: #FAFAFA;    /* Primary text — near white */
+--text-secondary: #A1A1AA;  /* Secondary text — zinc-400 */
+--text-dim: #52525B;        /* Dimmed labels — zinc-600 */
+--text-accent: #60A5FA;     /* Accent text — blue-400 */
+```
 
-/* Semantic */
---success: #16A34A;           /* green-600 */
---warning: #D97706;           /* amber-600 */
---error: #DC2626;             /* red-600 */
+### Brand / Accents — 60-30-10 Rule
 
-/* Borders & Shadows */
---border: #334155;            /* slate-700 */
---border-light: #475569;     /* slate-600 — prominent borders */
---shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
---shadow-md: 0 4px 6px rgba(0,0,0,0.3);
---shadow-lg: 0 10px 25px rgba(0,0,0,0.4);
+```css
+/* 60% dominant: --bg-app and surfaces */
+/* 30% secondary: */
+--brand-primary: #3B82F6;   /* Blue-500 — primary actions, active tabs */
+--brand-hover: #2563EB;     /* Blue-600 — hover state */
+--brand-glow: rgba(59, 130, 246, 0.5);  /* Glow effects */
 
-/* Radius */
---radius-sm: 4px;   /* indicators, small badges */
---radius-md: 6px;   /* inputs, buttons */
---radius-lg: 8px;   /* cards, sections */
---radius-xl: 12px;  /* pills, error indicator */
+/* 10% accent: */
+--accent-purple: #8B5CF6;   /* Purple-500 — premium/creative highlights */
+--accent-teal: #14B8A6;     /* Teal-500 — progress bars, success variant */
+--accent-amber: #F59E0B;    /* Amber-500 — secondary CTA, warnings */
+```
+
+### Semantic Status Colors
+
+```css
+--success: #22C55E;   /* Green-500 — approve, online, success */
+--warning: #F59E0B;   /* Amber-500 — caution, generating state */
+--error: #EF4444;     /* Red-500 — reject, delete, error */
+```
+
+### Borders & Shadows
+
+```css
+--border: #27272A;           /* Subtle border — zinc-800 */
+--border-light: #3F3F46;     /* Prominent border — zinc-700 */
+--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+--shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+--shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+--shadow-glow: 0 0 15px rgba(59, 130, 246, 0.15);
+```
+
+### Border Radius
+
+```css
+--radius-sm: 6px;    /* Small badges, indicators */
+--radius-md: 8px;    /* Inputs, buttons */
+--radius-lg: 12px;   /* Cards, sections */
+--radius-xl: 16px;   /* Pills, large panels */
+```
+
+### Token Aliases (for backward compatibility)
+
+```css
+/* design-viewer.css uses these older names — aliased in dashboard.css */
+--bg-primary: var(--bg-app);
+--bg-secondary: var(--bg-sidebar);
+--bg-tertiary: var(--bg-card-hover);
+--bg-hover: var(--bg-card-hover);
+--accent-primary: var(--brand-primary);
+--accent-secondary: var(--brand-hover);
+--accent-light: #3B82F6;
 ```
 
 ### Semantic Color Usage
 
 | Purpose | Token | Example |
 |---------|-------|---------|
-| Primary action button | `--accent-primary` | Generate, Send |
-| Secondary action | `--accent-amber` | Secondary CTA |
+| Primary action button | `--brand-primary` | Generate, Send |
+| Hover state | `--brand-hover` | Button hover |
 | Approve / success | `--success` | Approve button, online badge |
 | Danger / destructive | `--error` | Reject, delete, error badge |
 | Warning / caution | `--warning` | Rollback, generating state |
 | Inactive / disabled | `--text-dim` | Disabled buttons, placeholder |
-| Section headings | `--accent-primary` | Forge3D section h3, plan title |
-| Active tab indicator | `--accent-primary` | 2px bottom border |
-| Hover highlight | `--accent-light` | Bold text, link hover |
+| Active tab indicator | `--brand-primary` | 2px bottom border + glow |
 
-### Hover State Darken Pattern
+### WCAG Contrast Compliance
 
-Button hover shades (no variable — use directly):
-- Blue hover: `--accent-light` (#3B82F6)
-- Green hover: `#15803D` (green-700)
-- Red hover: `#B91C1C` (red-700)
-- Amber hover: `#B45309` (amber-700)
-- Secondary hover: `#EAB308` (yellow-500)
-
-### Contrast Compliance (WCAG)
-
-- `--text-primary` (#F1F5F9) on `--bg-primary` (#0F172A): ~15:1 (AAA pass)
-- `--text-primary` on `--bg-card` (#1E293B): ~12:1 (AAA pass)
-- `--accent-primary` (#2563EB) on `--bg-primary`: ~4.6:1 (AA pass)
-- `--accent-light` (#3B82F6) on `--bg-primary`: ~5.2:1 (AA pass)
-- `--success` (#16A34A) on `--bg-primary`: ~4.8:1 (AA pass)
-- `--error` (#DC2626) on `--bg-primary`: ~4.6:1 (AA pass)
+| Combination | Ratio | Rating |
+|-------------|-------|--------|
+| `--text-primary` (#FAFAFA) on `--bg-app` (#09090B) | ~19:1 | AAA ✓ |
+| `--text-primary` on `--bg-card` (#141820) | ~16:1 | AAA ✓ |
+| `--text-secondary` (#A1A1AA) on `--bg-app` | ~8:1 | AAA ✓ |
+| `--brand-primary` (#3B82F6) on `--bg-app` | ~5.5:1 | AA ✓ |
+| `--text-dim` (#52525B) on `--bg-sidebar` (#0F1116) | ~3.5:1 | AA Large ✓ |
 
 ## Typography
 
+### Font Stack
+
 ```css
---font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
---font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+--font-sans: 'Inter', system-ui, sans-serif;           /* Body text */
+--font-heading: 'Outfit', 'Inter', sans-serif;         /* Headings */
+--font-mono: 'JetBrains Mono', monospace;              /* Code/paths */
 ```
 
-Google Fonts loaded in `index.html`:
-- Inter: 400, 500, 600, 700
-- JetBrains Mono: 400, 500
+Google Fonts loaded in `index.html`: Inter (400,500,600,700), Outfit (400,500,600,700), JetBrains Mono (400,500).
 
-### Scale (Major Third 1.25 from 16px base)
+### Type Scale — Major Third (1.25) from 16px base
 
-| Element | Size | Weight | Usage |
-|---------|------|--------|-------|
-| Welcome heading | 1.5rem (24px) | 700 | Welcome message h2 |
-| Logo | 1.375rem (22px) | 700 | Topbar brand |
-| Plan title | 1.125rem (18px) | 600 | Plan viewer heading |
-| Body | 0.9375rem (15px) | 400 | Chat input |
-| UI labels | 0.875rem (14px) | 500 | Tabs, buttons, inputs |
-| Small | 0.8125rem (13px) | 400 | Mono paths, plan meta |
-| Caption | 0.75rem (12px) | 400-600 | Section headers, meta |
-| Micro | 0.625rem (10px) | — | Status dots |
+| Element | Size | Weight | Line Height | Usage |
+|---------|------|--------|-------------|-------|
+| Display | 2.5rem (40px) | 700 | 1.1 | Hero/splash text |
+| H1 / Welcome | 2rem (32px) | 700 | 1.15 | Welcome message |
+| H2 / Panel Title | 1.5rem (24px) | 600 | 1.2 | Section titles |
+| H3 / Card Title | 1.125rem (18px) | 600 | 1.25 | Card headers |
+| Body | 1rem (16px) | 400 | 1.5 | Default text |
+| UI Labels | 0.875rem (14px) | 500 | 1.4 | Tabs, buttons, inputs |
+| Small / Meta | 0.8125rem (13px) | 400 | 1.5 | Paths, metadata |
+| Caption | 0.75rem (12px) | 500-600 | 1.4 | Section headers (uppercase) |
 
 ### Rules
 
-- **Max 2 typefaces**: `--font-sans` (everything) + `--font-mono` (code/paths only)
-- **Minimum**: Never below 0.625rem (10px) for any visible text
-- **Section headings**: uppercase + `letter-spacing: 0.5-1px`
+- **Max 2 typefaces** in UI: `--font-heading` + `--font-sans`. Use `--font-mono` only for code/paths.
+- **Minimum readable**: Never below 0.625rem (10px).
+- **Section headings**: `text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.75rem; font-weight: 600; color: var(--text-dim);`
+- **Weight contrast**: Minimum 2 weight steps between heading (600-700) and body (400).
 
-## Spacing (8px Base Grid)
+### Proven Pairings (from cowork-skills/design-system)
+
+| Heading | Body | Vibe |
+|---------|------|------|
+| Outfit 600 | Inter 400 | **BrightForge default** — rounded modern + systematic |
+| Inter 700 | Inter 400 | Neutral, developer-friendly |
+| Poppins 600 | Nunito 400 | Rounded, approachable (alternative) |
+
+## Spacing — 8px Base Grid
 
 ```css
---spacing-xs: 0.25rem;  /* 4px — tight inline, icon gaps */
---spacing-sm: 0.5rem;   /* 8px — compact spacing */
---spacing-md: 1rem;     /* 16px — default padding/gap */
---spacing-lg: 1.5rem;   /* 24px — section padding */
---spacing-xl: 2rem;     /* 32px — large section separation */
+--spacing-xs: 0.25rem;   /* 4px — tight inline spacing, icon gaps */
+--spacing-sm: 0.5rem;    /* 8px — compact element spacing */
+--spacing-md: 1rem;      /* 16px — default padding/gap */
+--spacing-lg: 1.5rem;    /* 24px — section inner padding */
+--spacing-xl: 2rem;      /* 32px — large section separation */
 ```
+
+**Rule**: All spacing values must be multiples of 8px. Only exception is 4px for micro-spacing.
 
 ## Layout
 
 ### Dashboard Structure
 
 ```
-┌──────────────────────────────────────────────┐
-│ Topbar (56px) — logo left, status right      │
-├──────────┬───────────────────────────────────┤
-│ Sidebar  │ Tab Bar (chat|design|forge3d|...) │
-│ (260px)  ├───────────────────────────────────┤
-│          │ Tab Panel (flex: 1, overflow)      │
-│ Sessions │                                    │
-│ Providers│                                    │
-│ Budget   │                                    │
-└──────────┴───────────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│ Topbar (64px) — logo left, status right           │
+├────────────┬─────────────────────────────────────┤
+│ Sidebar    │ Tab Bar (Chat|Design|Forge3D|Health) │
+│ (280px)    ├─────────────────────────────────────┤
+│            │ Tab Panel (flex: 1, overflow: auto)  │
+│ Sessions   │                                      │
+│ Providers  │                                      │
+│ Budget     │                                      │
+└────────────┴─────────────────────────────────────┘
 ```
+
+### Sidebar Pattern
+
+- Width: 280px fixed
+- Items: 4px vertical gap
+- Active item: `rgba(59, 130, 246, 0.1)` background + blue left border
+- Section headings: uppercase, `--text-dim`, `--spacing-sm` margin-bottom
 
 ### Component Patterns
 
 **Card**: `background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--spacing-md);`
 
-**Section heading**: `font-size: 0.75rem; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px;`
+**Primary button**: `background: var(--brand-primary); color: #fff; border-radius: var(--radius-md); font-weight: 600;`
 
-**Input field**: `background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary); focus: border-color: var(--accent-primary);`
+**Input field**: `background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); focus: border-color: var(--brand-primary) + box-shadow glow;`
 
-**Primary button**: `background: var(--accent-primary); color: #fff; border-radius: var(--radius-md); font-weight: 600; hover: var(--accent-light) + translateY(-1px) + box-shadow;`
-
-**Focus visible**: `outline: 2px solid var(--accent-primary); outline-offset: 2px;`
+**Focus visible**: `outline: 2px solid var(--brand-primary); outline-offset: 2px;`
 
 ### Animations
 
-- **fadeIn**: opacity 0→1, translateY 10px→0, 0.3s ease (messages)
-- **slideUp**: opacity 0→1, translateY 20px→0, 0.3s ease (plan viewer)
-- **pulse**: opacity 0.3↔1, scale 0.8↔1, 1.4s ease (loading dots)
-- **Transitions**: 0.2s ease for hover/focus states
+- **fadeIn**: opacity 0→1, translateY 10px→0, 0.3s ease-out (messages)
+- **slideUp**: opacity 0→1, translateY 20px→0, 0.3s ease (panels)
+- **Card hover**: `translateY(-2px)` + border-color lighten, 0.2s ease
+- **Transitions**: 0.2s ease for all hover/focus states
 
 ## CSS File Organization
 
 | File | Purpose |
 |------|---------|
-| `dashboard.css` | Base tokens, global layout, chat, plan viewer, buttons, utilities |
-| `system-health.css` | Health tab — provider cards, latency charts, activity |
+| `dashboard.css` | Base tokens, global layout, chat, buttons, utilities |
+| `system-health.css` | Health tab — provider cards, latency, activity |
 | `file-browser.css` | File browser dropdown component |
 | `design-viewer.css` | Design tab — prompt input, image cards, status |
 | `forge3d.css` | Forge3D tab — viewport, controls, gallery, queue |
@@ -175,14 +219,15 @@ Google Fonts loaded in `index.html`:
 2. Add component-scoped styles to the relevant tab CSS file
 3. Keep global utilities (`.hidden`, scrollbar) in `dashboard.css`
 4. Use `var(--radius-md)` for inputs/buttons, `var(--radius-lg)` for cards
-5. Match existing shadow pattern (cards are flat with border; buttons get shadow on hover only)
+5. Match shadow pattern: cards are flat with border; buttons get shadow on hover only
 6. All font sizes in `rem`, never `px`
 
 ## Accessibility Checklist
 
 - All text meets WCAG AA contrast (4.5:1 body, 3:1 large)
 - Color is not the sole indicator of meaning (status badges have text + color)
-- Interactive elements have `:hover`, `:focus`, and `:focus-visible` states
+- Interactive elements have `:hover`, `:focus-visible` states with visible ring
 - Font size never below 10px (0.625rem) for readable text
 - Keyboard-navigable tabs and buttons via `:focus-visible` ring
 - `aria-label` on icon-only buttons and indicators
+- Colorblind safety: never rely on color alone — pair with icons, labels, or patterns

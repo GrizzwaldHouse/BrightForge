@@ -480,6 +480,60 @@ class ModelBridge extends EventEmitter {
   }
 
   /**
+   * Extract PBR materials from a GLB file via the Python server.
+   * @param {Buffer} glbBuffer - The GLB file data
+   * @param {string} preset - Material preset name (default: 'ue5-standard')
+   * @returns {Promise<{manifest: object, textures: string[], success: boolean, error: string|null}>}
+   */
+  async extractMaterials(glbBuffer, preset = 'ue5-standard') {
+    this._ensureRunning();
+    console.log(`[BRIDGE] Requesting material extraction (${glbBuffer.length} bytes, preset: ${preset})...`);
+
+    const formData = new FormData();
+    formData.append('file', new Blob([glbBuffer]), 'mesh.glb');
+    formData.append('preset', preset);
+
+    const response = await this._fetchRaw(`${this.baseUrl}/extract-materials`, {
+      method: 'POST',
+      body: formData,
+      signal: AbortSignal.timeout(forge3dConfig.generation.timeout_ms)
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ detail: response.statusText }));
+      throw new Error(`Material extraction failed: ${err.detail || err.error || response.statusText}`);
+    }
+
+    const result = await response.json();
+    const textures = (result.extraction && result.extraction.textures) || [];
+    console.log(`[BRIDGE] Material extraction complete: ${textures.length} textures`);
+    return {
+      manifest: result.manifest || {},
+      textures: textures,
+      materials: (result.extraction && result.extraction.materials) || [],
+      success: true,
+      error: null
+    };
+  }
+
+  /**
+   * Get available material presets from the Python server.
+   * @returns {Promise<string[]>}
+   */
+  async getMaterialPresets() {
+    this._ensureRunning();
+    console.log('[BRIDGE] Fetching material presets...');
+
+    const result = await this._fetchWithTimeout(
+      `${this.baseUrl}/material-presets`,
+      forge3dConfig.healthCheck.timeout_ms
+    );
+
+    console.log(`[BRIDGE] Material presets: ${result.presets?.length || 0} available`);
+    return result.presets || [];
+  }
+
+  /**
    * Check FBX converter availability.
    * @returns {Promise<Object>} FBX converter status
    */
@@ -586,11 +640,11 @@ class ModelBridge extends EventEmitter {
     // Check required Python packages
     try {
       await this._runCommand('python', [
-        '-c', 'import fastapi, diffusers, trimesh, PIL'
+        '-c', 'import fastapi, diffusers, trimesh, PIL, pynvml'
       ]);
       console.log('[BRIDGE] Required Python packages verified');
     } catch (_e) {
-      issues.push('Missing Python packages (need: fastapi, diffusers, trimesh, Pillow)');
+      issues.push('Missing Python packages (need: fastapi, diffusers, trimesh, Pillow, pynvml)');
     }
 
     return { ready: issues.length === 0, issues };

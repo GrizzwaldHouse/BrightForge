@@ -43,9 +43,10 @@ providers:
     features:
       - text-to-image
 
-  # Priority 3: Gemini - Free tier image generation
+  # Priority 3: Gemini "Nano Banana" - Free tier image generation
   gemini:
     enabled: true
+    alias: "nano-banana"  # Informal name for Gemini image gen
     base_url: "https://generativelanguage.googleapis.com/v1beta"
     api_key_env: "GEMINI_API_KEY"
     priority: 3
@@ -53,6 +54,11 @@ providers:
     rate_limit: 60  # requests per minute
     models:
       default: "gemini-2.0-flash-exp"
+      image_gen: "gemini-2.0-flash-exp"
+    generation_config:
+      responseModalities:
+        - "TEXT"
+        - "IMAGE"
     supported_formats:
       - png
       - jpg
@@ -92,12 +98,12 @@ task_routing:
     prefer:
       - pollinations
       - together
-      - gemini
+      - gemini   # aka nano-banana
     fallback: stability
   image_editing:
     prefer:
       - pollinations
-      - gemini
+      - gemini   # aka nano-banana
     fallback: stability
 
 # Global defaults

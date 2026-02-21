@@ -105,7 +105,17 @@ export function metricsRoutes() {
       console.log('[ROUTE] /api/metrics/stream - Client connected');
 
       const listener = (event) => {
-        res.write(`data: ${JSON.stringify(event)}\n\n`);
+        try {
+          if (res.writable && !res.writableEnded) {
+            res.write(`data: ${JSON.stringify(event)}\n\n`);
+          } else {
+            telemetryBus.off('all', listener);
+          }
+        } catch (err) {
+          if (err.code === 'EPIPE') {
+            telemetryBus.off('all', listener);
+          }
+        }
       };
 
       telemetryBus.on('all', listener);

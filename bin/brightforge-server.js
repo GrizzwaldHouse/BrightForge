@@ -66,7 +66,7 @@ async function main() {
   }
 
   // Start server
-  app.listen(port, () => {
+  const server = app.listen(port, () => {
     console.log('');
     console.log('  ╔══════════════════════════════════════╗');
     console.log('  ║    BrightForge Server v3.1.0         ║');
@@ -95,18 +95,34 @@ async function main() {
     console.log('');
   });
 
-  // Graceful shutdown
-  process.on('SIGINT', () => {
-    console.log('\n  [SERVER] Shutting down...');
-    store.destroy();
-    process.exit(0);
+  server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+      console.error('');
+      console.error(`  [FATAL] Port ${port} is already in use.`);
+      console.error('  [FATAL] Please stop the other process or use PORT=xxxx brightforge-server');
+      console.error('');
+      process.exit(1);
+    } else {
+      console.error(`  [FATAL] Server error: ${error.message}`);
+      errorHandler.report('fatal', error, { source: 'server-listener' });
+      process.exit(1);
+    }
   });
 
-  process.on('SIGTERM', () => {
+  // Graceful shutdown
+  const shutdown = () => {
     console.log('\n  [SERVER] Shutting down...');
-    store.destroy();
-    process.exit(0);
-  });
+    server.close(() => {
+      store.destroy();
+      process.exit(0);
+    });
+    // Fallback exit if server.close hangs
+    setTimeout(() => process.exit(0), 1000);
+  };
+
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
+
 }
 
 main().catch((error) => {

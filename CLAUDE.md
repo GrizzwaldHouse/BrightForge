@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-**BrightForge** (v3.1.0-alpha). A hybrid AI coding + design + 3D generation agent that uses local LLMs (Ollama) with cloud fallback via a free-first provider chain. Plan-review-run workflow: LLM generates a plan, user reviews colored diffs, approves or rejects, changes are applied with backup/rollback support. Includes AI-powered image generation (Design Engine) and GPU-accelerated 3D mesh generation (ForgePipeline).
+**BrightForge** (v4.2.0-alpha). A hybrid AI coding + design + 3D generation agent that uses local LLMs (Ollama) with cloud fallback via a free-first provider chain. Plan-review-run workflow: LLM generates a plan, user reviews colored diffs, approves or rejects, changes are applied with backup/rollback support. Includes AI-powered image generation via "Nano Banana" (Gemini) + multi-provider chain (Design Engine) and GPU-accelerated 3D mesh generation (ForgePipeline).
 
 ## Commands
 
@@ -118,6 +118,17 @@ Provider-specific API formats are handled internally:
 - **Gemini**: API key in query param, `generateContent` endpoint, role mapping (`assistant`→`model`)
 
 Priority: Ollama(1) → Groq(2) → Cerebras(3) → Together(4) → Mistral(5) → Gemini(5) → Claude(6) → OpenAI(7) → OpenRouter(99)
+
+### Image Provider Chain (ImageClient)
+
+`src/core/image-client.js` — Tries image providers in priority order from `config/image-providers.yaml`. Free-first chain with fallback.
+
+Priority: Pollinations(1) → Together(2) → Nano Banana/Gemini(3) → Stability(4)
+
+- **Pollinations** — Zero auth, completely free, FLUX model
+- **Together** — FLUX.1 Schnell Free endpoint
+- **Nano Banana (Gemini)** — Gemini 2.0 Flash image generation via `generateContent` with `responseModalities: ["TEXT", "IMAGE"]`
+- **Stability** — Premium fallback (paid, disabled by default)
 
 ### LLM Output Format
 
@@ -237,8 +248,34 @@ Requires `.env.local` with API keys: `GROQ_API_KEY`, `CEREBRAS_API_KEY`, `TOGETH
 
 - `config/llm-providers.yaml` — All 9 LLM providers, task routing rules, budget limits ($1/day)
 - `config/agent-config.yaml` — Task classification keywords, file context limits, plan engine settings, web server config, error handling config
-- `config/image-providers.yaml` — Image generation providers (Pollinations, Together, Gemini, Stability)
+- `config/image-providers.yaml` — Image providers: Pollinations, Together, Nano Banana (Gemini), Stability
 - `config/styles/*.md` — Design style templates (blue-glass, dark-industrial, default)
+
+## Skills & Knowledge Base
+
+Skills are stored in two locations:
+
+### Project Skills (`.claude/skills/`)
+
+| Skill | Purpose |
+|-------|---------|
+| `ui-design-system.md` | Design tokens, color palette, typography, spacing, layout for the BrightForge dashboard |
+| `nano-banana-integration.md` | Gemini "Nano Banana" image generation workflow, prompt patterns, API format |
+| `brightforge-module.md` | Module creation patterns and conventions |
+| `forge3d-workflow.md` | Forge3D 3D generation pipeline workflow |
+| `provider-chain.md` | LLM provider chain configuration guide |
+| `testing-guide.md` | Self-test patterns and verification procedures |
+| `web-dashboard.md` | Web dashboard development patterns |
+
+### Shared Skills (`.claude/cowork-skills/` — git submodule)
+
+Cloned from `https://github.com/GrizzwaldHouse/cowork-skills.git`.
+
+| Skill | Type | Purpose |
+|-------|------|---------|
+| `design-system` | auto-loaded | Color theory, typography, layout grids, accessibility |
+| `canva-designer` | user-invocable | Canva prompt engineering and quality review |
+| `document-designer` | auto-loaded | Excel, Word, PowerPoint, PDF formatting |
 
 ## Python Environment (Forge3D)
 

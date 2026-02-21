@@ -242,6 +242,7 @@ class ForgeSession extends EventEmitter {
       type: 'mesh',
       meshBuffer: result.glbBuffer,
       fbxBuffer: result.fbxBuffer || null,
+      thumbnailBuffer: session.imageBuffer || null, // Use input image as thumbnail
       generationTime: result.metadata.generationTime || 0,
       fileSize: result.metadata.fileSize || result.glbBuffer.length,
       fbxFileSize: result.metadata.fbxFileSize || 0
@@ -299,6 +300,7 @@ class ForgeSession extends EventEmitter {
       imageBuffer,
       meshBuffer: fullResult.glbBuffer,
       fbxBuffer: fullResult.fbxBuffer || null,
+      thumbnailBuffer: imageBuffer, // Use generated image as thumbnail
       totalTime: fullResult.total_time,
       stages: fullResult.stages,
       vramAfter: fullResult.vram_after

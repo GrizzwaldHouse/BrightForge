@@ -71,6 +71,15 @@
   --spacing-md: 1rem;
   --spacing-lg: 1.5rem;
   --spacing-xl: 2rem;
+
+  /* Token Aliases (backward compat for design-viewer.css) */
+  --bg-primary: var(--bg-app);
+  --bg-secondary: var(--bg-sidebar);
+  --bg-tertiary: var(--bg-card-hover);
+  --bg-hover: var(--bg-card-hover);
+  --accent-primary: var(--brand-primary);
+  --accent-secondary: var(--brand-hover);
+  --accent-light: #3B82F6;
 }
 
 /* === Reset & Base === */
@@ -140,6 +149,7 @@ button {
   font-size: 1.5rem;
   background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
@@ -219,7 +229,7 @@ button {
 .sidebar-section h3 {
   font-size: 0.75rem;
   text-transform: uppercase;
-  color: var(--text-dim);
+  color: var(--text-secondary);
   letter-spacing: 0.05em;
   margin-bottom: var(--spacing-sm);
   display: flex;
@@ -603,13 +613,12 @@ button {
 }
 
 .input-group label {
-  display: block;
-  margin-bottom: var(--spacing-sm);
-  color: var(--text-secondary);
-  font-weight: 500;
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-bottom: var(--spacing-sm);
+  color: var(--text-secondary);
+  font-weight: 500;
 }
 
 .input-group textarea,
@@ -668,4 +677,92 @@ button {
 .folder-icon {
   width: 14px;
   height: 14px;
+}
+
+/* === Focus Visible (Keyboard Accessibility) === */
+.tab:focus-visible,
+.btn:focus-visible,
+.icon-btn:focus-visible,
+.btn-icon-primary:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+#chat-input:focus-visible {
+  outline: none;
+  /* Already has wrapper glow */
+}
+
+.session-item:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: -2px;
+}
+
+/* === Micro-Animations === */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulseGlow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+  }
+
+  50% {
+    box-shadow: 0 0 12px 4px rgba(59, 130, 246, 0.2);
+  }
+}
+
+.tab-panel.active {
+  animation: slideUp 0.25s ease-out;
+}
+
+.btn-primary:active {
+  transform: scale(0.97);
+}
+
+.budget-card {
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.budget-card:hover {
+  border-color: var(--border-light);
+  box-shadow: var(--shadow-md);
+}
+
+.welcome-icon {
+  animation: pulseGlow 3s ease-in-out infinite;
+}
+
+/* === Scrollbar === */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-light);
+}
+
+/* === Utility: Hidden === */
+.hidden {
+  display: none !important;
 }

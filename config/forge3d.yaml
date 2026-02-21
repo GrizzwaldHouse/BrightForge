@@ -95,6 +95,11 @@ fbx_export:
   auto_convert: true
   coordinate_system: "unreal"
 
+materials:
+  extract_on_convert: true
+  default_preset: "ue5-standard"
+  texture_output_dir: "textures"
+
 ui:
   generation_polling_ms: 2000
   vram_polling_ms: 10000

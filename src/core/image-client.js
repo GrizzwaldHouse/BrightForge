@@ -176,6 +176,7 @@ class ImageClient {
     case 'together':
       return await this._callTogether(prompt, options);
     case 'gemini':
+    case 'nano-banana':
       return await this._callGemini(prompt, options);
     case 'stability':
       return await this._callStability(prompt, options);
@@ -267,15 +268,15 @@ class ImageClient {
   }
 
   /**
-   * Gemini - Free tier image generation
+   * Gemini "Nano Banana" — image generation via generateContent
+   * Uses responseModalities: ["TEXT", "IMAGE"] to produce inline PNG
    */
   async _callGemini(prompt, options) {
     const provider = this.providers.gemini;
     const apiKey = this.getApiKey('gemini');
     if (!apiKey) throw new Error('GEMINI_API_KEY not found');
 
-    // Gemini uses generateContent API
-    const model = options.model || provider.models?.default || 'gemini-2.0-flash-exp';
+    const model = options.model || provider.models?.image_gen || provider.models?.default || 'gemini-2.0-flash-exp';
     const url = `${provider.base_url}/models/${model}:generateContent?key=${apiKey}`;
 
     const requestBody = {
@@ -285,8 +286,8 @@ class ImageClient {
         }]
       }],
       generationConfig: {
-        temperature: options.temperature || 0.9,
-        maxOutputTokens: 2048
+        responseModalities: ['TEXT', 'IMAGE'],
+        temperature: options.temperature || 0.9
       }
     };
 
@@ -303,11 +304,52 @@ class ImageClient {
       throw new Error(`Gemini API error: ${response.status} ${errorText}`);
     }
 
-    const _data = await response.json();
-    // Gemini image generation would return image data in response
-    // For now, return placeholder since Gemini's image gen API varies
-    console.warn('[IMAGE] Gemini image generation needs full implementation');
-    throw new Error('Gemini image generation not fully implemented yet');
+    const data = await response.json();
+
+    // Extract inline image data from response parts
+    const candidates = data.candidates || [];
+    if (candidates.length === 0) {
+      throw new Error('Gemini returned no candidates');
+    }
+
+    const parts = candidates[0]?.content?.parts || [];
+    const imagePart = parts.find(p => p.inlineData?.mimeType?.startsWith('image/'));
+
+    if (!imagePart) {
+      const textPart = parts.find(p => p.text);
+      const reason = textPart ? textPart.text.substring(0, 200) : 'No image data in response';
+      throw new Error(`Gemini did not return an image: ${reason}`);
+    }
+
+    // Decode base64 image data
+    const imageBuffer = Buffer.from(imagePart.inlineData.data, 'base64');
+    const mimeType = imagePart.inlineData.mimeType;
+    const ext = mimeType === 'image/jpeg' ? 'jpg' : 'png';
+
+    // Save to disk
+    const savedPath = await this.saveImage(imageBuffer, 'gemini', {
+      ...options,
+      format: ext
+    });
+
+    console.log(`[IMAGE] Nano Banana (Gemini) generated image: ${savedPath}`);
+
+    // Also extract any accompanying text
+    const textPart = parts.find(p => p.text);
+    if (textPart) {
+      console.log(`[IMAGE] Gemini description: ${textPart.text.substring(0, 120)}`);
+    }
+
+    return {
+      path: savedPath,
+      url: null,  // Gemini returns inline data, not URLs
+      provider: 'gemini',
+      alias: 'nano-banana',
+      cost: provider.cost_per_image || 0,
+      model,
+      format: ext,
+      description: textPart?.text || null
+    };
   }
 
   /**

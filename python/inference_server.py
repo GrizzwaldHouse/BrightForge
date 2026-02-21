@@ -10,6 +10,8 @@ Endpoints:
   POST /generate/full   - Text prompt -> Image -> GLB mesh + FBX (two-stage)
   POST /convert/glb-to-fbx - Convert existing GLB to FBX
   GET  /convert/status  - FBX converter availability
+  POST /extract-materials - Extract PBR textures + UE5 manifest from GLB
+  GET  /material-presets  - List available UE5 material presets
   GET  /health          - GPU status, model loaded state
   GET  /status          - VRAM usage, current operation
 
@@ -33,6 +35,7 @@ import uvicorn
 
 from model_manager import model_manager, ModelState
 from fbx_converter import fbx_converter
+from material_extractor import material_extractor
 
 # Load configuration
 _config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.yaml')
@@ -109,9 +112,9 @@ app = FastAPI(
 
 
 def cleanup_temp_files(max_age_hours=None):
+    """Remove temp files older than max_age_hours."""
     if max_age_hours is None:
         max_age_hours = _cfg('cleanup', 'temp_file_max_age_hours', 24)
-    """Remove temp files older than max_age_hours."""
     if not TEMP_DIR.exists():
         return
 
@@ -462,6 +465,86 @@ async def convert_glb_to_fbx(
 async def convert_status():
     """Check FBX converter availability and backend info."""
     return fbx_converter.get_status()
+
+
+# --- Material Extraction Endpoints ---
+
+@app.post('/extract-materials')
+async def extract_materials(
+    file: UploadFile = File(...),
+    preset: str = Form(default='ue5-standard'),
+    split_channels: bool = Form(default=True),
+):
+    """Extract PBR materials and textures from a GLB file.
+
+    Returns JSON with material manifest and paths to extracted textures.
+    """
+    if not material_extractor.is_available():
+        raise HTTPException(503, 'Material extraction not available. Install pygltflib.')
+
+    contents = await file.read()
+    max_upload_bytes = _cfg('generation', 'max_upload_size_bytes', 20 * 1024 * 1024)
+    if len(contents) > max_upload_bytes:
+        raise HTTPException(400, 'File too large. Maximum 20 MB.')
+
+    job_id = generate_job_id()
+    temp_glb = TEMP_DIR / f'{job_id}_material.glb'
+    temp_glb.write_bytes(contents)
+
+    texture_dir = OUTPUT_DIR / f'{job_id}_materials'
+
+    try:
+        logger.info(f'[SERVER] Material extraction request: job={job_id}, preset={preset}')
+
+        # Extract textures from GLB
+        extraction = material_extractor.extract_from_glb(str(temp_glb), str(texture_dir))
+        if not extraction['success']:
+            raise HTTPException(500, f'Extraction failed: {extraction.get("error")}')
+
+        # Split ORM channels if requested
+        split_results = []
+        if split_channels and extraction['textures']:
+            for tex_path in extraction['textures']:
+                # Look for metallicRoughness textures (packed ORM)
+                if 'metallicRoughness' in tex_path or 'metallic' in tex_path.lower():
+                    split_result = material_extractor.split_orm_texture(tex_path, str(texture_dir))
+                    if split_result['success']:
+                        split_results.append(split_result)
+
+        # Generate UE5 manifest
+        manifest_result = material_extractor.generate_ue5_manifest(str(temp_glb), preset)
+
+        response = {
+            'success': True,
+            'job_id': job_id,
+            'extraction': {
+                'textures': extraction['textures'],
+                'materials': extraction['materials'],
+            },
+            'split_channels': split_results,
+            'manifest': manifest_result.get('manifest'),
+            'manifest_path': manifest_result.get('manifest_path'),
+        }
+
+        return JSONResponse(response)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f'[SERVER] Material extraction error: {e}')
+        raise HTTPException(500, f'Internal error: {str(e)}')
+    finally:
+        if temp_glb.exists():
+            temp_glb.unlink()
+
+
+@app.get('/material-presets')
+async def get_material_presets():
+    """List available UE5 material presets."""
+    return {
+        'presets': material_extractor.get_material_presets(),
+        'status': material_extractor.get_status(),
+    }
 
 
 @app.get('/download/{job_id}/{filename}')

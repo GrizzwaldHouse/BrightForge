@@ -29,7 +29,9 @@ export function configRoutes() {
    */
   router.get('/config', (req, res) => {
     try {
-      console.log('[ROUTE] /api/config - loading config');
+      try {
+        console.log('[ROUTE] /api/config - loading config');
+      } catch (e) { /* ignore EPIPE */ }
 
       const configPath = join(__dirname, '../../../config/llm-providers.yaml');
 
@@ -80,7 +82,9 @@ export function configRoutes() {
    */
   router.get('/health', async (req, res) => {
     try {
-      console.log('[ROUTE] /api/health - checking system health');
+      try {
+        console.log('[ROUTE] /api/health - checking system health');
+      } catch (e) { /* ignore EPIPE */ }
 
       const client = new UniversalLLMClient();
 

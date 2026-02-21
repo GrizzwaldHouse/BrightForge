@@ -42,6 +42,9 @@ class UniversalLLMClient {
       requests: {},
       tokens: {}
     };
+
+    // Cache for provider health (e.g. Ollama availability) to avoid repeated timeouts
+    this.healthCache = new Map();
   }
 
   getDefaultConfig() {
@@ -96,13 +99,24 @@ class UniversalLLMClient {
    * Check if Ollama is running locally
    */
   async checkOllamaRunning() {
+    const cacheKey = 'ollama';
+    const cached = this.healthCache.get(cacheKey);
+    const cacheTTL = 30000; // 30 seconds
+
+    if (cached && (Date.now() - cached.timestamp < cacheTTL)) {
+      return cached.status;
+    }
+
     try {
       const response = await fetch('http://127.0.0.1:11434/api/tags', {
         method: 'GET',
         signal: AbortSignal.timeout(2000)
       });
-      return response.ok;
+      const isRunning = response.ok;
+      this.healthCache.set(cacheKey, { status: isRunning, timestamp: Date.now() });
+      return isRunning;
     } catch {
+      this.healthCache.set(cacheKey, { status: false, timestamp: Date.now() });
       return false;
     }
   }
