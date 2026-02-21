@@ -1,0 +1,1 @@
+create a reusable Button component in TypeScript with variants (primary, secondary, danger) and onClick handler
