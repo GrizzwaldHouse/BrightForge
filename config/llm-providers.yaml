@@ -107,6 +107,21 @@ providers:
       gpt-4o-mini: 0.00015
       gpt-4o: 0.005
 
+  # Priority 8: DeepSeek (chat + R1 reasoning)
+  deepseek:
+    enabled: true
+    base_url: "https://api.deepseek.com/v1"
+    api_key_env: "DEEPSEEK_API_KEY"
+    models:
+      default: "deepseek-chat"
+      code: "deepseek-chat"
+      reasoner: "deepseek-reasoner"
+    priority: 8
+    cost_per_1k_tokens:
+      deepseek-chat: 0.00014
+      deepseek-reasoner: 0.00055
+    mcp_server: "deepseek"  # Reference to MCP server in mcp-servers.yaml
+
   # Aggregator fallback (last resort)
   openrouter:
     enabled: true
@@ -158,8 +173,16 @@ task_routing:
   complex_reasoning:
     description: "Architecture decisions, business strategy"
     prefer:
+      - deepseek:reasoner
       - claude:complex
     fallback: "together:default"
+    max_tokens: 8192
+
+  deep_analysis:
+    description: "Multi-step deep analysis via DeepSeek R1"
+    prefer:
+      - deepseek:reasoner
+    fallback: "claude:complex"
     max_tokens: 8192
 
   client_communication:

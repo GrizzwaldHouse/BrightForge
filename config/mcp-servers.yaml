@@ -1,0 +1,32 @@
+# MCP Server Registry Configuration
+# Defines available MCP servers and their connection settings
+
+servers:
+  # Built-in DeepSeek MCP server
+  deepseek:
+    enabled: true
+    description: "DeepSeek AI via MCP - chat, R1 reasoning, code generation"
+    transport: stdio
+    command: node
+    args:
+      - "src/mcp/mcp-server.js"
+      - "--serve"
+    env: {}
+    auto_start: false  # Start on first use (lazy-init)
+    tools:
+      - deepseek_chat
+      - deepseek_reason
+      - deepseek_code
+      - deepseek_analyze
+    rate_limits:
+      deepseek_chat: 30       # requests per minute
+      deepseek_reason: 10
+      deepseek_code: 20
+      deepseek_analyze: 5
+
+# Global MCP settings
+settings:
+  auto_connect: false          # Don't auto-start servers on boot
+  connection_timeout: 30000    # 30s timeout for server connections
+  max_servers: 10              # Maximum concurrent MCP servers
+  log_requests: true           # Log MCP JSON-RPC requests to telemetry
