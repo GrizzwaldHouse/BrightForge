@@ -538,11 +538,40 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: relative;
 }
 
 .btn-icon-primary:hover {
   background: var(--brand-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.btn-icon-primary:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.btn-icon-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Pulse animation for send button when input has content */
+.btn-icon-primary.ready {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  50% {
+    box-shadow: 0 2px 8px rgba(80, 150, 255, 0.4);
+  }
 }
 
 /* === Buttons === */
@@ -765,4 +794,50 @@ button {
 /* === Utility: Hidden === */
 .hidden {
   display: none !important;
+}
+
+/* === Responsive Design: Tablet & Mobile === */
+
+/* Tablet - 1024px and below */
+@media (max-width: 1024px) {
+  .main-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: fixed;
+    left: -280px;
+    transition: left 0.3s;
+    z-index: 1000;
+  }
+
+  .sidebar.active {
+    left: 0;
+  }
+
+  .tab-content {
+    padding: var(--spacing-md);
+  }
+}
+
+/* Mobile - 768px and below */
+@media (max-width: 768px) {
+  .chat-container {
+    height: calc(100vh - 200px);
+  }
+
+  .input-area {
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+
+  .btn-icon-primary {
+    width: 100%;
+    height: 48px;
+  }
+
+  .tab-list {
+    overflow-x: auto;
+    white-space: nowrap;
+  }
 }

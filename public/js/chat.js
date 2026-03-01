@@ -180,12 +180,20 @@ class ChatPanel {
   }
 
   /**
-   * Scroll to bottom of chat
+   * Scroll to bottom of chat (debounced to prevent accumulation)
    */
   scrollToBottom() {
-    // Small delay to ensure content is rendered
-    setTimeout(() => {
-      this.container.scrollTop = this.container.scrollHeight;
+    // Cancel any pending scroll
+    if (this._scrollTimeout) {
+      clearTimeout(this._scrollTimeout);
+    }
+
+    // Debounce scroll operation
+    this._scrollTimeout = setTimeout(() => {
+      if (this.container) {
+        this.container.scrollTop = this.container.scrollHeight;
+      }
+      this._scrollTimeout = null;
     }, 50);
   }
 }

@@ -4,101 +4,208 @@
  * @date February 11, 2026
  */
 
+console.log('[APP] ===== app.js LOADING =====');
+
+console.log('[APP] Importing ChatPanel...');
 import { ChatPanel } from './chat.js';
+console.log('[APP] Importing PlanViewer...');
 import { PlanViewer } from './plan-viewer.js';
+console.log('[APP] Importing SessionManager...');
 import { SessionManager } from './session-manager.js';
+console.log('[APP] Importing SystemHealthPanel...');
 import { SystemHealthPanel } from './system-health.js';
+console.log('[APP] Importing FileBrowser...');
 import { FileBrowser } from './file-browser.js';
+console.log('[APP] Importing DesignViewer...');
 import { DesignViewer } from './design-viewer.js';
+console.log('[APP] Importing Forge3DPanel...');
 import { Forge3DPanel } from './forge3d-panel.js';
+console.log('[APP] ✓ All modules imported successfully');
 
 class App {
   constructor() {
-    this.sessionId = null;
-    this.projectRoot = '';
-    this.currentPlan = null;
-    this.config = null;
-    this.health = null;
+    console.log('[APP] Constructor started');
+    try {
+      this.sessionId = null;
+      this.projectRoot = '';
+      this.currentPlan = null;
+      this.config = null;
+      this.health = null;
 
-    // Initialize modules
-    this.chat = new ChatPanel(this);
-    this.planViewer = new PlanViewer(this);
-    this.sessionManager = new SessionManager(this);
-    this.healthPanel = new SystemHealthPanel();
-    this.designViewer = new DesignViewer();
-    this.forge3dPanel = new Forge3DPanel();
-    this.fileBrowser = null; // Initialized after DOM ready
+      // Initialize modules
+      console.log('[APP] Initializing ChatPanel...');
+      this.chat = new ChatPanel(this);
+      console.log('[APP] ChatPanel initialized');
 
-    this.init();
+      console.log('[APP] Initializing PlanViewer...');
+      this.planViewer = new PlanViewer(this);
+      console.log('[APP] PlanViewer initialized');
+
+      console.log('[APP] Initializing SessionManager...');
+      this.sessionManager = new SessionManager(this);
+      console.log('[APP] SessionManager initialized');
+
+      console.log('[APP] Initializing SystemHealthPanel...');
+      this.healthPanel = new SystemHealthPanel();
+      console.log('[APP] SystemHealthPanel initialized');
+
+      console.log('[APP] Initializing DesignViewer...');
+      this.designViewer = new DesignViewer();
+      console.log('[APP] DesignViewer initialized');
+
+      console.log('[APP] Initializing Forge3DPanel...');
+      this.forge3dPanel = new Forge3DPanel();
+      console.log('[APP] Forge3DPanel initialized');
+
+      this.fileBrowser = null; // Initialized after DOM ready
+
+      console.log('[APP] Constructor complete, calling init()');
+      this.init();
+    } catch (error) {
+      console.error('[APP] FATAL: Constructor failed:', error);
+      console.error('[APP] Error stack:', error.stack);
+      throw error;
+    }
   }
 
   async init() {
+    console.log('[APP] ===== INIT STARTED =====');
     console.log('[APP] Initializing BrightForge dashboard...');
 
-    // Bind UI events
-    this.bindEvents();
-
-    // Setup tab navigation
-    this.setupTabNavigation();
-
-    // Load initial data
     try {
+      // Bind UI events
+      console.log('[APP] Step 1: Binding events...');
+      this.bindEvents();
+      console.log('[APP] ✓ Events bound');
+
+      // Setup tab navigation
+      console.log('[APP] Step 2: Setting up tab navigation...');
+      this.setupTabNavigation();
+      console.log('[APP] ✓ Tab navigation setup');
+
+      // Load initial data
+      console.log('[APP] Step 3: Loading health and config in parallel...');
       await Promise.all([
-        this.loadHealth(),
-        this.loadConfig()
+        this.loadHealth().then(() => console.log('[APP] ✓ Health loaded')),
+        this.loadConfig().then(() => console.log('[APP] ✓ Config loaded'))
       ]);
 
+      console.log('[APP] Step 4: Loading sessions...');
       await this.sessionManager.loadSessions();
+      console.log('[APP] ✓ Sessions loaded');
 
       // Initialize file browser
+      console.log('[APP] Step 5: Initializing file browser...');
       this.fileBrowser = new FileBrowser('project-root-container', {
         placeholder: 'Search or browse project folder...',
         maxRecent: 5
       });
       this.fileBrowser.render();
+      console.log('[APP] ✓ File browser initialized');
 
       // Restore project root from localStorage
+      console.log('[APP] Step 6: Restoring project root...');
       const savedProject = localStorage.getItem('brightforge-project-root');
       if (savedProject) {
         this.projectRoot = savedProject;
         this.fileBrowser.setValue(savedProject);
+        console.log('[APP] ✓ Project root restored:', savedProject);
+      } else {
+        console.log('[APP] ✓ No saved project root');
       }
 
       // Start provider status polling (every 30 seconds)
+      console.log('[APP] Step 7: Starting provider status polling...');
       this.startProviderStatusPolling();
+      console.log('[APP] ✓ Polling started');
 
-      console.log('[APP] Initialization complete');
+      // Initialize Lucide icons ONCE on page load
+      console.log('[APP] Step 8: Initializing Lucide icons...');
+      if (window.lucide) {
+        window.lucide.createIcons();
+        console.log('[APP] ✓ Lucide icons initialized');
+      } else {
+        console.warn('[APP] ⚠ Lucide not available');
+      }
+
+      console.log('[APP] ===== INITIALIZATION COMPLETE =====');
     } catch (error) {
-      console.error('[APP] Initialization failed:', error);
+      console.error('[APP] ===== INITIALIZATION FAILED =====');
+      console.error('[APP] Error:', error);
+      console.error('[APP] Error message:', error.message);
+      console.error('[APP] Error stack:', error.stack);
       this.showError('Failed to initialize dashboard. Is the server running?');
+      throw error;
     }
   }
 
   bindEvents() {
-    // Send message
-    document.getElementById('send-btn').addEventListener('click', () => this.sendMessage());
+    console.log('[APP] bindEvents: Looking for DOM elements...');
 
-    document.getElementById('chat-input').addEventListener('keydown', (e) => {
+    const sendBtn = document.getElementById('send-btn');
+    const chatInput = document.getElementById('chat-input');
+    const newSessionBtn = document.getElementById('new-session-btn');
+    const projectRootContainer = document.getElementById('project-root-container');
+    const settingsBtn = document.getElementById('settings-btn');
+
+    console.log('[APP] bindEvents: send-btn =', sendBtn ? '✓ found' : '✗ NOT FOUND');
+    console.log('[APP] bindEvents: chat-input =', chatInput ? '✓ found' : '✗ NOT FOUND');
+    console.log('[APP] bindEvents: new-session-btn =', newSessionBtn ? '✓ found' : '✗ NOT FOUND');
+    console.log('[APP] bindEvents: project-root-container =', projectRootContainer ? '✓ found' : '✗ NOT FOUND');
+    console.log('[APP] bindEvents: settings-btn =', settingsBtn ? '✓ found' : '✗ NOT FOUND');
+
+    if (!sendBtn || !chatInput) {
+      console.error('[APP] bindEvents: CRITICAL - send-btn or chat-input not found!');
+      throw new Error('Required DOM elements not found: send-btn or chat-input');
+    }
+
+    // Add ready class when input has content (pulsing send button affordance)
+    chatInput.addEventListener('input', () => {
+      if (chatInput.value.trim()) {
+        sendBtn.classList.add('ready');
+      } else {
+        sendBtn.classList.remove('ready');
+      }
+    });
+    console.log('[APP] bindEvents: ✓ Chat input listener added');
+
+    // Send message
+    sendBtn.addEventListener('click', () => this.sendMessage());
+    console.log('[APP] bindEvents: ✓ Send button click listener added');
+
+    chatInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         this.sendMessage();
       }
     });
+    console.log('[APP] bindEvents: ✓ Chat input keydown listener added');
 
     // New session
-    document.getElementById('new-session-btn').addEventListener('click', () => this.newSession());
+    if (newSessionBtn) {
+      newSessionBtn.addEventListener('click', () => this.newSession());
+      console.log('[APP] bindEvents: ✓ New session button listener added');
+    }
 
     // File browser selection change
-    document.getElementById('project-root-container').addEventListener('filebrowser:select', (e) => {
-      this.projectRoot = e.detail.path;
-      localStorage.setItem('brightforge-project-root', this.projectRoot);
-      console.log('[APP] Project root selected:', this.projectRoot);
-    });
+    if (projectRootContainer) {
+      projectRootContainer.addEventListener('filebrowser:select', (e) => {
+        this.projectRoot = e.detail.path;
+        localStorage.setItem('brightforge-project-root', this.projectRoot);
+        console.log('[APP] Project root selected:', this.projectRoot);
+      });
+      console.log('[APP] bindEvents: ✓ File browser listener added');
+    }
 
     // Settings (placeholder)
-    document.getElementById('settings-btn').addEventListener('click', () => {
-      alert('Settings panel coming soon!');
-    });
+    if (settingsBtn) {
+      settingsBtn.addEventListener('click', () => {
+        alert('Settings panel coming soon!');
+      });
+      console.log('[APP] bindEvents: ✓ Settings button listener added');
+    }
+
+    console.log('[APP] bindEvents: All event bindings complete');
   }
 
   /**
@@ -404,34 +511,43 @@ class App {
       const statusSpan = document.createElement('span');
       statusSpan.className = 'provider-status';
 
-      const icon = document.createElement('i');
-
       // info is { enabled, available } from /api/health
       const avail = typeof info === 'object' ? info.available : info;
 
+      let statusClass = 'offline';
+      let statusName = 'unavailable';
       if (avail === 'available' || avail === 'configured' || avail === true) {
-        statusSpan.classList.add('online');
-        icon.setAttribute('data-lucide', 'check-circle-2');
+        statusClass = 'online';
+        statusName = 'available';
       } else if (avail === 'no_api_key' || avail === 'unknown') {
-        statusSpan.classList.add('degraded');
-        icon.setAttribute('data-lucide', 'alert-circle');
-      } else {
-        statusSpan.classList.add('offline');
-        icon.setAttribute('data-lucide', 'x-circle');
+        statusClass = 'degraded';
+        statusName = 'error';
       }
 
-      // Icon styling via CSS preferred, but inline for safety
-      icon.style.width = '14px';
-      icon.style.height = '14px';
+      statusSpan.classList.add(statusClass);
 
-      statusSpan.appendChild(icon);
+      // Create SVG icon manually (no data-lucide to avoid re-rendering)
+      const iconSvg = this._createStatusIcon(statusName);
+      statusSpan.innerHTML = iconSvg;
+
       item.appendChild(nameSpan);
       item.appendChild(statusSpan);
       list.appendChild(item);
     });
+  }
 
-    // Explicitly trigger icon render
-    if (window.lucide) window.lucide.createIcons();
+  /**
+   * Create status icon SVG manually
+   * @param {string} status - 'available', 'error', or 'unavailable'
+   * @returns {string} SVG markup
+   */
+  _createStatusIcon(status) {
+    const iconMap = {
+      'available': '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>',
+      'error': '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>',
+      'unavailable': '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>'
+    };
+    return iconMap[status] || iconMap['unavailable'];
   }
 
   /**
@@ -504,9 +620,52 @@ class App {
   }
 }
 
+// Global error handlers for debugging
+window.addEventListener('error', (event) => {
+  console.error('[APP] ===== GLOBAL ERROR =====');
+  console.error('[APP] Message:', event.message);
+  console.error('[APP] Filename:', event.filename);
+  console.error('[APP] Line:', event.lineno, 'Col:', event.colno);
+  console.error('[APP] Error object:', event.error);
+  if (event.error && event.error.stack) {
+    console.error('[APP] Stack trace:', event.error.stack);
+  }
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('[APP] ===== UNHANDLED PROMISE REJECTION =====');
+  console.error('[APP] Reason:', event.reason);
+  if (event.reason && event.reason.stack) {
+    console.error('[APP] Stack trace:', event.reason.stack);
+  }
+});
+
 // Initialize on DOM ready
+console.log('[APP] ===== SCRIPT LOADED =====');
+console.log('[APP] Waiting for DOMContentLoaded...');
+
 document.addEventListener('DOMContentLoaded', () => {
-  window.app = new App();
+  console.log('[APP] ===== DOM CONTENT LOADED =====');
+  console.log('[APP] Creating App instance...');
+  try {
+    window.app = new App();
+    console.log('[APP] ✓ App instance created and assigned to window.app');
+  } catch (error) {
+    console.error('[APP] ===== FAILED TO CREATE APP INSTANCE =====');
+    console.error('[APP] Error:', error);
+    console.error('[APP] Error message:', error.message);
+    console.error('[APP] Error stack:', error.stack);
+
+    // Show error on page
+    document.body.innerHTML = `
+      <div style="padding: 40px; font-family: monospace; background: #1a1a2e; color: #e0e7ff; min-height: 100vh;">
+        <h1 style="color: #ef4444;">❌ BrightForge Failed to Load</h1>
+        <h2>Error: ${error.message}</h2>
+        <pre style="background: #0a0e27; padding: 20px; border-radius: 8px; overflow: auto;">${error.stack}</pre>
+        <p>Check the browser console for detailed logs.</p>
+      </div>
+    `;
+  }
 });
 
 export { App };
