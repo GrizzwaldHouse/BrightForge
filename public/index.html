@@ -236,10 +236,37 @@
                 </div>
 
                 <div id="forge3d-upload-group" class="forge3d-input-group hidden">
-                  <div id="forge3d-upload-area" class="forge3d-upload-area">
-                    <input type="file" id="forge3d-upload" accept="image/*">
-                    <i data-lucide="upload-cloud" class="upload-icon"></i>
-                    <span>Drop image here or click to upload</span>
+                  <label>Reference Image</label>
+                  <div class="forge3d-image-input">
+                    <!-- Method 1: Drag & Drop Zone -->
+                    <div id="forge3d-upload-area" class="forge3d-upload-area">
+                      <input type="file" id="forge3d-upload" accept="image/*">
+                      <div class="upload-placeholder" id="forge3d-upload-placeholder">
+                        <i data-lucide="upload-cloud" class="upload-icon"></i>
+                        <span class="upload-text">Drop image here</span>
+                        <span class="upload-hint">PNG, JPG, WebP up to 20 MB</span>
+                      </div>
+                      <div class="upload-preview hidden" id="forge3d-upload-preview">
+                        <img id="forge3d-preview-img" alt="Preview">
+                        <button id="forge3d-clear-image" class="btn-clear-image" title="Remove image">
+                          <i data-lucide="x"></i>
+                        </button>
+                        <span class="upload-filename" id="forge3d-upload-filename"></span>
+                      </div>
+                    </div>
+
+                    <!-- Method 2 & 3: Action Buttons -->
+                    <div class="forge3d-image-actions">
+                      <button id="forge3d-browse-btn" class="btn-image-action" title="Browse files">
+                        <i data-lucide="folder-open"></i> Browse
+                      </button>
+                      <button id="forge3d-explorer-btn" class="btn-image-action" title="Open file explorer">
+                        <i data-lucide="hard-drive"></i> Explorer
+                      </button>
+                      <button id="forge3d-paste-btn" class="btn-image-action" title="Paste from clipboard">
+                        <i data-lucide="clipboard"></i> Paste
+                      </button>
+                    </div>
                   </div>
                 </div>
 

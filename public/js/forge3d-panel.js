@@ -23,6 +23,7 @@ class Forge3DPanel {
     this.activeSessionId = null;
     this.initialized = false;
     this._config = null;
+    this._selectedFile = null; // Currently selected image file
   }
 
   /**
@@ -87,16 +88,16 @@ class Forge3DPanel {
     const genBtn = document.getElementById('forge3d-generate-btn');
     if (genBtn) genBtn.addEventListener('click', () => this._handleGenerate());
 
-    // Image upload
+    // Image upload (hidden file input change)
     const uploadInput = document.getElementById('forge3d-upload');
-    if (uploadInput) uploadInput.addEventListener('change', (e) => this._handleUpload(e));
+    if (uploadInput) uploadInput.addEventListener('change', (e) => this._setImageFromInput(e));
 
-    // Upload area drag and drop
+    // --- Image Input Method 1: Drag & Drop ---
     const uploadArea = document.getElementById('forge3d-upload-area');
     if (uploadArea) {
       uploadArea.addEventListener('dragover', (e) => {
         e.preventDefault();
-        uploadArea.classList.add('drag-over');
+        if (!this._selectedFile) uploadArea.classList.add('drag-over');
       });
       uploadArea.addEventListener('dragleave', () => {
         uploadArea.classList.remove('drag-over');
@@ -104,15 +105,54 @@ class Forge3DPanel {
       uploadArea.addEventListener('drop', (e) => {
         e.preventDefault();
         uploadArea.classList.remove('drag-over');
-        if (e.dataTransfer.files.length > 0) {
-          document.getElementById('forge3d-upload').files = e.dataTransfer.files;
-          this._handleUpload({ target: { files: e.dataTransfer.files } });
+        const file = e.dataTransfer.files[0];
+        if (file) this._setImage(file);
+      });
+      // Click the drop zone to open file picker (only when no image selected)
+      uploadArea.addEventListener('click', (e) => {
+        if (!this._selectedFile && e.target.closest('.btn-clear-image') === null) {
+          uploadInput.click();
         }
       });
-      uploadArea.addEventListener('click', () => {
-        document.getElementById('forge3d-upload').click();
-      });
     }
+
+    // --- Image Input Method 2: Browse button (opens file picker) ---
+    const browseBtn = document.getElementById('forge3d-browse-btn');
+    if (browseBtn) browseBtn.addEventListener('click', () => {
+      const input = document.getElementById('forge3d-upload');
+      if (input) input.click();
+    });
+
+    // --- Image Input Method 3: Explorer button (opens native OS file dialog via Electron IPC or fallback) ---
+    const explorerBtn = document.getElementById('forge3d-explorer-btn');
+    if (explorerBtn) explorerBtn.addEventListener('click', () => this._openExplorer());
+
+    // --- Image Input Method 4: Paste from clipboard ---
+    const pasteBtn = document.getElementById('forge3d-paste-btn');
+    if (pasteBtn) pasteBtn.addEventListener('click', () => this._pasteFromClipboard());
+
+    // Global paste handler (Ctrl+V anywhere on Forge3D tab)
+    document.addEventListener('paste', (e) => {
+      const forge3dPanel = document.querySelector('[data-panel="forge3d"]');
+      if (!forge3dPanel || forge3dPanel.classList.contains('hidden') || !forge3dPanel.classList.contains('active')) return;
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          e.preventDefault();
+          const file = item.getAsFile();
+          if (file) this._setImage(file);
+          break;
+        }
+      }
+    });
+
+    // Clear image button
+    const clearBtn = document.getElementById('forge3d-clear-image');
+    if (clearBtn) clearBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this._clearImage();
+    });
 
     // Type selector
     const typeSelect = document.getElementById('forge3d-type');
@@ -142,6 +182,150 @@ class Forge3DPanel {
     if (pauseBtn) pauseBtn.addEventListener('click', () => this._toggleQueuePause());
   }
 
+  // =============================================
+  // Image Input Methods
+  // =============================================
+
+  /**
+   * Handle file input change event (from Browse or drop zone click).
+   */
+  _setImageFromInput(event) {
+    const file = event.target.files[0];
+    if (file) this._setImage(file);
+  }
+
+  /**
+   * Set the selected image file and show preview.
+   * Validates type and size before accepting.
+   * @param {File} file
+   */
+  _setImage(file) {
+    if (!file.type.startsWith('image/')) {
+      this._showStatus('Please select an image file (PNG, JPG, WebP)', 'error');
+      return;
+    }
+
+    const maxBytes = this._cfg('generation.max_image_size_bytes', 20 * 1024 * 1024);
+    if (file.size > maxBytes) {
+      const maxMb = (maxBytes / (1024 * 1024)).toFixed(0);
+      this._showStatus(`Image too large (max ${maxMb} MB)`, 'error');
+      return;
+    }
+
+    this._selectedFile = file;
+
+    // Show preview
+    const uploadArea = document.getElementById('forge3d-upload-area');
+    const placeholder = document.getElementById('forge3d-upload-placeholder');
+    const preview = document.getElementById('forge3d-upload-preview');
+    const previewImg = document.getElementById('forge3d-preview-img');
+    const filename = document.getElementById('forge3d-upload-filename');
+
+    if (uploadArea) uploadArea.classList.add('has-image');
+    if (placeholder) placeholder.classList.add('hidden');
+    if (preview) preview.classList.remove('hidden');
+    if (filename) filename.textContent = `${file.name} (${this._formatSize(file.size)})`;
+
+    // Generate thumbnail preview
+    if (previewImg) {
+      const reader = new FileReader();
+      reader.onload = (e) => { previewImg.src = e.target.result; };
+      reader.readAsDataURL(file);
+    }
+
+    this._showStatus(`Image selected: ${file.name}`, 'info');
+    console.log('[FORGE3D-PANEL] Image selected:', file.name, file.type, this._formatSize(file.size));
+  }
+
+  /**
+   * Clear the selected image and reset the upload area.
+   */
+  _clearImage() {
+    this._selectedFile = null;
+
+    const uploadArea = document.getElementById('forge3d-upload-area');
+    const placeholder = document.getElementById('forge3d-upload-placeholder');
+    const preview = document.getElementById('forge3d-upload-preview');
+    const previewImg = document.getElementById('forge3d-preview-img');
+    const uploadInput = document.getElementById('forge3d-upload');
+
+    if (uploadArea) uploadArea.classList.remove('has-image');
+    if (placeholder) placeholder.classList.remove('hidden');
+    if (preview) preview.classList.add('hidden');
+    if (previewImg) previewImg.src = '';
+    if (uploadInput) uploadInput.value = '';
+
+    this._showStatus('Image cleared', 'info');
+  }
+
+  /**
+   * Open OS file explorer dialog.
+   * Uses Electron IPC if available, falls back to file input.
+   */
+  async _openExplorer() {
+    // Electron path: use IPC to open native dialog
+    if (window.electronAPI?.openFileDialog) {
+      try {
+        const result = await window.electronAPI.openFileDialog({
+          title: 'Select Reference Image',
+          filters: [
+            { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'tiff'] }
+          ],
+          properties: ['openFile']
+        });
+        if (result && result.filePath) {
+          const response = await fetch(`/api/forge3d/local-file?path=${encodeURIComponent(result.filePath)}`);
+          if (response.ok) {
+            const blob = await response.blob();
+            const file = new File([blob], result.filePath.split(/[/\\]/).pop(), { type: blob.type });
+            this._setImage(file);
+          }
+        }
+        return;
+      } catch (err) {
+        console.warn('[FORGE3D-PANEL] Electron dialog failed, falling back:', err.message);
+      }
+    }
+
+    // Web fallback: use a file input with webkitdirectory-like behavior
+    // We create a temporary input that mimics explorer behavior
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/png,image/jpeg,image/webp,image/bmp,image/tiff';
+    input.style.display = 'none';
+    input.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) this._setImage(file);
+      input.remove();
+    });
+    document.body.appendChild(input);
+    input.click();
+  }
+
+  /**
+   * Paste image from clipboard.
+   */
+  async _pasteFromClipboard() {
+    try {
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        const imageType = item.types.find((t) => t.startsWith('image/'));
+        if (imageType) {
+          const blob = await item.getType(imageType);
+          const ext = imageType.split('/')[1] || 'png';
+          const file = new File([blob], `pasted-image.${ext}`, { type: imageType });
+          this._setImage(file);
+          return;
+        }
+      }
+      this._showStatus('No image found in clipboard', 'error');
+    } catch (err) {
+      // Clipboard API may not be available or permission denied
+      this._showStatus('Clipboard access denied. Try Ctrl+V instead.', 'error');
+      console.warn('[FORGE3D-PANEL] Clipboard read failed:', err.message);
+    }
+  }
+
   /**
    * Toggle input fields based on selected generation type.
    */
@@ -165,6 +349,7 @@ class Forge3DPanel {
 
   /**
    * Handle generate button click.
+   * Routes to image upload for mesh type, or JSON request for text-based types.
    */
   async _handleGenerate() {
     const type = document.getElementById('forge3d-type').value;
@@ -172,8 +357,18 @@ class Forge3DPanel {
     const projectSelect = document.getElementById('forge3d-project-select');
     const projectId = projectSelect?.value || null;
 
+    // Mesh type requires a staged image
+    if (type === 'mesh') {
+      if (!this._selectedFile) {
+        this._showStatus('Select an image first (drag & drop, browse, or paste)', 'error');
+        return;
+      }
+      return this._uploadAndGenerate(this._selectedFile);
+    }
+
+    // Text-based types require a prompt
     const minPromptLen = this._cfg('generation.min_prompt_length', 3);
-    if ((type === 'image' || type === 'full') && (!prompt || prompt.length < minPromptLen)) {
+    if (!prompt || prompt.length < minPromptLen) {
       this._showStatus(`Enter a prompt (at least ${minPromptLen} characters)`, 'error');
       return;
     }
@@ -200,7 +395,7 @@ class Forge3DPanel {
       this.activeSessionId = data.sessionId;
       this._showStatus(`Queued (session: ${data.sessionId}). Generating...`, 'info');
       this._startPolling(data.sessionId);
-      this._startVramPolling(VRAM_POLL_ACTIVE); // Speed up during generation
+      this._startVramPolling(VRAM_POLL_ACTIVE);
 
     } catch (err) {
       this._showStatus(`Error: ${err.message}`, 'error');
@@ -209,24 +404,10 @@ class Forge3DPanel {
   }
 
   /**
-   * Handle image upload for mesh generation.
+   * Upload the staged image and start mesh generation.
+   * @param {File} file - The image file to upload
    */
-  async _handleUpload(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      this._showStatus('Please upload an image file (PNG, JPG, WebP)', 'error');
-      return;
-    }
-
-    const maxBytes = this._cfg('generation.max_image_size_bytes', 20 * 1024 * 1024);
-    if (file.size > maxBytes) {
-      const maxMb = (maxBytes / (1024 * 1024)).toFixed(0);
-      this._showStatus(`Image too large (max ${maxMb} MB)`, 'error');
-      return;
-    }
-
+  async _uploadAndGenerate(file) {
     this._showStatus(`Uploading ${file.name} for mesh generation...`, 'info');
     this._setGenerating(true);
 
@@ -248,6 +429,7 @@ class Forge3DPanel {
       this.activeSessionId = data.sessionId;
       this._showStatus(`Generating mesh from image (session: ${data.sessionId})...`, 'info');
       this._startPolling(data.sessionId);
+      this._startVramPolling(VRAM_POLL_ACTIVE);
 
     } catch (err) {
       this._showStatus(`Upload error: ${err.message}`, 'error');

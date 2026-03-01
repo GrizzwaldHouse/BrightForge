@@ -118,7 +118,14 @@
   border-color: var(--accent-primary);
 }
 
-/* === Upload Area === */
+/* === Image Input Container === */
+.forge3d-image-input {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+/* === Upload Area (Drag & Drop) === */
 .forge3d-upload-area {
   border: 2px dashed var(--border);
   border-radius: var(--radius-lg);
@@ -128,6 +135,8 @@
   transition: all 0.2s;
   color: var(--text-secondary);
   font-size: 13px;
+  position: relative;
+  min-height: 100px;
 }
 
 .forge3d-upload-area:hover,
@@ -137,8 +146,123 @@
   color: var(--accent-primary);
 }
 
+.forge3d-upload-area.has-image {
+  border-style: solid;
+  border-color: var(--accent-primary);
+  padding: var(--spacing-sm);
+  cursor: default;
+}
+
 .forge3d-upload-area input[type="file"] {
   display: none;
+}
+
+.upload-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.upload-text {
+  font-weight: 500;
+}
+
+.upload-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+/* Image Preview */
+.upload-preview {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.upload-preview img {
+  max-width: 100%;
+  max-height: 120px;
+  border-radius: var(--radius-sm);
+  object-fit: contain;
+}
+
+.upload-filename {
+  font-size: 11px;
+  color: var(--text-secondary);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-clear-image {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--error);
+  color: white;
+  border: 2px solid var(--bg-card);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: transform 0.15s;
+}
+
+.btn-clear-image:hover {
+  transform: scale(1.15);
+}
+
+.btn-clear-image i,
+.btn-clear-image svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* === Image Action Buttons === */
+.forge3d-image-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--spacing-xs);
+}
+
+.btn-image-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 6px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-image-action:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  background: rgba(37, 99, 235, 0.05);
+}
+
+.btn-image-action:active {
+  transform: scale(0.97);
+}
+
+.btn-image-action i,
+.btn-image-action svg {
+  width: 14px;
+  height: 14px;
 }
 
 /* === Generate Button === */
