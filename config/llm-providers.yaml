@@ -8,8 +8,8 @@ providers:
     base_url: "http://127.0.0.1:11434/v1"
     api_key: null  # No key needed for local
     models:
-      code: "qwen2.5-coder:14b"
-      fast: "qwen2.5-coder:1.5b"
+      code: "llama3:8b"
+      fast: "llama3:8b"
       embed: "nomic-embed-text"
     priority: 1
     cost_per_1k_tokens: 0

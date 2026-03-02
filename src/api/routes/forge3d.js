@@ -1,10 +1,11 @@
 /**
  * Forge3D Routes - API endpoints for 3D generation
  *
- * 21 endpoints for generation, projects, assets, queue, models, FBX:
+ * 22 endpoints for generation, projects, assets, queue, models, FBX:
  *
  * POST /api/forge3d/generate        - Start generation (image or text)
  * GET  /api/forge3d/status/:id      - Check generation progress
+ * GET  /api/forge3d/stream/:id      - SSE stream for real-time generation progress
  * GET  /api/forge3d/download/:id    - Download .glb/.png/.fbx file (?format=fbx)
  * GET  /api/forge3d/projects        - List projects
  * POST /api/forge3d/projects        - Create project
@@ -31,7 +32,7 @@
  *
  * TODO(P1): Add rate limiting on /generate endpoint (prevent GPU queue flooding)
  * TODO(P1): Add API key authentication for non-localhost access
- * TODO(P1): Add WebSocket or SSE for real-time generation progress (replace polling)
+ * DONE: SSE endpoint at GET /stream/:id for real-time generation progress
  * TODO(P1): Add request body size limit middleware (prevent OOM from large uploads)
  * TODO(P2): Add OpenAPI/Swagger spec generation from route definitions
  * TODO(P2): Add /api/forge3d/models/delete endpoint for model cleanup
@@ -56,24 +57,34 @@ import forge3dDb from '../../forge3d/database.js';
 
 const router = express.Router();
 
-// Initialize project manager, queue, model downloader, and bridge on first request.
-// Lazy-init pattern: Python server takes 30s+ to start, so we don't block Express boot.
-// Bridge starts on first forge3d tab visit (GET /bridge, /projects, /generate, etc.).
+// Sync init for DB, queue, and project manager (fast, no I/O wait).
+// Bridge startup is separate — it takes 30s+ and must be awaited before generation.
 let initialized = false;
+let bridgeReady = null;
+
 function ensureInit() {
   if (!initialized) {
     projectManager.init();
     generationQueue.init();
     modelDownloader.initialize();
-
-    // Start Python inference bridge (fire-and-forget — logs errors internally)
-    modelBridge.start().catch((err) => {
-      console.error(`[ROUTE] ModelBridge startup failed: ${err.message}`);
-      errorHandler.report('bridge_error', err, { endpoint: 'ensureInit' });
-    });
-
     initialized = true;
   }
+}
+
+// Start the Python inference bridge and return a promise that resolves when ready.
+// Multiple callers share the same promise (no duplicate starts).
+// If startup fails, bridgeReady resets to null so the next request retries.
+async function ensureBridge() {
+  ensureInit();
+  if (!bridgeReady) {
+    bridgeReady = modelBridge.start().catch((err) => {
+      console.error(`[ROUTE] ModelBridge startup failed: ${err.message}`);
+      errorHandler.report('bridge_error', err, { endpoint: 'ensureBridge' });
+      bridgeReady = null;
+      return false;
+    });
+  }
+  return bridgeReady;
 }
 
 // --- Generation ---
@@ -94,8 +105,16 @@ function ensureInit() {
  *   projectId: string (optional)
  */
 router.post('/generate', express.raw({ type: 'image/*', limit: forge3dConfig.api.raw_body_limit }), async (req, res) => {
-  ensureInit();
+  await ensureBridge();
   console.log('[ROUTE] POST /api/forge3d/generate');
+
+  // Verify bridge is actually running before creating a session
+  if (modelBridge.state !== 'running') {
+    const reason = modelBridge.unavailableReason || modelBridge.state;
+    return res.status(503).json({
+      error: `Python server is not running (state: ${reason})`
+    });
+  }
 
   const endTimer = telemetryBus.startTimer('forge3d_api_generate');
 
@@ -189,7 +208,10 @@ router.post('/generate', express.raw({ type: 'image/*', limit: forge3dConfig.api
         filename: 'upload.png'
       });
 
-      forgeSession.run(sessionId).catch(() => { });
+      forgeSession.run(sessionId).catch((err) => {
+        console.error(`[ROUTE] Image mesh generation failed: ${err.message}`);
+        errorHandler.report('forge3d_error', err, { endpoint: 'generate', sessionId, type: 'mesh' });
+      });
 
       endTimer({ sessionId, type: 'mesh' });
       return res.status(202).json({
@@ -223,6 +245,48 @@ router.get('/status/:id', (req, res) => {
     return res.status(404).json({ error: 'Session not found' });
   }
   res.json(status);
+});
+
+/**
+ * GET /api/forge3d/stream/:id
+ * SSE stream for real-time generation progress.
+ * Replaces polling for active generation sessions.
+ */
+router.get('/stream/:id', (req, res) => {
+  res.set({
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive'
+  });
+  res.flushHeaders();
+
+  const sessionId = req.params.id;
+
+  const onProgress = (data) => {
+    if (data.sessionId === sessionId) {
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    }
+  };
+
+  const onComplete = (data) => {
+    if (data.sessionId === sessionId) {
+      res.write(`data: ${JSON.stringify({ ...data, done: true })}\n\n`);
+      cleanup();
+      res.end();
+    }
+  };
+
+  const cleanup = () => {
+    forgeSession.off('progress', onProgress);
+    forgeSession.off('complete', onComplete);
+    forgeSession.off('failed', onComplete);
+  };
+
+  forgeSession.on('progress', onProgress);
+  forgeSession.on('complete', onComplete);
+  forgeSession.on('failed', onComplete);
+
+  req.on('close', cleanup);
 });
 
 /**
@@ -422,7 +486,7 @@ router.get('/assets/:id/download', (req, res) => {
  * Body: { assetId: string }
  */
 router.post('/convert', async (req, res) => {
-  ensureInit();
+  await ensureBridge();
   const { assetId } = req.body;
 
   if (!assetId) {
@@ -741,6 +805,8 @@ router.get('/stats', (_req, res) => {
  * Get Python bridge status.
  */
 router.get('/bridge', async (_req, res) => {
+  // Trigger bridge startup on first visit (e.g. Forge3D tab opened)
+  ensureBridge();
   try {
     const info = modelBridge.getInfo();
     let health = null;

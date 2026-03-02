@@ -44,6 +44,7 @@ class ModelBridge extends EventEmitter {
     this.startTime = null;
     this.consecutiveHealthFailures = 0;
     this.unavailableReason = null;
+    this.pythonCmd = null; // Discovered Python command (python, python3, python3.13, etc.)
   }
 
   /**
@@ -158,7 +159,8 @@ class ModelBridge extends EventEmitter {
       '--host', this.host
     ];
 
-    this.pythonProcess = spawn('python', args, {
+    const cmd = this.pythonCmd || 'python';
+    this.pythonProcess = spawn(cmd, args, {
       cwd: PYTHON_DIR,
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true
@@ -603,31 +605,41 @@ class ModelBridge extends EventEmitter {
   async _checkEnvironment() {
     const issues = [];
 
-    // Check Python version (3.10+)
-    try {
-      const pyVersion = await this._runCommand('python', ['--version']);
-      const match = pyVersion.match(/Python (\d+)\.(\d+)/);
-      if (match) {
-        const [, major, minor] = match.map(Number);
-        if (major < 3 || (major === 3 && minor < 10)) {
-          issues.push(`Python ${major}.${minor} found, need 3.10+`);
-        } else {
-          console.log(`[BRIDGE] Python ${major}.${minor} detected`);
+    // Try multiple Python command names (Windows Store Python often needs python3.x)
+    const candidates = ['python', 'python3', 'python3.13', 'python3.12', 'python3.11', 'python3.10'];
+    let foundPython = null;
+
+    for (const cmd of candidates) {
+      try {
+        const pyVersion = await this._runCommand(cmd, ['--version']);
+        const match = pyVersion.match(/Python (\d+)\.(\d+)/);
+        if (match) {
+          const [, major, minor] = match.map(Number);
+          if (major >= 3 && minor >= 10) {
+            foundPython = cmd;
+            console.log(`[BRIDGE] Python ${major}.${minor} detected (command: ${cmd})`);
+            break;
+          }
         }
-      } else {
-        issues.push('Could not parse Python version');
+      } catch (_e) {
+        // Try next candidate
       }
-    } catch (_e) {
-      issues.push('Python not found in PATH');
     }
+
+    if (!foundPython) {
+      issues.push('Python 3.10+ not found (tried: python, python3, python3.13, python3.12, python3.11, python3.10)');
+      return { ready: false, issues };
+    }
+
+    this.pythonCmd = foundPython;
 
     // Check CUDA availability
     try {
-      const cudaCheck = await this._runCommand('python', [
+      const cudaCheck = await this._runCommand(foundPython, [
         '-c', 'import torch; print(torch.cuda.is_available())'
       ]);
       if (cudaCheck.trim() !== 'True') {
-        issues.push('CUDA not available (torch.cuda.is_available() = False)');
+        console.warn('[BRIDGE] CUDA not available — running in CPU mode (generation will be slow)');
       } else {
         console.log('[BRIDGE] CUDA GPU detected');
       }
@@ -637,7 +649,7 @@ class ModelBridge extends EventEmitter {
 
     // Check required Python packages
     try {
-      await this._runCommand('python', [
+      await this._runCommand(foundPython, [
         '-c', 'import fastapi, diffusers, trimesh, PIL, pynvml'
       ]);
       console.log('[BRIDGE] Required Python packages verified');

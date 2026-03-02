@@ -17,8 +17,8 @@ class SessionManager {
    */
   async loadSessions() {
     try {
-      const sessions = await this.app.apiGet('/api/sessions');
-      this.sessions = sessions || [];
+      const data = await this.app.apiGet('/api/sessions');
+      this.sessions = data.sessions || data || [];
       this.render();
       console.log('[SESSION] Loaded sessions:', this.sessions.length);
     } catch (error) {

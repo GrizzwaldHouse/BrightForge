@@ -1170,3 +1170,13 @@
   min-width: unset;
   line-height: 1;
 }
+
+/* Loading bar pulse animation for bridge startup */
+.forge3d-progress-bar.pulsing {
+  animation: progress-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes progress-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}

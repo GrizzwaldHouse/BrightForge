@@ -31,6 +31,7 @@ class Forge3DPanel {
     this._compareViewerB = null; // Feature 11: right compare viewer
     this._syncHandler = null; // Feature 11: camera sync handler
     this._syncing = false; // Feature 11: re-entrancy guard
+    this._eventSource = null; // SSE connection for generation progress
   }
 
   /**
@@ -526,6 +527,23 @@ class Forge3DPanel {
     this._showStatus('Submitting generation request...', 'info');
     this._setGenerating(true);
 
+    // Check bridge readiness before submitting generation request
+    try {
+      const bridgeRes = await fetch('/api/forge3d/bridge');
+      const bridgeData = await bridgeRes.json();
+      if (bridgeData.bridge.state !== 'running') {
+        const ready = await this._waitForBridge();
+        if (!ready) {
+          this._setGenerating(false);
+          return;
+        }
+      }
+    } catch (_e) {
+      this._showStatus('Cannot reach server', 'error');
+      this._setGenerating(false);
+      return;
+    }
+
     try {
       const body = { type, projectId: projectId || undefined };
       if (prompt) body.prompt = prompt;
@@ -544,7 +562,7 @@ class Forge3DPanel {
       const data = await res.json();
       this.activeSessionId = data.sessionId;
       this._showStatus(`Queued (session: ${data.sessionId}). Generating...`, 'info');
-      this._startPolling(data.sessionId);
+      this._streamProgress(data.sessionId);
       this._startVramPolling(VRAM_POLL_ACTIVE);
 
     } catch (err) {
@@ -578,7 +596,7 @@ class Forge3DPanel {
       const data = await res.json();
       this.activeSessionId = data.sessionId;
       this._showStatus(`Generating mesh from image (session: ${data.sessionId})...`, 'info');
-      this._startPolling(data.sessionId);
+      this._streamProgress(data.sessionId);
       this._startVramPolling(VRAM_POLL_ACTIVE);
 
     } catch (err) {
@@ -588,7 +606,90 @@ class Forge3DPanel {
   }
 
   /**
+   * Stream generation progress via SSE.
+   * Falls back to polling if the SSE connection is lost.
+   */
+  _streamProgress(sessionId) {
+    if (this._eventSource) this._eventSource.close();
+
+    this._eventSource = new EventSource(`/api/forge3d/stream/${sessionId}`);
+
+    this._eventSource.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.done) {
+        this._eventSource.close();
+        this._eventSource = null;
+        if (data.state === 'complete' || data.result) {
+          this._onGenerationComplete(sessionId, data);
+        } else {
+          this._showStatus(`Generation failed: ${data.error || 'Unknown error'}`, 'error');
+          this._setGenerating(false);
+          this._startVramPolling(VRAM_POLL_IDLE);
+        }
+        return;
+      }
+      const stage = data.progress?.stage || data.state || 'processing';
+      const pct = data.progress?.percent || 0;
+      this._showStatus(`Generating... (${stage} ${pct}%)`, 'info');
+      this._updateProgress(pct);
+    };
+
+    this._eventSource.onerror = () => {
+      // SSE connection lost — fall back to polling as safety net
+      if (this._eventSource) {
+        this._eventSource.close();
+        this._eventSource = null;
+      }
+      console.warn('[FORGE3D-PANEL] SSE connection lost, falling back to polling');
+      this._startPolling(sessionId);
+    };
+  }
+
+  /**
+   * Wait for the Python inference bridge to become ready.
+   * Shows a pulsing progress bar during startup.
+   * @returns {Promise<boolean>} true if bridge is running
+   */
+  async _waitForBridge() {
+    this._showStatus('Starting Python inference server...', 'info');
+    this._updateProgress(5);
+    const bar = document.getElementById('forge3d-progress-bar');
+    if (bar) bar.classList.add('pulsing');
+
+    const maxWaitMs = this._cfg('ui.bridge_startup_timeout_ms', 120000);
+    const pollMs = this._cfg('ui.bridge_check_interval_ms', 2000);
+    const start = Date.now();
+
+    while (Date.now() - start < maxWaitMs) {
+      try {
+        const res = await fetch('/api/forge3d/bridge');
+        const data = await res.json();
+        if (data.bridge.state === 'running') {
+          if (bar) bar.classList.remove('pulsing');
+          this._updateProgress(20);
+          return true;
+        }
+        if (data.bridge.state === 'unavailable' || data.bridge.state === 'error') {
+          if (bar) bar.classList.remove('pulsing');
+          this._showStatus(`Server error: ${data.bridge.unavailableReason || 'unknown'}`, 'error');
+          return false;
+        }
+      } catch (_e) {
+        console.warn('[FORGE3D-PANEL] Bridge check failed, retrying...');
+      }
+      // Bridge still starting — update progress pulse
+      const elapsed = Date.now() - start;
+      this._updateProgress(5 + Math.floor((elapsed / maxWaitMs) * 15));
+      await new Promise((r) => setTimeout(r, pollMs));
+    }
+    if (bar) bar.classList.remove('pulsing');
+    this._showStatus('Server startup timed out', 'error');
+    return false;
+  }
+
+  /**
    * Poll session status until complete/failed.
+   * Kept as fallback when SSE connection fails.
    */
   _startPolling(sessionId) {
     if (this.pollInterval) clearInterval(this.pollInterval);
@@ -617,8 +718,8 @@ class Forge3DPanel {
           this._showStatus(`Generating... (${stage} ${pct}%)`, 'info');
           this._updateProgress(pct);
         }
-      } catch (_err) {
-        // Network error, keep polling
+      } catch (err) {
+        console.warn('[FORGE3D-PANEL] Polling network error:', err.message);
       }
     }, pollMs);
   }
@@ -710,8 +811,8 @@ class Forge3DPanel {
       }
 
       if (currentValue) select.value = currentValue;
-    } catch (_err) {
-      // Silent fail
+    } catch (err) {
+      console.warn('[FORGE3D-PANEL] Failed to load projects:', err.message);
     }
   }
 
@@ -756,7 +857,8 @@ class Forge3DPanel {
           </div>
         </div>
       `).join('');
-    } catch (_err) {
+    } catch (err) {
+      console.warn('[FORGE3D-PANEL] Failed to load assets:', err.message);
       gallery.innerHTML = '<div class="gallery-empty">Failed to load assets</div>';
     }
   }
@@ -791,8 +893,8 @@ class Forge3DPanel {
           </div>
         `;
       }
-    } catch (_err) {
-      // Silent
+    } catch (err) {
+      console.warn('[FORGE3D-PANEL] Failed to load stats:', err.message);
     }
   }
 
@@ -820,8 +922,8 @@ class Forge3DPanel {
           <span class="queue-time">${this._formatTime(s.createdAt)}</span>
         </div>
       `).join('');
-    } catch (_err) {
-      // Silent
+    } catch (err) {
+      console.warn('[FORGE3D-PANEL] Failed to load queue:', err.message);
     }
   }
 
@@ -872,7 +974,8 @@ class Forge3DPanel {
         vramText.textContent = data.bridge?.state === 'running' ? 'GPU N/A' : 'Server offline';
         vramBar.style.width = '0%';
       }
-    } catch (_err) {
+    } catch (err) {
+      console.warn('[FORGE3D-PANEL] VRAM update failed:', err.message);
       const vramText = document.getElementById('forge3d-vram-text');
       if (vramText) vramText.textContent = 'Bridge offline';
     }
@@ -918,7 +1021,8 @@ class Forge3DPanel {
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-    } catch (_err) {
+    } catch (err) {
+      console.warn('[FORGE3D-PANEL] Asset download failed:', err.message);
       this._showStatus('Download failed', 'error');
     }
   }
@@ -978,7 +1082,8 @@ class Forge3DPanel {
       await fetch(`/api/forge3d/assets/${assetId}`, { method: 'DELETE' });
       this._loadAssets();
       this._showStatus('Asset deleted', 'info');
-    } catch (_err) {
+    } catch (err) {
+      console.warn('[FORGE3D-PANEL] Asset delete failed:', err.message);
       this._showStatus('Delete failed', 'error');
     }
   }
@@ -1066,7 +1171,7 @@ class Forge3DPanel {
       const data = await res.json();
       this.activeSessionId = data.sessionId;
       this._showStatus(`Variation queued (session: ${data.sessionId}, seed: ${seed})`, 'info');
-      this._startPolling(data.sessionId);
+      this._streamProgress(data.sessionId);
       this._startVramPolling(VRAM_POLL_ACTIVE);
     } catch (err) {
       this._showStatus(`Vary error: ${err.message}`, 'error');
@@ -1157,7 +1262,8 @@ class Forge3DPanel {
           }
         });
       });
-    } catch (_err) {
+    } catch (err) {
+      console.warn('[FORGE3D-PANEL] Failed to load history:', err.message);
       grid.innerHTML = '<div class="gallery-empty" style="grid-column: 1 / -1;">Failed to load history</div>';
     }
   }
@@ -1297,8 +1403,8 @@ class Forge3DPanel {
           return;
         }
       }
-    } catch (_e) {
-      // Queue check failed, proceed anyway
+    } catch (err) {
+      console.warn('[FORGE3D-PANEL] Queue availability check failed:', err.message);
     }
 
     // Show progress UI
@@ -1380,8 +1486,8 @@ class Forge3DPanel {
             clearInterval(interval);
             resolve(status.state);
           }
-        } catch (_e) {
-          // Keep polling
+        } catch (err) {
+          console.warn('[FORGE3D-PANEL] Session poll error:', err.message);
         }
       }, pollMs);
     });

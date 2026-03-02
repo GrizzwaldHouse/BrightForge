@@ -48,8 +48,8 @@ class FbxConverter:
                 self.backend = 'assimp'
                 logger.info('[FBX] Backend: pyassimp (Open Asset Import Library)')
                 return
-            except ImportError:
-                logger.info('[FBX] pyassimp not available, checking Blender...')
+            except BaseException as e:
+                logger.info(f'[FBX] pyassimp not available ({e}), checking Blender...')
 
         # Try Blender
         configured_path = _cfg('fbx_export', 'blender_path', None)
