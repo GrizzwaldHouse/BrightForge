@@ -129,6 +129,20 @@ class Forge3DConfig {
       vram_polling_ms: 10000,
       vram_thresholds: { ok_pct: 70, warn_pct: 85 }
     });
+
+    this.promptTemplates = Array.isArray(this.config.prompt_templates)
+      ? this.config.prompt_templates
+      : [];
+
+    this.promptEnhancer = this._section('prompt_enhancer', {
+      task_routing_key: 'prompt_enhance',
+      system_prompt: 'You are a 3D model prompt optimizer. Rewrite the user prompt into a detailed description for text-to-3D generation. Return ONLY the enhanced prompt.',
+      max_tokens: 300
+    });
+
+    this.batch = this._section('batch', {
+      max_prompts: 5
+    });
   }
 
   /**
@@ -182,7 +196,10 @@ class Forge3DConfig {
       generation: {
         max_image_size_bytes: this.generation.max_image_size_bytes,
         min_prompt_length: this.generation.min_prompt_length
-      }
+      },
+      promptTemplates: this.promptTemplates,
+      hasEnhancer: true,
+      batch: this.batch
     };
   }
 }
@@ -215,10 +232,27 @@ if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(pr
   const absPath = cfg.resolvePath('data/forge3d.db');
   console.assert(absPath.includes('data'), 'Resolved path should contain data');
 
+  // Test prompt templates loaded
+  console.assert(Array.isArray(cfg.promptTemplates), 'Prompt templates should be an array');
+  console.assert(cfg.promptTemplates.length >= 12, 'Should have at least 12 templates');
+  console.assert(cfg.promptTemplates[0].category, 'Template should have category');
+  console.assert(cfg.promptTemplates[0].label, 'Template should have label');
+  console.assert(cfg.promptTemplates[0].prompt, 'Template should have prompt');
+
+  // Test prompt enhancer loaded
+  console.assert(cfg.promptEnhancer.task_routing_key === 'prompt_enhance', 'Enhancer routing key');
+  console.assert(cfg.promptEnhancer.max_tokens === 300, 'Enhancer max tokens');
+
+  // Test batch config
+  console.assert(cfg.batch.max_prompts === 5, 'Batch max prompts should be 5');
+
   // Test getClientConfig
   const client = cfg.getClientConfig();
   console.assert(client.viewer.camera.fov === 45, 'Client config should have viewer');
   console.assert(client.ui.generation_polling_ms === 2000, 'Client config should have UI');
+  console.assert(Array.isArray(client.promptTemplates), 'Client config should have promptTemplates');
+  console.assert(client.hasEnhancer === true, 'Client config should have hasEnhancer');
+  console.assert(client.batch.max_prompts === 5, 'Client config should have batch');
 
   // Test deep merge with override
   const custom = new Forge3DConfig({ python_server: { default_port: 9999 } });

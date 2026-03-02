@@ -42,9 +42,10 @@
 
 import express from 'express';
 import { existsSync } from 'fs';
-import { extname } from 'path';
+import { extname, basename, join, resolve, normalize } from 'path';
 import errorHandler from '../../core/error-handler.js';
 import telemetryBus from '../../core/telemetry-bus.js';
+import llmClient from '../../core/llm-client.js';
 import modelBridge from '../../forge3d/model-bridge.js';
 import forgeSession from '../../forge3d/forge-session.js';
 import projectManager from '../../forge3d/project-manager.js';
@@ -568,6 +569,135 @@ router.post('/assets/:id/extract-materials', async (req, res) => {
   }
 });
 
+// --- Textures ---
+
+/**
+ * GET /api/forge3d/assets/:id/textures
+ * List texture files for an asset that has extracted materials.
+ * Returns: { textures: [{ name, label, url }] }
+ */
+router.get('/assets/:id/textures', (req, res) => {
+  ensureInit();
+  const assetId = req.params.id;
+
+  console.log(`[ROUTE:FORGE3D] GET /api/forge3d/assets/${assetId}/textures`);
+
+  try {
+    const asset = forge3dDb.getAsset(assetId);
+    if (!asset) {
+      return res.status(404).json({ error: 'Asset not found' });
+    }
+
+    if (!asset.has_materials || !asset.material_data) {
+      return res.json({ textures: [] });
+    }
+
+    let manifest;
+    try {
+      manifest = JSON.parse(asset.material_data);
+    } catch (_e) {
+      return res.json({ textures: [] });
+    }
+
+    // Build texture list from manifest
+    const textures = [];
+    const textureTypes = ['albedo', 'normal', 'roughness', 'metallic', 'ao', 'emissive'];
+    const labelMap = {
+      albedo: 'Albedo',
+      normal: 'Normal',
+      roughness: 'Roughness',
+      metallic: 'Metallic',
+      ao: 'AO',
+      emissive: 'Emissive'
+    };
+
+    for (const texType of textureTypes) {
+      const texFile = manifest[texType] || manifest.textures?.[texType];
+      if (texFile) {
+        const name = typeof texFile === 'string' ? texFile : texFile.filename;
+        if (name) {
+          textures.push({
+            name,
+            label: labelMap[texType] || texType,
+            url: `/api/forge3d/assets/${assetId}/textures/${encodeURIComponent(name)}`
+          });
+        }
+      }
+    }
+
+    res.json({ textures });
+  } catch (err) {
+    console.error(`[ROUTE:FORGE3D] Texture list error: ${err.message}`);
+    errorHandler.report('forge3d_error', err, { endpoint: 'list_textures', assetId });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/forge3d/assets/:id/textures/:name
+ * Serve a specific texture file for an asset.
+ * PATH TRAVERSAL PROTECTION: validates filename and resolves within asset directory only.
+ */
+router.get('/assets/:id/textures/:name', (req, res) => {
+  ensureInit();
+  const assetId = req.params.id;
+  const texName = req.params.name;
+
+  console.log(`[ROUTE:FORGE3D] GET /api/forge3d/assets/${assetId}/textures/${texName}`);
+
+  try {
+    const asset = forge3dDb.getAsset(assetId);
+    if (!asset) {
+      return res.status(404).json({ error: 'Asset not found' });
+    }
+
+    if (!asset.file_path) {
+      return res.status(404).json({ error: 'Asset has no file path' });
+    }
+
+    // PATH TRAVERSAL PROTECTION
+    // Only allow simple filenames (no directory separators or parent refs)
+    const safeName = basename(texName);
+    if (safeName !== texName || texName.includes('..') || texName.includes('/') || texName.includes('\\')) {
+      console.warn(`[ROUTE:FORGE3D] Path traversal attempt blocked: ${texName}`);
+      return res.status(400).json({ error: 'Invalid texture filename' });
+    }
+
+    // Resolve texture path relative to asset's directory
+    const assetDir = resolve(join(asset.file_path, '..'));
+    const texturesDir = resolve(join(assetDir, 'textures'));
+    const texturePath = resolve(join(texturesDir, safeName));
+
+    // Ensure resolved path is within the expected directory
+    if (!texturePath.startsWith(normalize(texturesDir))) {
+      console.warn(`[ROUTE:FORGE3D] Path traversal escape blocked: ${texturePath}`);
+      return res.status(400).json({ error: 'Invalid texture path' });
+    }
+
+    if (!existsSync(texturePath)) {
+      return res.status(404).json({ error: 'Texture file not found' });
+    }
+
+    const ext = extname(safeName).toLowerCase();
+    const mimeMap = {
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.webp': 'image/webp',
+      '.tga': 'image/x-tga',
+      '.exr': 'image/x-exr'
+    };
+
+    const contentType = mimeMap[ext] || 'application/octet-stream';
+    res.set('Content-Type', contentType);
+    res.sendFile(texturePath);
+  } catch (err) {
+    console.error(`[ROUTE:FORGE3D] Texture serve error: ${err.message}`);
+    errorHandler.report('forge3d_error', err, { endpoint: 'serve_texture', assetId });
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- History & Stats ---
 
 /**
@@ -774,6 +904,84 @@ router.get('/models/status', (_req, res) => {
  */
 router.get('/config', (_req, res) => {
   res.json(forge3dConfig.getClientConfig());
+});
+
+// --- Prompt Enhancement ---
+
+/**
+ * POST /api/forge3d/enhance-prompt
+ * Use LLM to enhance a short 3D prompt into a detailed description.
+ * Body: { prompt: string }
+ * Returns: { enhanced, original, provider }
+ */
+router.post('/enhance-prompt', async (req, res) => {
+  const { prompt } = req.body;
+
+  if (!prompt || prompt.trim().length < 2) {
+    return res.status(400).json({ error: 'Prompt is required (at least 2 characters)' });
+  }
+
+  console.log('[ROUTE:FORGE3D] POST /api/forge3d/enhance-prompt');
+  const endTimer = telemetryBus.startTimer('forge3d_api_enhance_prompt');
+
+  try {
+    const enhancerCfg = forge3dConfig.promptEnhancer;
+    const messages = [
+      { role: 'system', content: enhancerCfg.system_prompt },
+      { role: 'user', content: prompt.trim() }
+    ];
+
+    const result = await llmClient.chat(messages, {
+      task: enhancerCfg.task_routing_key,
+      max_tokens: enhancerCfg.max_tokens
+    });
+
+    const enhanced = result.content.trim();
+    endTimer({ success: true, provider: result.provider });
+
+    res.json({
+      enhanced,
+      original: prompt.trim(),
+      provider: result.provider
+    });
+  } catch (err) {
+    console.error(`[ROUTE:FORGE3D] Enhance prompt error: ${err.message}`);
+    errorHandler.report('forge3d_error', err, { endpoint: 'enhance_prompt' });
+    endTimer({ error: err.message });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Thumbnails ---
+
+/**
+ * POST /api/forge3d/sessions/:id/thumbnail
+ * Save a thumbnail image for a generation session.
+ * Body: { thumbnail: string (base64 data URL) }
+ */
+router.post('/sessions/:id/thumbnail', (req, res) => {
+  ensureInit();
+  const sessionId = req.params.id;
+  const { thumbnail } = req.body;
+
+  if (!thumbnail || !thumbnail.startsWith('data:image/')) {
+    return res.status(400).json({ error: 'Invalid thumbnail data URL' });
+  }
+
+  console.log(`[ROUTE:FORGE3D] POST /api/forge3d/sessions/${sessionId}/thumbnail`);
+
+  try {
+    // Store thumbnail in generation_history
+    forge3dDb.db.prepare(
+      'UPDATE generation_history SET thumbnail = ? WHERE id = ?'
+    ).run(thumbnail, sessionId);
+
+    res.json({ saved: true });
+  } catch (err) {
+    console.error(`[ROUTE:FORGE3D] Thumbnail save error: ${err.message}`);
+    errorHandler.report('forge3d_error', err, { endpoint: 'save_thumbnail', sessionId });
+    res.status(500).json({ error: err.message });
+  }
 });
 
 export default router;

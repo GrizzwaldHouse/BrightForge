@@ -106,3 +106,52 @@ ui:
   vram_thresholds:
     ok_pct: 70
     warn_pct: 85
+
+# Prompt templates for quick generation
+prompt_templates:
+  - category: "Weapons"
+    label: "Medieval Sword"
+    prompt: "A detailed medieval longsword with ornate crossguard, leather-wrapped grip, and polished steel blade, high-poly 3D model"
+  - category: "Weapons"
+    label: "Sci-Fi Blaster"
+    prompt: "A futuristic sci-fi energy blaster pistol with glowing blue accents, sleek chrome body, and ergonomic grip, game-ready 3D asset"
+  - category: "Furniture"
+    label: "Wooden Chair"
+    prompt: "A classic wooden dining chair with turned legs, curved backrest, and natural oak finish, realistic 3D furniture model"
+  - category: "Furniture"
+    label: "Modern Desk"
+    prompt: "A minimalist modern office desk with clean lines, white laminate top, and steel hairpin legs, 3D interior asset"
+  - category: "Nature"
+    label: "Oak Tree"
+    prompt: "A large mature oak tree with thick trunk, sprawling branches, and dense green canopy, detailed 3D nature model"
+  - category: "Nature"
+    label: "Rock Formation"
+    prompt: "A rugged natural rock formation with layered sedimentary textures, moss patches, and realistic weathering, 3D environment prop"
+  - category: "Vehicles"
+    label: "Sports Car"
+    prompt: "A sleek modern sports car with aerodynamic body, low profile, glossy red paint, and detailed wheels, high-quality 3D vehicle"
+  - category: "Vehicles"
+    label: "Spaceship"
+    prompt: "A compact sci-fi spaceship with angular hull plating, engine nacelles, and glowing thruster ports, game-ready 3D spacecraft"
+  - category: "Characters"
+    label: "Knight"
+    prompt: "A medieval knight in full plate armor with visored helm, chainmail details, and a heraldic tabard, 3D character model"
+  - category: "Characters"
+    label: "Robot"
+    prompt: "A humanoid robot with articulated joints, exposed mechanical parts, glowing LED eyes, and brushed metal surface, 3D character asset"
+  - category: "Architecture"
+    label: "Castle Tower"
+    prompt: "A medieval castle tower with crenellated battlements, arrow slits, stone block texture, and a conical roof, 3D architecture model"
+  - category: "Architecture"
+    label: "Modern House"
+    prompt: "A contemporary two-story house with flat roof, floor-to-ceiling windows, white render walls, and wooden deck, 3D architectural visualization"
+
+# LLM-powered prompt enhancement
+prompt_enhancer:
+  task_routing_key: "prompt_enhance"
+  system_prompt: "You are a 3D model prompt optimizer. Given a short user prompt, rewrite it into a detailed, descriptive prompt optimized for text-to-3D generation. Focus on shape, materials, textures, and visual details. Keep the result under 200 words. Return ONLY the enhanced prompt text, no explanations."
+  max_tokens: 300
+
+# Batch generation limits
+batch:
+  max_prompts: 5

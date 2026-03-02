@@ -193,12 +193,53 @@
 
         <div class="tab-panel" data-panel="forge3d">
           <div id="forge3d-panel" class="forge3d-layout">
+            <!-- Compare Wrapper (hidden by default) -->
+            <div id="forge3d-compare-wrapper" class="forge3d-compare-wrapper hidden">
+              <div class="forge3d-compare-pane">
+                <div class="forge3d-compare-header">
+                  <select id="forge3d-compare-select-a" class="forge3d-compare-select">
+                    <option value="">Select model A...</option>
+                  </select>
+                </div>
+                <div id="forge3d-viewport-compare-a" class="forge3d-compare-viewport"></div>
+              </div>
+              <div class="forge3d-compare-divider"></div>
+              <div class="forge3d-compare-pane">
+                <div class="forge3d-compare-header">
+                  <select id="forge3d-compare-select-b" class="forge3d-compare-select">
+                    <option value="">Select model B...</option>
+                  </select>
+                </div>
+                <div id="forge3d-viewport-compare-b" class="forge3d-compare-viewport"></div>
+              </div>
+            </div>
+
+            <!-- Texture Strip (below viewport) -->
+            <div id="forge3d-texture-strip" class="forge3d-texture-strip hidden"></div>
+
             <!-- 3D Viewport -->
-            <div class="forge3d-viewport-wrapper">
+            <div class="forge3d-viewport-wrapper" id="forge3d-viewport-wrapper">
               <div id="forge3d-viewport"></div>
               <div class="forge3d-viewport-toolbar">
                 <button id="forge3d-wireframe-btn" title="Toggle wireframe"><i data-lucide="grid"></i></button>
                 <button id="forge3d-reset-btn" title="Reset camera"><i data-lucide="refresh-cw"></i></button>
+                <button id="forge3d-turntable-btn" title="Toggle turntable"><i data-lucide="rotate-cw"></i></button>
+                <button id="forge3d-screenshot-btn" title="Capture screenshot"><i data-lucide="camera"></i></button>
+                <button id="forge3d-compare-btn" title="Compare models side-by-side"><i data-lucide="columns"></i></button>
+                <button id="forge3d-ref-overlay-btn" class="hidden" title="Toggle reference overlay"><i data-lucide="image"></i></button>
+                <div class="forge3d-ref-opacity hidden" id="forge3d-ref-opacity-group">
+                  <input type="range" id="forge3d-ref-opacity" min="0" max="100" value="50" title="Reference opacity">
+                </div>
+                <div class="forge3d-env-switcher">
+                  <button id="forge3d-env-btn" title="Environment"><i data-lucide="sun"></i></button>
+                  <div id="forge3d-env-dropdown" class="forge3d-dropdown hidden">
+                    <button data-env="dark" class="forge3d-env-option">Dark</button>
+                    <button data-env="light" class="forge3d-env-option">Light</button>
+                    <button data-env="gradient" class="forge3d-env-option">Gradient</button>
+                    <button data-env="studio" class="forge3d-env-option">Studio</button>
+                    <button data-env="wireframe-grid" class="forge3d-env-option">Wireframe</button>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -232,7 +273,17 @@
 
                 <div id="forge3d-prompt-group" class="forge3d-input-group">
                   <label for="forge3d-prompt">Prompt</label>
-                  <textarea id="forge3d-prompt" placeholder="Describe a 3D object... (e.g., 'a red medieval sword')"></textarea>
+                  <div class="forge3d-prompt-row">
+                    <textarea id="forge3d-prompt" placeholder="Describe a 3D object... (e.g., 'a red medieval sword')"></textarea>
+                    <button id="forge3d-enhance-btn" class="forge3d-enhance-btn" title="Enhance prompt with AI">
+                      <i data-lucide="sparkles"></i>
+                    </button>
+                  </div>
+                </div>
+
+                <div id="forge3d-templates-group" class="forge3d-input-group">
+                  <label>Quick Prompts</label>
+                  <div id="forge3d-templates" class="forge3d-template-grid"></div>
                 </div>
 
                 <div id="forge3d-upload-group" class="forge3d-input-group hidden">
@@ -285,9 +336,23 @@
                   </div>
                 </div>
 
-                <button id="forge3d-generate-btn" class="forge3d-generate-btn">
-                  <i data-lucide="play"></i> Generate
-                </button>
+                <div class="forge3d-generate-row">
+                  <button id="forge3d-generate-btn" class="forge3d-generate-btn">
+                    <i data-lucide="play"></i> Generate
+                  </button>
+                  <button id="forge3d-vary-btn" class="forge3d-vary-btn hidden">
+                    <i data-lucide="shuffle"></i> Vary
+                  </button>
+                  <button id="forge3d-batch-toggle" class="forge3d-batch-toggle" title="Toggle batch mode">
+                    <i data-lucide="layers"></i>
+                  </button>
+                </div>
+
+                <div id="forge3d-batch-group" class="forge3d-input-group hidden">
+                  <label for="forge3d-batch-prompts">Batch Prompts (one per line, max 5)</label>
+                  <textarea id="forge3d-batch-prompts" class="forge3d-batch-textarea" placeholder="a red medieval sword&#10;a blue crystal shield&#10;a golden chalice" rows="5"></textarea>
+                  <div id="forge3d-batch-progress" class="forge3d-batch-progress hidden"></div>
+                </div>
                 <div class="forge3d-progress">
                   <div id="forge3d-progress-bar" class="forge3d-progress-bar"></div>
                 </div>
@@ -305,19 +370,31 @@
                 </div>
               </div>
 
-              <!-- Queue -->
+              <!-- History / Assets / Queue subtabs -->
               <div class="forge3d-section">
-                <h3><i data-lucide="list"></i> Queue</h3>
-                <div id="forge3d-queue-list" class="forge3d-queue">
-                  <div class="queue-empty">No recent jobs</div>
+                <div class="forge3d-subtabs">
+                  <button class="forge3d-subtab active" data-subtab="history">History</button>
+                  <button class="forge3d-subtab" data-subtab="assets">Assets</button>
+                  <button class="forge3d-subtab" data-subtab="queue">Queue</button>
                 </div>
-              </div>
 
-              <!-- Asset Gallery -->
-              <div class="forge3d-section">
-                <h3><i data-lucide="image"></i> Assets</h3>
-                <div id="forge3d-gallery" class="forge3d-gallery">
-                  <div class="gallery-empty">Select a project to view assets</div>
+                <div id="forge3d-subtab-history" class="forge3d-subpanel">
+                  <div id="forge3d-history-grid" class="forge3d-history-grid">
+                    <div class="gallery-empty">No generation history yet</div>
+                  </div>
+                </div>
+
+                <div id="forge3d-subtab-assets" class="forge3d-subpanel hidden">
+                  <div id="forge3d-gallery" class="forge3d-gallery">
+                    <div class="gallery-empty">Select a project to view assets</div>
+                  </div>
+                </div>
+
+                <div id="forge3d-subtab-queue" class="forge3d-subpanel hidden">
+                  <div id="forge3d-queue-list" class="forge3d-queue">
+                    <div class="queue-empty">No recent jobs</div>
+                  </div>
+                  <button id="forge3d-queue-pause" class="btn-small" style="margin-top: 6px;">Pause Queue</button>
                 </div>
               </div>
             </div>
@@ -351,18 +428,14 @@
     document.addEventListener('DOMContentLoaded', () => {
       lucide.createIcons();
       
-      // Re-run icons when tabs change (in case of dynamic content, though mostly static)
-      const observer = new MutationObserver(() => {
-        lucide.createIcons();
-      });
-      observer.observe(document.body, { childList: true, subtree: true });
+      // Icons are initialized once. Dynamic content uses manual SVG injection.
     });
 
     // Error indicator polling (observer feedback in dashboard)
     (function() {
       const indicator = document.getElementById('error-indicator');
       const countEl = document.getElementById('error-count');
-      let lastCount = 0;
+      let _lastCount = 0;
 
       async function pollErrors() {
         try {
@@ -380,7 +453,7 @@
             indicator.classList.remove('pulse');
           }
           
-          lastCount = count;
+          _lastCount = count;
         } catch {
           indicator.classList.add('hidden');
         }

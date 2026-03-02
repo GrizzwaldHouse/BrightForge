@@ -208,6 +208,16 @@ task_routing:
     fallback: "claude:balanced"
     max_tokens: 2048
 
+  prompt_enhance:
+    description: "Enhance short 3D generation prompts into detailed descriptions"
+    prefer:
+      - groq:fast
+      - cerebras
+      - gemini
+      - ollama:fast
+    fallback: "together"
+    max_tokens: 300
+
 # Budget limits (daily)
 budget:
   daily_limit_usd: 1.00
