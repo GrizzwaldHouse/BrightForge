@@ -633,18 +633,18 @@ class ModelBridge extends EventEmitter {
 
     this.pythonCmd = foundPython;
 
-    // Check CUDA availability
+    // Check CUDA availability (actually test GPU usability, not just detection)
     try {
       const cudaCheck = await this._runCommand(foundPython, [
-        '-c', 'import torch; print(torch.cuda.is_available())'
+        '-c', 'import torch; t=torch.zeros(1,device="cuda"); print("usable")'
       ]);
-      if (cudaCheck.trim() !== 'True') {
-        console.warn('[BRIDGE] CUDA not available — running in CPU mode (generation will be slow)');
+      if (cudaCheck.trim() === 'usable') {
+        console.log('[BRIDGE] CUDA GPU verified usable');
       } else {
-        console.log('[BRIDGE] CUDA GPU detected');
+        console.warn('[BRIDGE] CUDA not usable — running in CPU mode (generation will be slow)');
       }
     } catch (_e) {
-      issues.push('PyTorch not installed or CUDA check failed');
+      console.warn('[BRIDGE] CUDA not available — running in CPU mode (generation will be slow)');
     }
 
     // Check required Python packages
@@ -703,7 +703,15 @@ class ModelBridge extends EventEmitter {
   }
 
   async _fetchRaw(url, options = {}) {
-    return fetch(url, options);
+    // Node.js undici has a default 300s headersTimeout that kills connections
+    // waiting for slow responses (e.g. model download on first generation).
+    // Disable it for generation requests — we rely on AbortSignal.timeout instead.
+    const { Agent } = await import('undici');
+    const dispatcher = new Agent({
+      headersTimeout: forge3dConfig.generation.timeout_ms,
+      bodyTimeout: forge3dConfig.generation.timeout_ms
+    });
+    return fetch(url, { ...options, dispatcher });
   }
 }
 

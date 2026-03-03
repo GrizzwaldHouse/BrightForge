@@ -18,6 +18,7 @@ Endpoints:
 Usage: python python/inference_server.py [--port 8001] [--host 127.0.0.1]
 """
 
+import asyncio
 import os
 import sys
 import uuid
@@ -84,16 +85,17 @@ async def lifespan(app):
     # Clean up old temp files older than configured max age
     cleanup_temp_files()
 
-    # Log GPU info
+    # Detect compute device and log GPU info
+    device = model_manager._get_device()
     vram = model_manager.get_vram_info()
-    if vram.get('available'):
+    if device == 'cuda' and vram.get('available'):
         logger.info(
             f'[SERVER] GPU: {vram.get("device_name")} | '
             f'VRAM: {vram.get("total_gb", 0):.1f} GB total, '
             f'{vram.get("free_gb", 0):.1f} GB free'
         )
     else:
-        logger.warning('[SERVER] No CUDA GPU detected. Generation will fail.')
+        logger.warning('[SERVER] Running in CPU mode. Generation will be slow but functional.')
 
     yield
 
@@ -204,7 +206,7 @@ async def generate_mesh(
         if max(img.size) > max_dim:
             raise HTTPException(400, f'Image too large: {img.size}. Maximum {max_dim}x{max_dim}.')
 
-        result = model_manager.generate_mesh(img, output_path)
+        result = await asyncio.to_thread(model_manager.generate_mesh, img, output_path)
 
         if not result['success']:
             raise HTTPException(500, f'Generation failed: {result.get("error")}')
@@ -296,7 +298,8 @@ async def generate_image(
     output_path = OUTPUT_DIR / f'{job_id}.png'
 
     try:
-        result = model_manager.generate_image(
+        result = await asyncio.to_thread(
+            model_manager.generate_image,
             prompt=prompt.strip(),
             output_path=output_path,
             width=width,
@@ -361,7 +364,8 @@ async def generate_full(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        result = model_manager.generate_full_pipeline(
+        result = await asyncio.to_thread(
+            model_manager.generate_full_pipeline,
             prompt=prompt.strip(),
             output_dir=output_dir,
             steps=steps,
@@ -434,7 +438,7 @@ async def convert_glb_to_fbx(
     fbx_path = OUTPUT_DIR / f'{job_id}.fbx'
 
     try:
-        result = fbx_converter.convert_glb_to_fbx(str(temp_glb), str(fbx_path))
+        result = await asyncio.to_thread(fbx_converter.convert_glb_to_fbx, str(temp_glb), str(fbx_path))
 
         if not result['success']:
             raise HTTPException(500, f'Conversion failed: {result.get("error")}')

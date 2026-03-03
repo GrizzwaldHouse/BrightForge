@@ -78,14 +78,43 @@ class ModelManager:
         # Restart Python after N generations to prevent VRAM fragmentation
         self._restart_threshold = CONFIG.get('vram', {}).get('generation_count_before_restart', 20)
 
+        # Device detection (cached after first call)
+        self._device = None
+
+    def _get_device(self):
+        """Get the best available compute device ('cuda' or 'cpu').
+
+        Tests that CUDA is actually usable (not just detected) to handle cases
+        like unsupported GPU architectures (e.g. sm_120 Blackwell with cu124).
+        """
+        if self._device is not None:
+            return self._device
+
+        try:
+            import torch
+            if torch.cuda.is_available():
+                # Verify GPU is actually usable by running a small tensor op
+                torch.zeros(1, device='cuda')
+                self._device = 'cuda'
+                logger.info(f'[MODEL] Using CUDA device: {torch.cuda.get_device_name(0)}')
+            else:
+                self._device = 'cpu'
+                logger.warning('[MODEL] CUDA not available, using CPU (generation will be slow)')
+        except Exception as e:
+            self._device = 'cpu'
+            logger.warning(f'[MODEL] CUDA test failed ({e}), falling back to CPU')
+
+        return self._device
+
     def get_vram_info(self):
         """Get current VRAM usage info."""
         try:
             import torch
-            if not torch.cuda.is_available():
+            if self._get_device() != 'cuda':
                 return {'available': False}
 
-            total = torch.cuda.get_device_properties(0).total_mem
+            props = torch.cuda.get_device_properties(0)
+            total = props.total_memory
             allocated = torch.cuda.memory_allocated(0)
             reserved = torch.cuda.memory_reserved(0)
             free = total - reserved
@@ -99,7 +128,7 @@ class ModelManager:
                 'total_gb': total / (1024 ** 3),
                 'free_gb': free / (1024 ** 3),
                 'usage_pct': (reserved / total) * 100 if total > 0 else 0,
-                'device_name': torch.cuda.get_device_name(0),
+                'device_name': props.name,
             }
         except Exception as e:
             logger.error(f'[MODEL] VRAM query failed: {e}')
@@ -107,9 +136,9 @@ class ModelManager:
 
     def _clear_vram(self):
         """Aggressively clear VRAM between operations."""
-        import torch
         gc.collect()
-        if torch.cuda.is_available():
+        if self._get_device() == 'cuda':
+            import torch
             torch.cuda.empty_cache()
             torch.cuda.synchronize()
         logger.info('[MODEL] VRAM cache cleared')
@@ -196,12 +225,16 @@ class ModelManager:
             self._unload_all()
             self._clear_vram()
 
-            instantmesh_vram = CONFIG.get('models', {}).get('instantmesh', {}).get('required_vram_gb', 6.0)
-            if not self._check_vram_budget(instantmesh_vram):
-                logger.error('[MODEL] Not enough VRAM for InstantMesh')
-                return False
+            device = self._get_device()
+            dtype = torch.float16 if device == 'cuda' else torch.float32
 
-            logger.info('[MODEL] Loading InstantMesh...')
+            if device == 'cuda':
+                instantmesh_vram = CONFIG.get('models', {}).get('instantmesh', {}).get('required_vram_gb', 6.0)
+                if not self._check_vram_budget(instantmesh_vram):
+                    logger.error('[MODEL] Not enough VRAM for InstantMesh')
+                    return False
+
+            logger.info(f'[MODEL] Loading InstantMesh on {device}...')
             info['state'] = ModelState.LOADING
 
             try:
@@ -210,32 +243,34 @@ class ModelManager:
                 instantmesh_repo = CONFIG.get('models', {}).get('instantmesh', {}).get('repo_id', 'TencentARC/InstantMesh')
                 model_path = self.models_dir / 'instantmesh'
                 if not model_path.exists():
-                    # Fall back to downloading from hub
                     logger.info('[MODEL] Model not cached locally, loading from HuggingFace...')
                     pipeline = DiffusionPipeline.from_pretrained(
                         instantmesh_repo,
-                        torch_dtype=torch.float16,
+                        torch_dtype=dtype,
                         trust_remote_code=True,
                     )
                 else:
                     pipeline = DiffusionPipeline.from_pretrained(
                         str(model_path),
-                        torch_dtype=torch.float16,
+                        torch_dtype=dtype,
                         trust_remote_code=True,
                         local_files_only=True,
                     )
 
-                pipeline = pipeline.to('cuda')
+                pipeline = pipeline.to(device)
 
                 info['pipeline'] = pipeline
                 info['state'] = ModelState.READY
                 info['load_count'] += 1
 
-                vram = self.get_vram_info()
-                logger.info(
-                    f'[MODEL] InstantMesh loaded. '
-                    f'VRAM: {vram.get("allocated_mb", 0):.0f} MB allocated'
-                )
+                if device == 'cuda':
+                    vram = self.get_vram_info()
+                    logger.info(
+                        f'[MODEL] InstantMesh loaded on CUDA. '
+                        f'VRAM: {vram.get("allocated_mb", 0):.0f} MB allocated'
+                    )
+                else:
+                    logger.info('[MODEL] InstantMesh loaded on CPU (generation will be slow)')
                 return True
 
             except Exception as e:
@@ -260,21 +295,27 @@ class ModelManager:
             self._unload_all()
             self._clear_vram()
 
-            sdxl_vram = CONFIG.get('models', {}).get('sdxl', {}).get('required_vram_gb', 8.0)
-            if not self._check_vram_budget(sdxl_vram):
-                logger.error('[MODEL] Not enough VRAM for SDXL')
-                return False
+            device = self._get_device()
+            dtype = torch.float16 if device == 'cuda' else torch.float32
 
-            logger.info('[MODEL] Loading SDXL (this may take a minute)...')
+            if device == 'cuda':
+                sdxl_vram = CONFIG.get('models', {}).get('sdxl', {}).get('required_vram_gb', 8.0)
+                if not self._check_vram_budget(sdxl_vram):
+                    logger.error('[MODEL] Not enough VRAM for SDXL')
+                    return False
+
+            logger.info(f'[MODEL] Loading SDXL on {device} (this may take a minute)...')
             info['state'] = ModelState.LOADING
 
             try:
                 from diffusers import StableDiffusionXLPipeline, DPMSolverMultistepScheduler
 
                 sdxl_repo = CONFIG.get('models', {}).get('sdxl', {}).get('repo_id', 'stabilityai/stable-diffusion-xl-base-1.0')
+                # Always download fp16 variant (smaller). from_pretrained
+                # auto-converts to the requested torch_dtype on load.
                 pipeline = StableDiffusionXLPipeline.from_pretrained(
                     sdxl_repo,
-                    torch_dtype=torch.float16,
+                    torch_dtype=dtype,
                     variant='fp16',
                     use_safetensors=True,
                 )
@@ -284,7 +325,7 @@ class ModelManager:
                     pipeline.scheduler.config
                 )
 
-                pipeline = pipeline.to('cuda')
+                pipeline = pipeline.to(device)
 
                 # Enable memory optimizations
                 pipeline.enable_attention_slicing()
@@ -293,11 +334,14 @@ class ModelManager:
                 info['state'] = ModelState.READY
                 info['load_count'] += 1
 
-                vram = self.get_vram_info()
-                logger.info(
-                    f'[MODEL] SDXL loaded. '
-                    f'VRAM: {vram.get("allocated_mb", 0):.0f} MB allocated'
-                )
+                if device == 'cuda':
+                    vram = self.get_vram_info()
+                    logger.info(
+                        f'[MODEL] SDXL loaded on CUDA. '
+                        f'VRAM: {vram.get("allocated_mb", 0):.0f} MB allocated'
+                    )
+                else:
+                    logger.info('[MODEL] SDXL loaded on CPU (generation will be slow)')
                 return True
 
             except Exception as e:

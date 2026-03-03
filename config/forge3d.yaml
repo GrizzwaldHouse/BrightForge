@@ -20,7 +20,7 @@ health_check:
   max_consecutive_failures: 3
 
 generation:
-  timeout_ms: 180000
+  timeout_ms: 600000  # 10 min — first generation downloads ~3GB model from HuggingFace
   full_pipeline_multiplier: 2
   max_image_size_bytes: 20971520  # 20 MB
   min_prompt_length: 3
