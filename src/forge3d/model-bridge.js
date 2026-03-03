@@ -395,7 +395,7 @@ class ModelBridge extends EventEmitter {
   }
 
   /**
-   * Full text-to-3D pipeline (SDXL -> InstantMesh).
+   * Full text-to-3D pipeline (SDXL -> Shap-E).
    * @param {string} prompt - Text description
    * @param {Object} [options] - steps, jobId
    * @returns {Promise<Object>} Pipeline result with image and mesh paths + buffers

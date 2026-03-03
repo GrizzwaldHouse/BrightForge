@@ -100,8 +100,8 @@ Web API (POST /api/forge3d/generate)  -or-  CLI --forge3d
    ModelBridge → Python FastAPI server (subprocess)
         |
         |  Image generation: SDXL → PNG
-        |  Mesh generation:  PNG → InstantMesh → GLB
-        |  Full pipeline:    Prompt → SDXL → InstantMesh → GLB
+        |  Mesh generation:  PNG → Shap-E → GLB
+        |  Full pipeline:    Prompt → SDXL → Shap-E → GLB
         |
         v
    ProjectManager.saveAsset() → data/output/{projectId}/
@@ -194,7 +194,7 @@ Five modules in `src/forge3d/`:
 | `forge-session.js` | Generation lifecycle (idle → generating → complete/failed) |
 | `project-manager.js` | CRUD for projects + file I/O with path traversal protection |
 
-**Python Inference Server** (`python/inference_server.py`): FastAPI subprocess on localhost, manages SDXL (image gen) and InstantMesh (mesh gen) models. Endpoints: `/generate/mesh`, `/generate/image`, `/generate/full`, `/health`, `/status`, `/download/{jobId}/{filename}`.
+**Python Inference Server** (`python/inference_server.py`): FastAPI subprocess on localhost, manages SDXL (image gen) and Shap-E (mesh gen) models. Endpoints: `/generate/mesh`, `/generate/image`, `/generate/full`, `/health`, `/status`, `/download/{jobId}/{filename}`.
 
 **Forge3D API** (17 endpoints at `/api/forge3d/`):
 - `POST /generate` — Start generation (returns 202 + sessionId)
@@ -282,7 +282,7 @@ Cloned from `https://github.com/GrizzwaldHouse/cowork-skills.git`.
 The 3D generation pipeline requires a Python environment with GPU support:
 - `python/requirements.txt` — PyTorch 2.10.0+cu124, diffusers, transformers, FastAPI, trimesh, pynvml
 - Python server is auto-spawned by `model-bridge.js` as a subprocess
-- CUDA GPU required for mesh/image generation (SDXL + InstantMesh models)
+- CUDA GPU required for mesh/image generation (SDXL + Shap-E models)
 - Data directory: `data/` (SQLite DB, output files, temp files)
 
 ## Commit & Attribution Guidelines

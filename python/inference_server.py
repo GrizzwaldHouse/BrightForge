@@ -5,9 +5,9 @@ FastAPI server for AI-powered 3D mesh generation.
 Bridges Node.js BrightForge with Python GPU inference.
 
 Endpoints:
-  POST /generate/mesh   - Image -> GLB mesh (+ optional FBX)
+  POST /generate/mesh   - Image -> GLB mesh via Shap-E (+ optional FBX)
   POST /generate/image  - Text prompt -> PNG image
-  POST /generate/full   - Text prompt -> Image -> GLB mesh + FBX (two-stage)
+  POST /generate/full   - Text prompt -> SDXL image -> Shap-E mesh + FBX (two-stage)
   POST /convert/glb-to-fbx - Convert existing GLB to FBX
   GET  /convert/status  - FBX converter availability
   POST /extract-materials - Extract PBR textures + UE5 manifest from GLB
@@ -96,6 +96,13 @@ async def lifespan(app):
         )
     else:
         logger.warning('[SERVER] Running in CPU mode. Generation will be slow but functional.')
+
+    # Check for HuggingFace authentication token
+    if not os.environ.get('HF_TOKEN'):
+        logger.warning(
+            '[SERVER] HF_TOKEN not set. Model downloads will be slower. '
+            'Set HF_TOKEN environment variable for faster downloads.'
+        )
 
     yield
 
@@ -341,7 +348,7 @@ async def generate_full(
     steps: int = Form(default=25),
     job_id: str = Form(default=None),
 ):
-    """Full text-to-3D pipeline: Text -> SDXL Image -> InstantMesh Mesh.
+    """Full text-to-3D pipeline: Text -> SDXL Image -> Shap-E Mesh.
 
     Two-stage pipeline with sequential VRAM management.
     Returns: JSON with paths to both image and mesh.

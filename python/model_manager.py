@@ -5,7 +5,7 @@ VRAM-aware lifecycle management for AI models.
 Enforces single-model mutex to prevent OOM on 16GB GPUs.
 
 Models:
-  - InstantMesh: Single-image to 3D mesh (~4-6 GB VRAM)
+  - Shap-E: Single-image to 3D mesh (~2-4 GB VRAM)
   - SDXL: Text to image (~5-8 GB VRAM)
 """
 
@@ -34,7 +34,7 @@ def _cfg(section, key, default=None):
 
 
 class ModelType(str, Enum):
-    INSTANTMESH = 'instantmesh'
+    SHAP_E = 'shap_e'
     SDXL = 'sdxl'
 
 
@@ -64,7 +64,7 @@ class ModelManager:
 
         # Model state tracking
         self._models = {
-            ModelType.INSTANTMESH: {'state': ModelState.UNLOADED, 'pipeline': None, 'load_count': 0},
+            ModelType.SHAP_E: {'state': ModelState.UNLOADED, 'pipeline': None, 'load_count': 0},
             ModelType.SDXL: {'state': ModelState.UNLOADED, 'pipeline': None, 'load_count': 0},
         }
 
@@ -100,11 +100,38 @@ class ModelManager:
             else:
                 self._device = 'cpu'
                 logger.warning('[MODEL] CUDA not available, using CPU (generation will be slow)')
+                self._log_gpu_setup_instructions()
         except Exception as e:
             self._device = 'cpu'
             logger.warning(f'[MODEL] CUDA test failed ({e}), falling back to CPU')
+            self._log_gpu_setup_instructions()
 
         return self._device
+
+    def _log_gpu_setup_instructions(self):
+        """Log actionable instructions for enabling GPU support."""
+        try:
+            import torch
+            torch_version = torch.__version__
+            cuda_version = getattr(torch.version, 'cuda', 'N/A')
+        except ImportError:
+            torch_version = 'unknown'
+            cuda_version = 'N/A'
+
+        logger.warning(
+            f'[MODEL] Current PyTorch {torch_version} (CUDA {cuda_version}) '
+            f'does not support this GPU.'
+        )
+        logger.warning(
+            '[MODEL] For RTX 5080 (Blackwell) GPU support, install PyTorch nightly:'
+        )
+        logger.warning(
+            '[MODEL]   pip install --pre torch torchvision '
+            '--index-url https://download.pytorch.org/whl/nightly/cu128'
+        )
+        logger.warning(
+            '[MODEL]   Note: Requires Python 3.12 (nightly may not support 3.13)'
+        )
 
     def get_vram_info(self):
         """Get current VRAM usage info."""
@@ -210,15 +237,15 @@ class ModelManager:
             info['state'] = ModelState.ERROR
             self._clear_vram()
 
-    def load_instantmesh(self):
-        """Load InstantMesh model for image-to-3D generation."""
+    def load_shap_e(self):
+        """Load Shap-E model for image-to-3D mesh generation."""
         import torch
 
         with self._model_lock:
-            info = self._models[ModelType.INSTANTMESH]
+            info = self._models[ModelType.SHAP_E]
 
             if info['state'] == ModelState.READY:
-                logger.info('[MODEL] InstantMesh already loaded')
+                logger.info('[MODEL] Shap-E already loaded')
                 return True
 
             # Unload any other model first
@@ -226,35 +253,39 @@ class ModelManager:
             self._clear_vram()
 
             device = self._get_device()
-            dtype = torch.float16 if device == 'cuda' else torch.float32
 
             if device == 'cuda':
-                instantmesh_vram = CONFIG.get('models', {}).get('instantmesh', {}).get('required_vram_gb', 6.0)
-                if not self._check_vram_budget(instantmesh_vram):
-                    logger.error('[MODEL] Not enough VRAM for InstantMesh')
+                shap_e_vram = CONFIG.get('models', {}).get('shap_e', {}).get('required_vram_gb', 4.0)
+                if not self._check_vram_budget(shap_e_vram):
+                    logger.error('[MODEL] Not enough VRAM for Shap-E')
                     return False
 
-            logger.info(f'[MODEL] Loading InstantMesh on {device}...')
+            logger.info(f'[MODEL] Loading Shap-E on {device}...')
             info['state'] = ModelState.LOADING
 
             try:
-                from diffusers import DiffusionPipeline
+                from diffusers import ShapEImg2ImgPipeline
 
-                instantmesh_repo = CONFIG.get('models', {}).get('instantmesh', {}).get('repo_id', 'TencentARC/InstantMesh')
-                model_path = self.models_dir / 'instantmesh'
-                if not model_path.exists():
-                    logger.info('[MODEL] Model not cached locally, loading from HuggingFace...')
-                    pipeline = DiffusionPipeline.from_pretrained(
-                        instantmesh_repo,
-                        torch_dtype=dtype,
-                        trust_remote_code=True,
+                shap_e_repo = CONFIG.get('models', {}).get('shap_e', {}).get('repo_id', 'openai/shap-e-img2img')
+                model_path = self.models_dir / 'shap-e-img2img'
+
+                if model_path.exists():
+                    logger.info('[MODEL] Loading Shap-E from local cache...')
+                    pipeline = ShapEImg2ImgPipeline.from_pretrained(
+                        str(model_path),
+                        local_files_only=True,
+                    )
+                elif device == 'cuda':
+                    logger.info('[MODEL] Downloading Shap-E from HuggingFace (fp16)...')
+                    pipeline = ShapEImg2ImgPipeline.from_pretrained(
+                        shap_e_repo,
+                        torch_dtype=torch.float16,
+                        variant='fp16',
                     )
                 else:
-                    pipeline = DiffusionPipeline.from_pretrained(
-                        str(model_path),
-                        torch_dtype=dtype,
-                        trust_remote_code=True,
-                        local_files_only=True,
+                    logger.info('[MODEL] Downloading Shap-E from HuggingFace...')
+                    pipeline = ShapEImg2ImgPipeline.from_pretrained(
+                        shap_e_repo,
                     )
 
                 pipeline = pipeline.to(device)
@@ -266,15 +297,15 @@ class ModelManager:
                 if device == 'cuda':
                     vram = self.get_vram_info()
                     logger.info(
-                        f'[MODEL] InstantMesh loaded on CUDA. '
+                        f'[MODEL] Shap-E loaded on CUDA. '
                         f'VRAM: {vram.get("allocated_mb", 0):.0f} MB allocated'
                     )
                 else:
-                    logger.info('[MODEL] InstantMesh loaded on CPU (generation will be slow)')
+                    logger.info('[MODEL] Shap-E loaded on CPU (generation will be slow)')
                 return True
 
             except Exception as e:
-                logger.error(f'[MODEL] InstantMesh load failed: {e}')
+                logger.error(f'[MODEL] Shap-E load failed: {e}')
                 info['state'] = ModelState.ERROR
                 info['pipeline'] = None
                 self._clear_vram()
@@ -352,7 +383,7 @@ class ModelManager:
                 return False
 
     def generate_mesh(self, image_data, output_path):
-        """Generate 3D mesh from image using InstantMesh.
+        """Generate 3D mesh from image using Shap-E.
 
         Args:
             image_data: PIL Image or path to image file.
@@ -365,16 +396,16 @@ class ModelManager:
             return {'success': False, 'error': 'Another generation is in progress'}
 
         try:
-            info = self._models[ModelType.INSTANTMESH]
+            info = self._models[ModelType.SHAP_E]
 
             if info['state'] != ModelState.READY:
-                if not self.load_instantmesh():
-                    return {'success': False, 'error': 'Failed to load InstantMesh'}
+                if not self.load_shap_e():
+                    return {'success': False, 'error': 'Failed to load Shap-E'}
 
             info['state'] = ModelState.GENERATING
             start = time.time()
 
-            logger.info('[MODEL] Generating mesh from image...')
+            logger.info('[MODEL] Generating mesh from image (Shap-E)...')
 
             from PIL import Image
             if isinstance(image_data, (str, Path)):
@@ -383,30 +414,50 @@ class ModelManager:
                 image = image_data.convert('RGB')
 
             # Resize to model's expected input
-            input_dims = CONFIG.get('models', {}).get('instantmesh', {}).get('input_dimensions', [256, 256])
+            input_dims = CONFIG.get('models', {}).get('shap_e', {}).get('input_dimensions', [256, 256])
             image = image.resize(tuple(input_dims), Image.LANCZOS)
 
             pipeline = info['pipeline']
-            instantmesh_steps = CONFIG.get('models', {}).get('instantmesh', {}).get('inference_steps', 75)
-            result = pipeline(image, num_inference_steps=instantmesh_steps)
+            shap_e_steps = CONFIG.get('models', {}).get('shap_e', {}).get('inference_steps', 64)
+            shap_e_guidance = CONFIG.get('models', {}).get('shap_e', {}).get('guidance_scale', 3.0)
+            shap_e_frame_size = CONFIG.get('models', {}).get('shap_e', {}).get('frame_size', 256)
 
-            # Extract mesh and save as GLB
+            result = pipeline(
+                image,
+                guidance_scale=shap_e_guidance,
+                num_inference_steps=shap_e_steps,
+                frame_size=shap_e_frame_size,
+                output_type='mesh',
+            )
+
+            # Export mesh: Shap-E -> PLY (intermediate) -> GLB via trimesh
             output_path = Path(output_path)
             output_path.parent.mkdir(parents=True, exist_ok=True)
 
-            if hasattr(result, 'meshes') and result.meshes:
-                mesh = result.meshes[0]
-                mesh.export(str(output_path))
-            elif hasattr(result, 'mesh'):
-                result.mesh.export(str(output_path))
-            else:
-                # Fallback: try trimesh export
-                import trimesh
-                if hasattr(result, 'vertices') and hasattr(result, 'faces'):
-                    mesh = trimesh.Trimesh(vertices=result.vertices, faces=result.faces)
-                    mesh.export(str(output_path), file_type='glb')
-                else:
-                    return {'success': False, 'error': 'Model output format not recognized'}
+            import tempfile
+            import trimesh
+            import numpy as np
+            from diffusers.utils import export_to_ply
+
+            mesh_output = result.images[0]
+
+            with tempfile.NamedTemporaryFile(suffix='.ply', delete=False, dir=str(output_path.parent)) as tmp:
+                ply_path = tmp.name
+
+            try:
+                export_to_ply(mesh_output, ply_path)
+
+                mesh = trimesh.load(ply_path)
+
+                # Fix orientation (Shap-E outputs bottom-up by default)
+                rot = trimesh.transformations.rotation_matrix(-np.pi / 2, [1, 0, 0])
+                mesh = mesh.apply_transform(rot)
+
+                mesh.export(str(output_path), file_type='glb')
+            finally:
+                # Clean up intermediate PLY
+                if os.path.exists(ply_path):
+                    os.unlink(ply_path)
 
             elapsed = time.time() - start
             self.generation_count += 1
@@ -451,7 +502,7 @@ class ModelManager:
 
         except Exception as e:
             logger.error(f'[MODEL] Mesh generation failed: {e}')
-            info = self._models[ModelType.INSTANTMESH]
+            info = self._models[ModelType.SHAP_E]
             info['state'] = ModelState.READY if info['pipeline'] else ModelState.ERROR
             return {'success': False, 'error': str(e)}
 
@@ -531,11 +582,11 @@ class ModelManager:
             self._generation_lock.release()
 
     def generate_full_pipeline(self, prompt, output_dir, steps=25):
-        """Full text-to-3D pipeline: SDXL image -> InstantMesh mesh.
+        """Full text-to-3D pipeline: SDXL image -> Shap-E mesh.
 
         This is the two-stage pipeline with sequential VRAM management:
         1. Load SDXL, generate image, unload SDXL
-        2. Load InstantMesh, generate mesh from image, unload InstantMesh
+        2. Load Shap-E, generate mesh from image, unload Shap-E
 
         Args:
             prompt: Text description of desired 3D object.
@@ -571,8 +622,8 @@ class ModelManager:
                 result['stage'] = 'image'
                 return result
 
-            # Stage 2: Image -> Mesh (InstantMesh)
-            logger.info('[MODEL] === Stage 2/2: Image -> Mesh (InstantMesh) ===')
+            # Stage 2: Image -> Mesh (Shap-E)
+            logger.info('[MODEL] === Stage 2/2: Image -> Mesh (Shap-E) ===')
             mesh_path = output_dir / 'generated_mesh.glb'
 
             self._generation_lock.release()

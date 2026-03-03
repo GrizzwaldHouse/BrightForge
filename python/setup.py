@@ -37,10 +37,10 @@ MODELS_DIR_DEFAULT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspat
 
 # Model registry: name -> (repo_id, subfolder, expected_size_mb)
 MODELS = {
-    'instantmesh': {
-        'repo_id': CONFIG.get('models', {}).get('instantmesh', {}).get('repo_id', 'TencentARC/InstantMesh'),
-        'description': 'Single-image to 3D mesh generation',
-        'size_mb': CONFIG.get('models', {}).get('instantmesh', {}).get('size_mb', 1500),
+    'shap_e': {
+        'repo_id': CONFIG.get('models', {}).get('shap_e', {}).get('repo_id', 'openai/shap-e-img2img'),
+        'description': 'Single-image to 3D mesh generation (Shap-E)',
+        'size_mb': CONFIG.get('models', {}).get('shap_e', {}).get('size_mb', 1000),
     },
 }
 

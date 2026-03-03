@@ -12,12 +12,14 @@ paths:
   models_dir: "data/models"
 
 models:
-  instantmesh:
-    repo_id: "TencentARC/InstantMesh"
-    required_vram_gb: 6.0
+  shap_e:
+    repo_id: "openai/shap-e-img2img"
+    required_vram_gb: 4.0
     input_dimensions: [256, 256]
-    inference_steps: 75
-    size_mb: 1500
+    inference_steps: 64
+    guidance_scale: 3.0
+    frame_size: 256
+    size_mb: 1000
   sdxl:
     repo_id: "stabilityai/stable-diffusion-xl-base-1.0"
     required_vram_gb: 8.0

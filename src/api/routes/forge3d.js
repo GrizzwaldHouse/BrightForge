@@ -903,7 +903,7 @@ router.get('/models', (_req, res) => {
 /**
  * POST /api/forge3d/models/download
  * Start downloading a model. Returns 202 for async operation.
- * Body: { model: "instantmesh" | "sdxl" }
+ * Body: { model: "shap_e" | "sdxl" }
  */
 router.post('/models/download', async (req, res) => {
   ensureInit();
