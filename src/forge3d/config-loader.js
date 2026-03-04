@@ -37,7 +37,7 @@ class Forge3DConfig {
       default_host: '127.0.0.1',
       port_range_start: 8001,
       port_range_end: 8010,
-      startup_timeout_ms: 30000,
+      startup_timeout_ms: 120000,
       startup_poll_ms: 1000,
       max_restart_attempts: 3,
       restart_cooldown_ms: 5000,
@@ -218,8 +218,9 @@ if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(pr
 
   // Verify sections loaded
   console.assert(cfg.pythonServer.default_port === 8001, 'Default port should be 8001');
+  console.assert(cfg.pythonServer.startup_timeout_ms === 120000, 'Startup timeout should be 120000');
   console.assert(cfg.healthCheck.interval_ms === 10000, 'Health interval should be 10000');
-  console.assert(cfg.generation.timeout_ms === 180000, 'Gen timeout should be 180000');
+  console.assert(cfg.generation.timeout_ms === 600000, 'Gen timeout should be 600000');
   console.assert(cfg.database.path === 'data/forge3d.db', 'DB path should match');
   console.assert(cfg.project.output_dir === 'data/output', 'Output dir should match');
   console.assert(cfg.queue.max_size === 20, 'Queue max size should be 20');

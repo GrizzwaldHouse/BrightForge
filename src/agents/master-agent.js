@@ -23,6 +23,7 @@ import { FileContext } from '../core/file-context.js';
 import { LocalAgent } from './local-agent.js';
 import { CloudAgent } from './cloud-agent.js';
 import telemetryBus from '../core/telemetry-bus.js';
+import projectMemory from '../core/project-memory.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -141,19 +142,31 @@ export class MasterAgent {
     });
     console.log(`[MASTER] Found ${contextResult.files.length} files (~${contextResult.totalTokensEstimate} tokens)`);
 
+    // 1b. Load project memory and detect tech stack
+    projectMemory.load(projectRoot);
+    projectMemory.detectTechStack(contextResult.files);
+    const memoryContext = projectMemory.getSystemPromptContext();
+    if (memoryContext) {
+      console.log(`[MASTER] Project memory loaded (${projectMemory._conventionCount()} conventions)`);
+    }
+
     // 2. Classify task complexity
     const complexity = this.classifyTask(task);
 
     // 3. Select agent
     const agent = this.selectAgent(complexity);
 
-    // 4. Generate plan via LLM
+    // 4. Generate plan via LLM (with project memory injected)
     console.log(`[MASTER] Generating plan with ${agent.name} agent...`);
     const llmResult = await agent.generatePlan(task, {
       files: contextResult.files,
-      projectRoot
+      projectRoot,
+      memoryContext
     }, {
-      maxTokens: options.maxTokens || 4096
+      maxTokens: options.maxTokens || 4096,
+      signal: options.signal,
+      onProviderTrying: options.onProviderTrying,
+      onProviderFailed: options.onProviderFailed
     });
 
     // 5. Parse LLM output into structured plan

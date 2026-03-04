@@ -659,6 +659,210 @@ class ModelManager:
             except RuntimeError:
                 pass  # Already released
 
+    def optimize_mesh(self, input_path, target_faces, output_path=None):
+        """Optimize a mesh by reducing face count via quadric decimation.
+
+        Args:
+            input_path: Path to input GLB/PLY/OBJ file.
+            target_faces: Target face count after optimization.
+            output_path: Output path (defaults to input with _optimized suffix).
+
+        Returns:
+            dict with 'success', 'output_path', 'original_faces', 'optimized_faces', 'reduction_pct'.
+        """
+        try:
+            import trimesh
+
+            input_path = Path(input_path)
+            if output_path is None:
+                output_path = input_path.parent / f'{input_path.stem}_optimized{input_path.suffix}'
+            else:
+                output_path = Path(output_path)
+
+            logger.info(f'[MODEL] Optimizing mesh: {input_path} -> target {target_faces} faces')
+
+            mesh = trimesh.load(str(input_path), force='mesh')
+            original_faces = len(mesh.faces)
+
+            if target_faces >= original_faces:
+                logger.info(f'[MODEL] Mesh already has {original_faces} faces (target: {target_faces}), skipping')
+                output_path = input_path
+                return {
+                    'success': True,
+                    'output_path': str(output_path),
+                    'original_faces': original_faces,
+                    'optimized_faces': original_faces,
+                    'reduction_pct': 0.0,
+                    'file_size_bytes': input_path.stat().st_size,
+                    'skipped': True,
+                }
+
+            # Quadric decimation
+            optimized = mesh.simplify_quadric_decimation(target_faces)
+
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            optimized.export(str(output_path), file_type='glb')
+
+            optimized_faces = len(optimized.faces)
+            reduction = ((original_faces - optimized_faces) / original_faces) * 100 if original_faces > 0 else 0
+
+            logger.info(
+                f'[MODEL] Mesh optimized: {original_faces} -> {optimized_faces} faces '
+                f'({reduction:.1f}% reduction)'
+            )
+
+            return {
+                'success': True,
+                'output_path': str(output_path),
+                'original_faces': original_faces,
+                'optimized_faces': optimized_faces,
+                'reduction_pct': round(reduction, 1),
+                'file_size_bytes': output_path.stat().st_size,
+                'skipped': False,
+            }
+
+        except Exception as e:
+            logger.error(f'[MODEL] Mesh optimization failed: {e}')
+            return {'success': False, 'error': str(e)}
+
+    def generate_lod_chain(self, input_path, output_dir, levels=None):
+        """Generate LOD (Level of Detail) chain from a mesh.
+
+        Args:
+            input_path: Path to input GLB file.
+            output_dir: Directory for LOD output files.
+            levels: List of reduction ratios (default [1.0, 0.5, 0.25]).
+
+        Returns:
+            dict with 'success', 'levels' array of {level, path, faces, file_size}.
+        """
+        if levels is None:
+            levels = [1.0, 0.5, 0.25]
+
+        try:
+            import trimesh
+
+            input_path = Path(input_path)
+            output_dir = Path(output_dir)
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            mesh = trimesh.load(str(input_path), force='mesh')
+            original_faces = len(mesh.faces)
+
+            logger.info(f'[MODEL] Generating LOD chain: {original_faces} faces, {len(levels)} levels')
+
+            lod_results = []
+            lod_names = ['high', 'mid', 'low', 'lowest']
+
+            for i, ratio in enumerate(levels):
+                name = lod_names[i] if i < len(lod_names) else f'lod{i}'
+                target = max(4, int(original_faces * ratio))
+                out_path = output_dir / f'mesh_{name}.glb'
+
+                if ratio >= 1.0:
+                    # Copy original
+                    mesh.export(str(out_path), file_type='glb')
+                    faces = original_faces
+                else:
+                    decimated = mesh.simplify_quadric_decimation(target)
+                    decimated.export(str(out_path), file_type='glb')
+                    faces = len(decimated.faces)
+
+                lod_results.append({
+                    'level': name,
+                    'ratio': ratio,
+                    'path': str(out_path),
+                    'faces': faces,
+                    'file_size': out_path.stat().st_size,
+                })
+
+                logger.info(f'[MODEL] LOD {name}: {faces} faces ({out_path.stat().st_size} bytes)')
+
+            return {
+                'success': True,
+                'levels': lod_results,
+                'original_faces': original_faces,
+            }
+
+        except Exception as e:
+            logger.error(f'[MODEL] LOD generation failed: {e}')
+            return {'success': False, 'error': str(e)}
+
+    def mesh_quality_report(self, input_path):
+        """Generate a quality report for a mesh.
+
+        Args:
+            input_path: Path to input GLB file.
+
+        Returns:
+            dict with vertex_count, face_count, bounding_box, estimated_vram, recommendations.
+        """
+        try:
+            import trimesh
+            import numpy as np
+
+            input_path = Path(input_path)
+            mesh = trimesh.load(str(input_path), force='mesh')
+
+            vertex_count = len(mesh.vertices)
+            face_count = len(mesh.faces)
+            bounds = mesh.bounding_box.extents.tolist()
+            file_size = input_path.stat().st_size
+
+            # Estimated VRAM: ~32 bytes per vertex (position + normal + UV + tangent)
+            estimated_vram_mb = (vertex_count * 32) / (1024 * 1024)
+
+            # Recommendations per target platform
+            recommendations = {}
+            presets = {
+                'mobile': 2000,
+                'web': 5000,
+                'desktop': 10000,
+                'unreal': 50000,
+            }
+
+            for platform, target in presets.items():
+                if face_count <= target:
+                    recommendations[platform] = {
+                        'status': 'ok',
+                        'message': f'Good for {platform} ({face_count} faces <= {target} target)',
+                    }
+                else:
+                    reduction = round(((face_count - target) / face_count) * 100, 1)
+                    recommendations[platform] = {
+                        'status': 'reduce',
+                        'message': f'Reduce to {target} faces ({reduction}% reduction needed)',
+                        'target_faces': target,
+                    }
+
+            is_watertight = bool(mesh.is_watertight)
+            is_manifold = bool(np.all(mesh.edges_unique_length > 0)) if len(mesh.edges_unique_length) > 0 else False
+
+            logger.info(
+                f'[MODEL] Quality report: {vertex_count} verts, {face_count} faces, '
+                f'{estimated_vram_mb:.1f} MB est. VRAM'
+            )
+
+            return {
+                'success': True,
+                'vertex_count': vertex_count,
+                'face_count': face_count,
+                'bounding_box': {
+                    'width': round(bounds[0], 3),
+                    'height': round(bounds[1], 3),
+                    'depth': round(bounds[2], 3),
+                },
+                'file_size_bytes': file_size,
+                'estimated_vram_mb': round(estimated_vram_mb, 2),
+                'is_watertight': is_watertight,
+                'is_manifold': is_manifold,
+                'recommendations': recommendations,
+            }
+
+        except Exception as e:
+            logger.error(f'[MODEL] Quality report failed: {e}')
+            return {'success': False, 'error': str(e)}
+
     def shutdown(self):
         """Clean shutdown — unload all models."""
         logger.info('[MODEL] Shutting down model manager...')

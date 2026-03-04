@@ -21,6 +21,12 @@
         <h1 class="logo">BrightForge</h1>
       </div>
       <div class="topbar-right">
+        <div id="cost-ticker" class="cost-ticker" title="Today's LLM spend">
+          <span class="cost-ticker-label">Today:</span>
+          <span id="cost-ticker-value" class="cost-ticker-value">$0.00</span>
+          <span class="cost-ticker-sep">/</span>
+          <span id="cost-ticker-limit" class="cost-ticker-limit">$1.00</span>
+        </div>
         <span id="error-indicator" class="error-indicator hidden" title="Recent errors" aria-label="Recent errors">
           <i data-lucide="alert-triangle" class="error-icon"></i>
           <span id="error-count" class="error-count">0</span>

@@ -9,6 +9,7 @@
  */
 
 import { randomUUID } from 'crypto';
+import { EventEmitter } from 'events';
 import { MasterAgent } from '../agents/master-agent.js';
 import { DiffApplier } from '../core/diff-applier.js';
 import { SessionLog } from '../core/session-log.js';
@@ -17,8 +18,9 @@ import { MultiStepPlanner } from '../core/multi-step-planner.js';
 import errorHandler from '../core/error-handler.js';
 import telemetryBus from '../core/telemetry-bus.js';
 
-export class WebSession {
+export class WebSession extends EventEmitter {
   constructor({ projectRoot, sessionsDir }) {
+    super();
     this.id = randomUUID();
     this.projectRoot = projectRoot;
     this.sessionsDir = sessionsDir;
@@ -36,6 +38,11 @@ export class WebSession {
     this.totalCost = 0;
     this.turns = 0;
 
+    // SSE streaming state
+    this._abortController = null;
+    this._generating = false;
+    this._recentErrors = [];
+
     telemetryBus.emit('session_created', { sessionId: this.id, projectRoot });
   }
 
@@ -43,25 +50,148 @@ export class WebSession {
     this.lastActivity = Date.now();
   }
 
+  /**
+   * Start plan generation (fire-and-forget).
+   * Emits events: plan:started, plan:provider_trying, plan:complete, plan:failed, plan:cancelled
+   * For SSE streaming — callers listen to events instead of awaiting a result.
+   */
+  startGeneration(message) {
+    this.touch();
+    this.turns++;
+    this.history.addUser(message);
+    this._generating = true;
+    this._abortController = new AbortController();
+
+    console.log(`[WEB] Session ${this.id.slice(0, 8)} - starting generation for: ${message.slice(0, 80)}`);
+    this.emit('plan:started', { sessionId: this.id, message });
+
+    // Fire-and-forget — errors are caught and emitted
+    this._runGeneration(message).catch((error) => {
+      // Safety net — _runGeneration handles its own errors, but just in case
+      console.error(`[WEB] Unhandled generation error: ${error.message}`);
+    });
+  }
+
+  /**
+   * Internal: run the actual generation (async).
+   * @private
+   */
+  async _runGeneration(message) {
+    try {
+      const signal = this._abortController.signal;
+
+      // Build LLM options with callbacks for SSE
+      const llmOptions = {
+        signal,
+        onProviderTrying: (provider, model) => {
+          this.emit('plan:provider_trying', { sessionId: this.id, provider, model });
+        },
+        onProviderFailed: (provider, error) => {
+          this.emit('plan:provider_failed', { sessionId: this.id, provider, error: error.message });
+        }
+      };
+
+      // Check if task needs decomposition
+      const { needsDecomposition, reason } = this.planner.shouldDecompose(message);
+      let plan;
+
+      if (needsDecomposition) {
+        console.log(`[WEB] Multi-step needed: ${reason}`);
+        const steps = await this.planner.decompose(message, this.projectRoot);
+        plan = await this.masterAgent.run(message, this.projectRoot, llmOptions);
+        plan.steps = steps;
+      } else {
+        plan = await this.masterAgent.run(message, this.projectRoot, llmOptions);
+      }
+
+      plan.id = randomUUID();
+      this.pendingPlan = plan;
+      this.plans.push(plan);
+      this.totalCost += plan.cost || 0;
+
+      const responseMsg = plan.operations?.length > 0
+        ? `Generated plan with ${plan.operations.length} file operation(s). Review and approve to apply.`
+        : 'No file operations generated. The LLM may not have understood the task. Try rephrasing.';
+
+      this.history.addAssistant(responseMsg);
+
+      // Clear error loop tracking on success
+      this._recentErrors = [];
+
+      this.emit('plan:complete', {
+        sessionId: this.id,
+        plan: this.sanitizePlan(plan),
+        status: plan.operations?.length > 0 ? 'pending_approval' : 'no_changes',
+        message: responseMsg,
+        cost: plan.cost || 0,
+        provider: plan.provider,
+        model: plan.model,
+        routingLog: plan.routingLog || [],
+        totalCost: this.totalCost
+      });
+
+    } catch (error) {
+      if (this._abortController?.signal?.aborted) {
+        console.log(`[WEB] Generation cancelled for session ${this.id.slice(0, 8)}`);
+        this.emit('plan:cancelled', { sessionId: this.id });
+        return;
+      }
+
+      console.error(`[WEB] Plan generation failed: ${error.message}`);
+      const errorId = errorHandler.report('plan_error', error, { sessionId: this.id });
+      const errorMsg = `Error generating plan: ${error.message}`;
+      this.history.addAssistant(errorMsg);
+
+      // Error loop detection — if same error repeats 3 times, warn
+      this._recentErrors.push(error.message);
+      if (this._recentErrors.length > 5) this._recentErrors.shift();
+      const repeated = this._recentErrors.filter(e => e === error.message).length;
+
+      this.emit('plan:failed', {
+        sessionId: this.id,
+        message: errorMsg,
+        errorId,
+        routingLog: error.routingLog || [],
+        errorLoop: repeated >= 3
+      });
+
+    } finally {
+      this._generating = false;
+      this._abortController = null;
+    }
+  }
+
+  /**
+   * Cancel an in-flight generation.
+   * @returns {boolean} Whether cancellation was performed
+   */
+  cancel() {
+    if (this._abortController && this._generating) {
+      console.log(`[WEB] Cancelling generation for session ${this.id.slice(0, 8)}`);
+      this._abortController.abort();
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Synchronous generatePlan for backward compatibility (e.g., ?sync=true).
+   * Waits for completion and returns the result directly.
+   */
   async generatePlan(message) {
     this.touch();
     this.turns++;
     this.history.addUser(message);
 
-    console.log(`[WEB] Session ${this.id.slice(0, 8)} - generating plan for: ${message.slice(0, 80)}`);
+    console.log(`[WEB] Session ${this.id.slice(0, 8)} - generating plan (sync) for: ${message.slice(0, 80)}`);
 
     try {
-      // Check if task needs decomposition
       const { needsDecomposition, reason } = this.planner.shouldDecompose(message);
 
       if (needsDecomposition) {
-        // For complex tasks, decompose into steps
         console.log(`[WEB] Multi-step needed: ${reason}`);
         const steps = await this.planner.decompose(message, this.projectRoot);
-
-        // Generate plan for first step (or all steps combined)
         const plan = await this.masterAgent.run(message, this.projectRoot);
-
         plan.steps = steps;
         plan.id = randomUUID();
         this.pendingPlan = plan;
@@ -80,7 +210,6 @@ export class WebSession {
         };
       }
 
-      // Simple task - generate plan directly
       const plan = await this.masterAgent.run(message, this.projectRoot);
       plan.id = randomUUID();
       this.pendingPlan = plan;

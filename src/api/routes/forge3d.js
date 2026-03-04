@@ -1,7 +1,7 @@
 /**
  * Forge3D Routes - API endpoints for 3D generation
  *
- * 22 endpoints for generation, projects, assets, queue, models, FBX:
+ * 26 endpoints for generation, projects, assets, queue, models, FBX, post-processing:
  *
  * POST /api/forge3d/generate        - Start generation (image or text)
  * GET  /api/forge3d/status/:id      - Check generation progress
@@ -26,6 +26,10 @@
  * GET  /api/forge3d/models          - List installed models
  * POST /api/forge3d/models/download - Start model download
  * GET  /api/forge3d/models/status   - Download progress for all active
+ * POST /api/forge3d/optimize        - Optimize mesh (reduce face count)
+ * POST /api/forge3d/lod/:id         - Generate LOD chain for asset
+ * GET  /api/forge3d/report/:id      - Quality report for asset
+ * GET  /api/forge3d/presets          - Optimization presets
  *
  * STATUS: Complete. All endpoints have error handling + telemetry.
  *         Localhost-only by default (Express binds to 127.0.0.1).
@@ -1014,6 +1018,149 @@ router.post('/enhance-prompt', async (req, res) => {
     console.error(`[ROUTE:FORGE3D] Enhance prompt error: ${err.message}`);
     errorHandler.report('forge3d_error', err, { endpoint: 'enhance_prompt' });
     endTimer({ error: err.message });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Post-Processing (Optimization, LOD, Quality Report) ---
+
+/**
+ * POST /api/forge3d/optimize
+ * Optimize a generated mesh by reducing face count.
+ * Body: { assetId: string, targetFaces: number }
+ */
+router.post('/optimize', async (req, res) => {
+  ensureInit();
+  const { assetId, targetFaces } = req.body;
+
+  if (!assetId) {
+    return res.status(400).json({ error: 'Missing assetId' });
+  }
+  if (!targetFaces || targetFaces < 4) {
+    return res.status(400).json({ error: 'targetFaces must be at least 4' });
+  }
+
+  console.log(`[ROUTE:FORGE3D] POST /api/forge3d/optimize asset=${assetId} target=${targetFaces}`);
+  const endTimer = telemetryBus.startTimer('forge3d_optimize');
+
+  try {
+    if (modelBridge.state !== 'running') {
+      return res.status(503).json({ error: 'Python bridge not running' });
+    }
+
+    // Load the asset's GLB file
+    const asset = forge3dDb.getAsset(assetId);
+    if (!asset) {
+      return res.status(404).json({ error: 'Asset not found' });
+    }
+
+    const { readFileSync } = await import('fs');
+    const glbBuffer = readFileSync(asset.file_path);
+
+    const result = await modelBridge.optimizeMesh(glbBuffer, targetFaces, assetId);
+    endTimer({ success: true });
+
+    res.json(result);
+  } catch (err) {
+    console.error(`[ROUTE:FORGE3D] Optimize error: ${err.message}`);
+    errorHandler.report('forge3d_error', err, { endpoint: 'optimize', assetId });
+    endTimer({ error: err.message });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/forge3d/lod/:id
+ * Generate LOD chain for a generated asset.
+ */
+router.post('/lod/:id', async (req, res) => {
+  ensureInit();
+  const assetId = req.params.id;
+
+  console.log(`[ROUTE:FORGE3D] POST /api/forge3d/lod/${assetId}`);
+  const endTimer = telemetryBus.startTimer('forge3d_lod');
+
+  try {
+    if (modelBridge.state !== 'running') {
+      return res.status(503).json({ error: 'Python bridge not running' });
+    }
+
+    const asset = forge3dDb.getAsset(assetId);
+    if (!asset) {
+      return res.status(404).json({ error: 'Asset not found' });
+    }
+
+    const { readFileSync } = await import('fs');
+    const glbBuffer = readFileSync(asset.file_path);
+
+    const result = await modelBridge.generateLOD(glbBuffer, assetId);
+    endTimer({ success: true });
+
+    res.json(result);
+  } catch (err) {
+    console.error(`[ROUTE:FORGE3D] LOD error: ${err.message}`);
+    errorHandler.report('forge3d_error', err, { endpoint: 'lod', assetId });
+    endTimer({ error: err.message });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/forge3d/report/:id
+ * Get quality report for a generated asset.
+ */
+router.get('/report/:id', async (req, res) => {
+  ensureInit();
+  const assetId = req.params.id;
+
+  console.log(`[ROUTE:FORGE3D] GET /api/forge3d/report/${assetId}`);
+
+  try {
+    if (modelBridge.state !== 'running') {
+      return res.status(503).json({ error: 'Python bridge not running' });
+    }
+
+    const asset = forge3dDb.getAsset(assetId);
+    if (!asset) {
+      return res.status(404).json({ error: 'Asset not found' });
+    }
+
+    const { readFileSync } = await import('fs');
+    const glbBuffer = readFileSync(asset.file_path);
+
+    const result = await modelBridge.getMeshReport(glbBuffer);
+    res.json(result);
+  } catch (err) {
+    console.error(`[ROUTE:FORGE3D] Report error: ${err.message}`);
+    errorHandler.report('forge3d_error', err, { endpoint: 'report', assetId });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/forge3d/presets
+ * Get optimization presets for different target platforms.
+ */
+router.get('/presets', async (_req, res) => {
+  ensureInit();
+
+  try {
+    if (modelBridge.state !== 'running') {
+      // Return defaults if bridge not running
+      return res.json({
+        presets: {
+          mobile: { target_faces: 2000, label: 'Mobile', description: 'Optimized for mobile devices' },
+          web: { target_faces: 5000, label: 'Web', description: 'Balanced for web browsers' },
+          desktop: { target_faces: 10000, label: 'Desktop', description: 'High quality for desktop apps' },
+          unreal: { target_faces: 50000, label: 'Unreal Engine', description: 'Game-ready for UE5' }
+        }
+      });
+    }
+
+    const result = await modelBridge.getOptimizationPresets();
+    res.json(result);
+  } catch (err) {
+    console.error(`[ROUTE:FORGE3D] Presets error: ${err.message}`);
     res.status(500).json({ error: err.message });
   }
 });

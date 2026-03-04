@@ -7,7 +7,7 @@ python_server:
   default_host: "127.0.0.1"
   port_range_start: 8001
   port_range_end: 8010
-  startup_timeout_ms: 30000
+  startup_timeout_ms: 120000  # 2 min — first-run model downloads take longer
   startup_poll_ms: 1000
   max_restart_attempts: 3
   restart_cooldown_ms: 5000

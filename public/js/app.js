@@ -119,6 +119,11 @@ class App {
       this.startProviderStatusPolling();
       console.log('[APP] ✓ Polling started');
 
+      // Start cost ticker polling (every 60 seconds)
+      console.log('[APP] Step 7b: Starting cost ticker polling...');
+      this.startCostPolling();
+      console.log('[APP] ✓ Cost polling started');
+
       // Initialize Lucide icons ONCE on page load
       console.log('[APP] Step 8: Initializing Lucide icons...');
       if (window.lucide) {
@@ -242,27 +247,43 @@ class App {
   }
 
   /**
-   * Send a chat message to the agent
+   * Send a chat message to the agent via SSE streaming.
+   * Fires POST to start generation, then connects EventSource for progress.
    */
   async sendMessage() {
     const input = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('send-btn');
     const message = input.value.trim();
 
     if (!message) return;
 
     // Disable input
     input.disabled = true;
-    document.getElementById('send-btn').disabled = true;
+    sendBtn.disabled = true;
 
     // Add user message to chat
     this.chat.addUserMessage(message);
     input.value = '';
+    sendBtn.classList.remove('ready');
 
-    // Show loading indicator
-    this.chat.showLoading();
+    // Show loading indicator with cancel button
+    this.chat.showLoading('Analyzing request...');
+    this._showCancelButton(true);
 
     try {
       const projectRoot = this.fileBrowser?.getValue()?.trim() || '';
+
+      // Check for multi-domain pipeline intent
+      const detection = await this.apiPost('/api/chat/pipeline/detect', { message });
+
+      if (detection.isPipeline) {
+        // Multi-domain pipeline detected — execute pipeline
+        await this._executePipeline(message, projectRoot, detection);
+        return;
+      }
+
+      // Standard single-domain generation
+      this.chat.updateLoading('Starting generation...');
 
       const response = await this.apiPost('/api/chat/turn', {
         sessionId: this.sessionId,
@@ -270,44 +291,282 @@ class App {
         projectRoot: projectRoot || undefined
       });
 
-      this.chat.hideLoading();
-
-      // Update session ID if new session created
+      // Update session ID
       if (response.sessionId && response.sessionId !== this.sessionId) {
         this.sessionId = response.sessionId;
-        await this.sessionManager.loadSessions();
+        this.sessionManager.loadSessions();
       }
 
-      // Handle response based on status
-      if (response.status === 'pending_approval' && response.plan) {
-        // Show plan for approval
-        this.currentPlan = response.plan;
-        this.planViewer.showPlan(response.plan, response.message);
-        this.chat.addSystemMessage('Plan generated. Review the changes below and approve or reject.');
-      } else if (response.status === 'complete') {
-        // Direct completion (no plan needed)
-        this.chat.addAssistantMessage(response.message || 'Task completed successfully.');
-      } else if (response.status === 'error') {
-        this.chat.addSystemMessage(`Error: ${response.message || 'Unknown error occurred'}`);
+      if (response.status === 'generating') {
+        // Connect SSE for real-time progress
+        this._connectStream(response.sessionId);
       } else {
-        this.chat.addAssistantMessage(response.message || 'Processing...');
-      }
-
-      // Update message history if provided
-      if (response.history) {
-        // Could re-render full history here if needed
+        // Sync fallback (if server returned a direct result)
+        this.chat.hideLoading();
+        this._showCancelButton(false);
+        this._handlePlanResult(response);
+        this._reenableInput();
       }
 
     } catch (error) {
       console.error('[APP] Send message failed:', error);
       this.chat.hideLoading();
+      this._showCancelButton(false);
+      this._hidePipelineProgress();
       this.chat.addSystemMessage(`Error: ${error.message}`);
-    } finally {
-      // Re-enable input
-      input.disabled = false;
-      document.getElementById('send-btn').disabled = false;
-      input.focus();
+      this._reenableInput();
     }
+  }
+
+  /**
+   * Execute a multi-domain creative pipeline.
+   * @param {string} message - User prompt
+   * @param {string} projectRoot - Project directory
+   * @param {Object} detection - Pipeline detection result
+   */
+  async _executePipeline(message, projectRoot, detection) {
+    const domainLabels = { forge3d: '3D', design: 'Design', code: 'Code' };
+    const domainList = detection.domains.map(d => domainLabels[d] || d).join(' + ');
+
+    this.chat.addSystemMessage(
+      `Pipeline detected: ${domainList} (${detection.steps.length} steps, confidence: ${Math.round(detection.confidence * 100)}%)`
+    );
+
+    this._showPipelineProgress(detection.steps);
+    this.chat.updateLoading('Starting creative pipeline...');
+
+    try {
+      const response = await this.apiPost('/api/chat/pipeline/execute', {
+        sessionId: this.sessionId,
+        message,
+        projectRoot: projectRoot || undefined
+      });
+
+      if (response.sessionId && response.sessionId !== this.sessionId) {
+        this.sessionId = response.sessionId;
+        this.sessionManager.loadSessions();
+      }
+
+      if (response.status === 'pipeline_running') {
+        this._connectStream(response.sessionId);
+      } else {
+        this.chat.hideLoading();
+        this._showCancelButton(false);
+        this._hidePipelineProgress();
+        this.chat.addSystemMessage(response.message || 'Pipeline could not start.');
+        this._reenableInput();
+      }
+    } catch (error) {
+      console.error('[APP] Pipeline execution failed:', error);
+      this.chat.hideLoading();
+      this._showCancelButton(false);
+      this._hidePipelineProgress();
+      this.chat.addSystemMessage(`Pipeline error: ${error.message}`);
+      this._reenableInput();
+    }
+  }
+
+  /**
+   * Connect to SSE stream for generation progress.
+   * @param {string} sessionId
+   */
+  _connectStream(sessionId) {
+    // Close any existing stream
+    if (this._eventSource) {
+      this._eventSource.close();
+    }
+
+    const url = `/api/chat/stream/${sessionId}`;
+    this._eventSource = new EventSource(url);
+
+    this._eventSource.addEventListener('provider_trying', (e) => {
+      const data = JSON.parse(e.data);
+      this.chat.updateLoading(`Trying ${data.provider}${data.model ? ' (' + data.model + ')' : ''}...`);
+    });
+
+    this._eventSource.addEventListener('provider_failed', (e) => {
+      const data = JSON.parse(e.data);
+      console.warn(`[APP] Provider failed: ${data.provider} - ${data.error}`);
+    });
+
+    this._eventSource.addEventListener('complete', (e) => {
+      const data = JSON.parse(e.data);
+      this._cleanupStream();
+      this.chat.hideLoading();
+      this._showCancelButton(false);
+      this._handlePlanResult(data);
+      this._reenableInput();
+    });
+
+    this._eventSource.addEventListener('failed', (e) => {
+      const data = JSON.parse(e.data);
+      this._cleanupStream();
+      this.chat.hideLoading();
+      this._showCancelButton(false);
+
+      if (data.errorLoop) {
+        this.chat.addSystemMessage('Error loop detected: the same error has occurred 3+ times. Consider rephrasing your request.');
+      }
+      this.chat.addSystemMessage(`Error: ${data.message || 'Generation failed'}`);
+      this._reenableInput();
+    });
+
+    this._eventSource.addEventListener('cancelled', () => {
+      this._cleanupStream();
+      this.chat.hideLoading();
+      this._showCancelButton(false);
+      this.chat.addSystemMessage('Generation cancelled.');
+      this._reenableInput();
+    });
+
+    // Pipeline step events
+    this._eventSource.addEventListener('pipeline_step_start', (e) => {
+      const data = JSON.parse(e.data);
+      const domainLabels = { forge3d: '3D Generation', design: 'Design Generation', code: 'Code Generation' };
+      const label = domainLabels[data.domain] || data.domain;
+      this.chat.updateLoading(`Step ${data.step}/${data.total}: ${label}...`);
+      this._updatePipelineStep(data.step - 1, 'active');
+    });
+
+    this._eventSource.addEventListener('pipeline_step_complete', (e) => {
+      const data = JSON.parse(e.data);
+      this._updatePipelineStep(data.step - 1, data.success ? 'complete' : 'failed');
+    });
+
+    this._eventSource.addEventListener('pipeline_complete', (e) => {
+      const data = JSON.parse(e.data);
+      this._cleanupStream();
+      this.chat.hideLoading();
+      this._showCancelButton(false);
+
+      const passed = data.stepsCompleted || 0;
+      const total = data.totalSteps || 0;
+      const status = data.success ? 'All steps completed' : `${passed}/${total} steps succeeded`;
+
+      this.chat.addAssistantMessageWithMeta(
+        `Pipeline complete: ${status}.`,
+        {
+          provider: 'pipeline',
+          model: `${data.domains?.join(' + ') || 'multi-domain'}`,
+          cost: data.totalCost || 0
+        }
+      );
+
+      // Keep progress bar visible briefly then fade
+      setTimeout(() => this._hidePipelineProgress(), 3000);
+      this._updateCostTicker();
+      this._reenableInput();
+    });
+
+    this._eventSource.addEventListener('pipeline_failed', (e) => {
+      const data = JSON.parse(e.data);
+      this._cleanupStream();
+      this.chat.hideLoading();
+      this._showCancelButton(false);
+      this._hidePipelineProgress();
+      this.chat.addSystemMessage(`Pipeline failed: ${data.message || 'Unknown error'}`);
+      this._updateCostTicker();
+      this._reenableInput();
+    });
+
+    this._eventSource.onerror = () => {
+      this._cleanupStream();
+      this.chat.hideLoading();
+      this._showCancelButton(false);
+      this._hidePipelineProgress();
+      this.chat.addSystemMessage('Stream connection lost. Check if the server is running.');
+      this._reenableInput();
+    };
+  }
+
+  /**
+   * Clean up EventSource connection.
+   */
+  _cleanupStream() {
+    if (this._eventSource) {
+      this._eventSource.close();
+      this._eventSource = null;
+    }
+  }
+
+  /**
+   * Handle a completed plan result (from SSE or sync response).
+   */
+  _handlePlanResult(data) {
+    if (data.status === 'pending_approval' && data.plan) {
+      this.currentPlan = data.plan;
+      this.planViewer.showPlan(data.plan, data.message);
+      this.chat.addAssistantMessageWithMeta(
+        'Plan generated. Review the changes below and approve or reject.',
+        {
+          provider: data.provider,
+          model: data.model,
+          cost: data.cost,
+          routingLog: data.routingLog,
+          showUpgrade: true,
+          onUpgrade: (provider) => this.upgradeResponse(provider)
+        }
+      );
+    } else if (data.status === 'no_changes') {
+      this.chat.addAssistantMessage(data.message || 'No file operations generated. Try rephrasing.');
+    } else if (data.status === 'error') {
+      this.chat.addSystemMessage(`Error: ${data.message || 'Unknown error occurred'}`);
+    } else {
+      this.chat.addAssistantMessage(data.message || 'Processing...');
+    }
+
+    // Refresh cost ticker after each generation
+    this._updateCostTicker();
+  }
+
+  /**
+   * Re-enable chat input after generation completes.
+   */
+  _reenableInput() {
+    const input = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('send-btn');
+    input.disabled = false;
+    sendBtn.disabled = false;
+    input.focus();
+  }
+
+  /**
+   * Show or hide the cancel generation button.
+   */
+  _showCancelButton(show) {
+    let cancelBtn = document.getElementById('cancel-generation-btn');
+
+    if (show && !cancelBtn) {
+      cancelBtn = document.createElement('button');
+      cancelBtn.id = 'cancel-generation-btn';
+      cancelBtn.className = 'btn btn-secondary btn-cancel-generation';
+      cancelBtn.textContent = 'Stop Generation';
+      cancelBtn.addEventListener('click', () => this._cancelGeneration());
+
+      const inputBar = document.querySelector('.chat-input-bar');
+      if (inputBar) inputBar.appendChild(cancelBtn);
+    } else if (!show && cancelBtn) {
+      cancelBtn.remove();
+    }
+  }
+
+  /**
+   * Cancel the current generation.
+   */
+  async _cancelGeneration() {
+    if (!this.sessionId) return;
+
+    try {
+      await this.apiPost(`/api/chat/cancel/${this.sessionId}`, {});
+    } catch (error) {
+      console.warn('[APP] Cancel request failed:', error.message);
+    }
+
+    this._cleanupStream();
+    this.chat.hideLoading();
+    this._showCancelButton(false);
+    this.chat.addSystemMessage('Generation cancelled.');
+    this._reenableInput();
   }
 
   /**
@@ -564,6 +823,167 @@ class App {
         console.warn('[APP] Provider status update failed:', error.message);
       }
     }, 30000);
+  }
+
+  /**
+   * Start cost ticker polling (every 60 seconds).
+   * Updates the header cost display from /api/cost/summary.
+   */
+  /**
+   * Show pipeline step progress bar in the chat area.
+   * @param {Array} steps - Pipeline steps from detection
+   */
+  _showPipelineProgress(steps) {
+    this._hidePipelineProgress();
+
+    const container = document.createElement('div');
+    container.id = 'pipeline-progress';
+    container.className = 'pipeline-progress';
+
+    const domainIcons = {
+      forge3d: '\u25B2',  // triangle for 3D
+      design: '\u25CF',   // circle for design
+      code: '\u25A0'      // square for code
+    };
+
+    steps.forEach((step, i) => {
+      const stepEl = document.createElement('div');
+      stepEl.className = 'pipeline-step pending';
+      stepEl.dataset.stepIndex = i;
+
+      const icon = document.createElement('span');
+      icon.className = 'pipeline-step-icon';
+      icon.textContent = domainIcons[step.domain] || '\u25C6';
+
+      const label = document.createElement('span');
+      label.className = 'pipeline-step-label';
+      label.textContent = step.description;
+
+      stepEl.appendChild(icon);
+      stepEl.appendChild(label);
+      container.appendChild(stepEl);
+
+      // Add connector between steps
+      if (i < steps.length - 1) {
+        const connector = document.createElement('div');
+        connector.className = 'pipeline-connector';
+        container.appendChild(connector);
+      }
+    });
+
+    const chatMessages = document.querySelector('.chat-messages');
+    if (chatMessages) {
+      chatMessages.appendChild(container);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+  }
+
+  /**
+   * Update a pipeline step's visual state.
+   * @param {number} index - Step index (0-based)
+   * @param {string} state - 'pending' | 'active' | 'complete' | 'failed'
+   */
+  _updatePipelineStep(index, state) {
+    const container = document.getElementById('pipeline-progress');
+    if (!container) return;
+
+    const stepEl = container.querySelector(`[data-step-index="${index}"]`);
+    if (!stepEl) return;
+
+    stepEl.className = `pipeline-step ${state}`;
+  }
+
+  /**
+   * Remove the pipeline progress bar.
+   */
+  _hidePipelineProgress() {
+    const container = document.getElementById('pipeline-progress');
+    if (container) container.remove();
+  }
+
+  startCostPolling() {
+    this._updateCostTicker();
+    setInterval(() => this._updateCostTicker(), 60000);
+  }
+
+  /**
+   * Fetch cost summary and update the header cost ticker.
+   */
+  async _updateCostTicker() {
+    try {
+      const data = await this.apiGet('/api/cost/summary');
+      const valueEl = document.getElementById('cost-ticker-value');
+      const limitEl = document.getElementById('cost-ticker-limit');
+
+      if (valueEl) {
+        valueEl.textContent = `$${(data.totalSpent || 0).toFixed(2)}`;
+        // Color coding based on usage percentage
+        valueEl.classList.remove('warning', 'danger');
+        if (data.budgetUsedPercent > 90) {
+          valueEl.classList.add('danger');
+        } else if (data.budgetUsedPercent > 60) {
+          valueEl.classList.add('warning');
+        }
+      }
+
+      if (limitEl) {
+        limitEl.textContent = `$${(data.budgetLimit || 1).toFixed(2)}`;
+      }
+
+      // Also update sidebar budget bar from the same data
+      this.updateBudgetDisplay({
+        remaining: data.budgetRemaining,
+        daily_limit_usd: data.budgetLimit
+      });
+    } catch (error) {
+      console.warn('[APP] Cost ticker update failed:', error.message);
+    }
+  }
+
+  /**
+   * Upgrade the last response using a specific provider.
+   * @param {string} targetProvider
+   */
+  async upgradeResponse(targetProvider) {
+    if (!this.sessionId) return;
+
+    this.chat.showLoading(`Upgrading via ${targetProvider}...`);
+    this._showCancelButton(false);
+
+    try {
+      const response = await this.apiPost('/api/chat/upgrade', {
+        sessionId: this.sessionId,
+        targetProvider
+      });
+
+      this.chat.hideLoading();
+
+      if (response.status === 'pending_approval' && response.plan) {
+        this.currentPlan = response.plan;
+        this.planViewer.showPlan(response.plan, response.message);
+
+        const costCompare = response.previousCost > 0
+          ? ` (previous: $${response.previousCost.toFixed(4)})`
+          : '';
+
+        this.chat.addAssistantMessageWithMeta(
+          `Upgraded plan ready. Review the changes below.${costCompare}`,
+          {
+            provider: response.provider,
+            model: response.model,
+            cost: response.cost
+          }
+        );
+      } else {
+        this.chat.addAssistantMessage(response.message || 'Upgrade produced no changes.');
+      }
+
+      // Refresh cost ticker
+      this._updateCostTicker();
+    } catch (error) {
+      this.chat.hideLoading();
+      this.chat.addSystemMessage(`Upgrade failed: ${error.message}`);
+    }
   }
 
   /**

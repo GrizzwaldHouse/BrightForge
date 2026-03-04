@@ -558,6 +558,165 @@ async def get_material_presets():
     }
 
 
+# --- Post-Processing Endpoints ---
+
+@app.post('/postprocess/optimize')
+async def postprocess_optimize(
+    file: UploadFile = File(...),
+    target_faces: int = Form(...),
+    job_id: str = Form(default=None),
+):
+    """Optimize a mesh by reducing face count.
+
+    Accepts: GLB mesh file + target face count
+    Returns: JSON with optimized file download path
+    """
+    if job_id is None:
+        job_id = generate_job_id()
+
+    logger.info(f'[SERVER] Optimize request: job={job_id}, target_faces={target_faces}')
+
+    if target_faces < 4:
+        raise HTTPException(400, 'Target faces must be at least 4')
+
+    contents = await file.read()
+    max_upload_bytes = _cfg('generation', 'max_upload_size_bytes', 20 * 1024 * 1024)
+    if len(contents) > max_upload_bytes:
+        raise HTTPException(400, 'File too large. Maximum 20 MB.')
+
+    temp_input = TEMP_DIR / f'{job_id}_optimize_input.glb'
+    temp_input.write_bytes(contents)
+
+    output_path = OUTPUT_DIR / f'{job_id}_optimized.glb'
+
+    try:
+        result = await asyncio.to_thread(
+            model_manager.optimize_mesh,
+            str(temp_input),
+            target_faces,
+            str(output_path),
+        )
+
+        if not result['success']:
+            raise HTTPException(500, f'Optimization failed: {result.get("error")}')
+
+        result['download_path'] = f'/download/{job_id}/{job_id}_optimized.glb'
+        return JSONResponse(result)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f'[SERVER] Optimize error: {e}')
+        raise HTTPException(500, f'Internal error: {str(e)}')
+    finally:
+        if temp_input.exists():
+            temp_input.unlink()
+
+
+@app.post('/postprocess/lod')
+async def postprocess_lod(
+    file: UploadFile = File(...),
+    job_id: str = Form(default=None),
+):
+    """Generate LOD chain from a mesh (high, mid, low).
+
+    Accepts: GLB mesh file
+    Returns: JSON with LOD level paths
+    """
+    if job_id is None:
+        job_id = generate_job_id()
+
+    logger.info(f'[SERVER] LOD request: job={job_id}')
+
+    contents = await file.read()
+    max_upload_bytes = _cfg('generation', 'max_upload_size_bytes', 20 * 1024 * 1024)
+    if len(contents) > max_upload_bytes:
+        raise HTTPException(400, 'File too large. Maximum 20 MB.')
+
+    temp_input = TEMP_DIR / f'{job_id}_lod_input.glb'
+    temp_input.write_bytes(contents)
+
+    output_dir = OUTPUT_DIR / f'{job_id}_lod'
+
+    try:
+        result = await asyncio.to_thread(
+            model_manager.generate_lod_chain,
+            str(temp_input),
+            str(output_dir),
+        )
+
+        if not result['success']:
+            raise HTTPException(500, f'LOD generation failed: {result.get("error")}')
+
+        # Add download paths
+        for level in result['levels']:
+            filename = Path(level['path']).name
+            level['download_path'] = f'/download/{job_id}_lod/{filename}'
+
+        return JSONResponse(result)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f'[SERVER] LOD error: {e}')
+        raise HTTPException(500, f'Internal error: {str(e)}')
+    finally:
+        if temp_input.exists():
+            temp_input.unlink()
+
+
+@app.post('/postprocess/report')
+async def postprocess_report(
+    file: UploadFile = File(...),
+):
+    """Generate quality report for a mesh.
+
+    Accepts: GLB mesh file
+    Returns: JSON with vertex/face counts, bounding box, recommendations
+    """
+    contents = await file.read()
+    max_upload_bytes = _cfg('generation', 'max_upload_size_bytes', 20 * 1024 * 1024)
+    if len(contents) > max_upload_bytes:
+        raise HTTPException(400, 'File too large. Maximum 20 MB.')
+
+    job_id = generate_job_id()
+    temp_input = TEMP_DIR / f'{job_id}_report_input.glb'
+    temp_input.write_bytes(contents)
+
+    try:
+        result = await asyncio.to_thread(
+            model_manager.mesh_quality_report,
+            str(temp_input),
+        )
+
+        if not result['success']:
+            raise HTTPException(500, f'Report failed: {result.get("error")}')
+
+        return JSONResponse(result)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f'[SERVER] Report error: {e}')
+        raise HTTPException(500, f'Internal error: {str(e)}')
+    finally:
+        if temp_input.exists():
+            temp_input.unlink()
+
+
+@app.get('/postprocess/presets')
+async def postprocess_presets():
+    """Return optimization preset configurations for different target platforms."""
+    return {
+        'presets': {
+            'mobile': {'target_faces': 2000, 'label': 'Mobile', 'description': 'Optimized for mobile devices'},
+            'web': {'target_faces': 5000, 'label': 'Web', 'description': 'Balanced for web browsers'},
+            'desktop': {'target_faces': 10000, 'label': 'Desktop', 'description': 'High quality for desktop apps'},
+            'unreal': {'target_faces': 50000, 'label': 'Unreal Engine', 'description': 'Game-ready for UE5'},
+        }
+    }
+
+
 @app.get('/download/{job_id}/{filename}')
 async def download_file(job_id: str, filename: str):
     """Download a generated file by job ID."""

@@ -104,15 +104,83 @@ class ChatPanel {
   }
 
   /**
+   * Add an assistant message with metadata (provider, cost, routing log).
+   * Used by SSE streaming to display rich response info.
+   */
+  addAssistantMessageWithMeta(text, meta = {}) {
+    const message = this.createMessage('assistant', text);
+
+    // Add meta badges (provider, cost, routing)
+    if (meta.provider || meta.cost !== undefined) {
+      const metaEl = document.createElement('div');
+      metaEl.className = 'message-meta';
+
+      if (meta.provider) {
+        const badge = document.createElement('span');
+        badge.className = 'meta-badge provider-badge';
+        badge.textContent = `${meta.provider}${meta.model ? '/' + meta.model : ''}`;
+        metaEl.appendChild(badge);
+      }
+
+      if (meta.cost !== undefined) {
+        const costBadge = document.createElement('span');
+        costBadge.className = 'meta-badge cost-badge';
+        costBadge.textContent = `$${meta.cost.toFixed(4)}`;
+        metaEl.appendChild(costBadge);
+      }
+
+      if (meta.routingLog && meta.routingLog.length > 1) {
+        const routingBtn = document.createElement('button');
+        routingBtn.className = 'meta-badge routing-toggle';
+        routingBtn.textContent = `${meta.routingLog.length} providers tried`;
+        routingBtn.addEventListener('click', () => {
+          const detail = routingBtn.nextElementSibling;
+          if (detail) detail.classList.toggle('hidden');
+        });
+        metaEl.appendChild(routingBtn);
+
+        const routingDetail = document.createElement('div');
+        routingDetail.className = 'routing-detail hidden';
+        routingDetail.innerHTML = meta.routingLog.map(entry => {
+          const icon = entry.status === 'success' ? '&#10003;' : entry.status === 'failed' ? '&#10007;' : '&#8212;';
+          return `<span class="routing-entry routing-${entry.status}">${icon} ${entry.provider}${entry.reason ? ': ' + entry.reason : ''}${entry.error ? ': ' + entry.error : ''}</span>`;
+        }).join('');
+        metaEl.appendChild(routingDetail);
+      }
+
+      // Upgrade button — re-run on a higher-tier provider
+      if (meta.showUpgrade && meta.onUpgrade) {
+        const upgradeBtn = document.createElement('button');
+        upgradeBtn.className = 'btn-upgrade';
+        upgradeBtn.textContent = 'Upgrade';
+        upgradeBtn.title = 'Re-run on a higher-tier provider';
+        upgradeBtn.addEventListener('click', () => {
+          // Offer Claude as upgrade target (highest quality)
+          const target = meta.provider === 'claude' ? 'openai' : 'claude';
+          meta.onUpgrade(target);
+        });
+        metaEl.appendChild(upgradeBtn);
+      }
+
+      // Insert meta after the message content
+      const content = message.querySelector('.message-content');
+      if (content) content.appendChild(metaEl);
+    }
+
+    this.container.appendChild(message);
+    this.scrollToBottom();
+  }
+
+  /**
    * Show loading indicator
    */
-  showLoading() {
+  showLoading(text) {
     this.hideLoading(); // Remove any existing loading indicator
 
     this.loadingElement = document.createElement('div');
     this.loadingElement.className = 'loading-indicator';
     this.loadingElement.innerHTML = `
-      <span>Agent is thinking</span>
+      <span class="loading-text">${text || 'Agent is thinking'}</span>
       <div class="loading-dots">
         <span></span>
         <span></span>
@@ -122,6 +190,16 @@ class ChatPanel {
 
     this.container.appendChild(this.loadingElement);
     this.scrollToBottom();
+  }
+
+  /**
+   * Update the loading indicator text (e.g., show which provider is being tried)
+   */
+  updateLoading(text) {
+    if (this.loadingElement) {
+      const textEl = this.loadingElement.querySelector('.loading-text');
+      if (textEl) textEl.textContent = text;
+    }
   }
 
   /**

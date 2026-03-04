@@ -13,6 +13,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import errorHandler from './error-handler.js';
 import telemetryBus from './telemetry-bus.js';
+import gitCheckpointer from './git-checkpointer.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -39,6 +40,13 @@ export class DiffApplier {
       console.log('[APPLY] No operations to apply');
       endTimer({ status: 'skipped', operations: 0 });
       return results;
+    }
+
+    // Git checkpoint before applying changes
+    const label = plan.task || plan.description || `plan ${plan.id}`;
+    const checkpoint = gitCheckpointer.checkpoint(projectRoot, label);
+    if (checkpoint.commitHash) {
+      plan._checkpointHash = checkpoint.commitHash;
     }
 
     for (const operation of plan.operations) {
@@ -118,6 +126,12 @@ export class DiffApplier {
       plan.status = 'applied';
       console.log(`[APPLY] Successfully applied ${results.applied} operations`);
       endTimer({ status: 'success', operations: results.applied });
+
+      // Git commit after successful apply
+      const postCommit = gitCheckpointer.commitAfter(projectRoot, label);
+      if (postCommit.commitHash) {
+        plan._appliedHash = postCommit.commitHash;
+      }
     } else {
       plan.status = 'failed';
       console.error(`[APPLY] Failed ${results.failed}/${plan.operations.length} operations`);
@@ -146,6 +160,18 @@ export class DiffApplier {
       return results;
     }
 
+    // Try git revert first if we have the applied commit hash
+    if (plan._appliedHash) {
+      console.log(`[APPLY] Attempting git revert of ${plan._appliedHash.slice(0, 8)}`);
+      const revertResult = gitCheckpointer.revert(projectRoot, plan._appliedHash);
+      if (revertResult.success) {
+        console.log('[APPLY] Git revert successful');
+        return { restored: plan.operations.length, errors: [] };
+      }
+      console.warn(`[APPLY] Git revert failed: ${revertResult.error}, falling back to backup restoration`);
+    }
+
+    // Fallback: restore from .brightforge-backup files
     // Process operations in reverse order
     for (let i = plan.operations.length - 1; i >= 0; i--) {
       const operation = plan.operations[i];

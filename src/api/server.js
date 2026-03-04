@@ -23,6 +23,8 @@ import { errorRoutes } from './routes/errors.js';
 import { metricsRoutes } from './routes/metrics.js';
 import designRoutes from './routes/design.js';
 import forge3dRoutes from './routes/forge3d.js';
+import { memoryRoutes } from './routes/memory.js';
+import { costRoutes } from './routes/cost.js';
 import errorHandler from '../core/error-handler.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -64,6 +66,8 @@ export function createServer(options = {}) {
   app.use('/api/metrics', metricsRoutes());
   app.use('/api/design', designRoutes);
   app.use('/api/forge3d', forge3dRoutes);
+  app.use('/api/memory', memoryRoutes());
+  app.use('/api/cost', costRoutes());
   app.use('/api', configRoutes());
 
   // Static frontend

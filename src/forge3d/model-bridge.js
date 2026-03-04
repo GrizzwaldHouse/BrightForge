@@ -45,6 +45,7 @@ class ModelBridge extends EventEmitter {
     this.consecutiveHealthFailures = 0;
     this.unavailableReason = null;
     this.pythonCmd = null; // Discovered Python command (python, python3, python3.13, etc.)
+    this.pythonPrefixArgs = []; // Prefix args for py launcher (e.g., ['-3.13'])
   }
 
   /**
@@ -153,11 +154,14 @@ class ModelBridge extends EventEmitter {
    * Spawn the Python subprocess.
    */
   _spawnProcess() {
-    const args = [
+    const baseArgs = [
       join(PYTHON_DIR, 'inference_server.py'),
       '--port', String(this.port),
       '--host', this.host
     ];
+
+    // Prepend py launcher prefix args if discovered (e.g., ['-3.13'])
+    const args = [...this.pythonPrefixArgs, ...baseArgs];
 
     const cmd = this.pythonCmd || 'python';
     this.pythonProcess = spawn(cmd, args, {
@@ -543,6 +547,105 @@ class ModelBridge extends EventEmitter {
   }
 
   /**
+   * Optimize a mesh by reducing face count.
+   * @param {Buffer} glbBuffer - GLB file bytes
+   * @param {number} targetFaces - Target face count
+   * @param {string} [jobId] - Optional job ID
+   * @returns {Promise<Object>} Optimization result
+   */
+  async optimizeMesh(glbBuffer, targetFaces, jobId = null) {
+    this._ensureRunning();
+    console.log(`[BRIDGE] Requesting mesh optimization (${glbBuffer.length} bytes, target: ${targetFaces} faces)...`);
+
+    const formData = new FormData();
+    formData.append('file', new Blob([glbBuffer]), 'mesh.glb');
+    formData.append('target_faces', String(targetFaces));
+    if (jobId) formData.append('job_id', jobId);
+
+    const response = await this._fetchRaw(`${this.baseUrl}/postprocess/optimize`, {
+      method: 'POST',
+      body: formData,
+      signal: AbortSignal.timeout(forge3dConfig.generation.timeout_ms)
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ detail: response.statusText }));
+      throw new Error(`Optimization failed: ${err.detail || err.error || response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log(`[BRIDGE] Mesh optimized: ${result.original_faces} -> ${result.optimized_faces} faces (${result.reduction_pct}%)`);
+    return result;
+  }
+
+  /**
+   * Generate LOD chain from a mesh.
+   * @param {Buffer} glbBuffer - GLB file bytes
+   * @param {string} [jobId] - Optional job ID
+   * @returns {Promise<Object>} LOD result with levels array
+   */
+  async generateLOD(glbBuffer, jobId = null) {
+    this._ensureRunning();
+    console.log(`[BRIDGE] Requesting LOD generation (${glbBuffer.length} bytes)...`);
+
+    const formData = new FormData();
+    formData.append('file', new Blob([glbBuffer]), 'mesh.glb');
+    if (jobId) formData.append('job_id', jobId);
+
+    const response = await this._fetchRaw(`${this.baseUrl}/postprocess/lod`, {
+      method: 'POST',
+      body: formData,
+      signal: AbortSignal.timeout(forge3dConfig.generation.timeout_ms)
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ detail: response.statusText }));
+      throw new Error(`LOD generation failed: ${err.detail || err.error || response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log(`[BRIDGE] LOD chain generated: ${result.levels?.length} levels`);
+    return result;
+  }
+
+  /**
+   * Get quality report for a mesh.
+   * @param {Buffer} glbBuffer - GLB file bytes
+   * @returns {Promise<Object>} Quality report
+   */
+  async getMeshReport(glbBuffer) {
+    this._ensureRunning();
+    console.log(`[BRIDGE] Requesting mesh quality report (${glbBuffer.length} bytes)...`);
+
+    const formData = new FormData();
+    formData.append('file', new Blob([glbBuffer]), 'mesh.glb');
+
+    const response = await this._fetchRaw(`${this.baseUrl}/postprocess/report`, {
+      method: 'POST',
+      body: formData,
+      signal: AbortSignal.timeout(forge3dConfig.healthCheck.timeout_ms)
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ detail: response.statusText }));
+      throw new Error(`Mesh report failed: ${err.detail || err.error || response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log(`[BRIDGE] Mesh report: ${result.vertex_count} verts, ${result.face_count} faces`);
+    return result;
+  }
+
+  /**
+   * Get optimization presets from the Python server.
+   * @returns {Promise<Object>} Presets config
+   */
+  async getOptimizationPresets() {
+    this._ensureRunning();
+    return this._fetchWithTimeout(`${this.baseUrl}/postprocess/presets`, forge3dConfig.healthCheck.timeout_ms);
+  }
+
+  /**
    * Download a generated file from the Python server.
    * @param {string} jobId - Job ID
    * @param {string} filename - File to download
@@ -605,19 +708,37 @@ class ModelBridge extends EventEmitter {
   async _checkEnvironment() {
     const issues = [];
 
-    // Try multiple Python command names (Windows Store Python often needs python3.x)
-    const candidates = ['python', 'python3', 'python3.13', 'python3.12', 'python3.11', 'python3.10'];
+    // Try py launcher first (most reliable on Windows), then direct commands
+    const candidates = [
+      { cmd: 'py', prefixArgs: ['-3.13'] },
+      { cmd: 'py', prefixArgs: ['-3.12'] },
+      { cmd: 'py', prefixArgs: ['-3.11'] },
+      { cmd: 'py', prefixArgs: ['-3.10'] },
+      { cmd: 'py', prefixArgs: ['-3'] },
+      { cmd: 'python3.13', prefixArgs: [] },
+      { cmd: 'python3.12', prefixArgs: [] },
+      { cmd: 'python3.11', prefixArgs: [] },
+      { cmd: 'python3.10', prefixArgs: [] },
+      { cmd: 'python', prefixArgs: [] },
+      { cmd: 'python3', prefixArgs: [] }
+    ];
     let foundPython = null;
+    let foundPrefixArgs = [];
 
-    for (const cmd of candidates) {
+    for (const candidate of candidates) {
       try {
-        const pyVersion = await this._runCommand(cmd, ['--version']);
+        const versionArgs = [...candidate.prefixArgs, '--version'];
+        const pyVersion = await this._runCommand(candidate.cmd, versionArgs);
         const match = pyVersion.match(/Python (\d+)\.(\d+)/);
         if (match) {
           const [, major, minor] = match.map(Number);
           if (major >= 3 && minor >= 10) {
-            foundPython = cmd;
-            console.log(`[BRIDGE] Python ${major}.${minor} detected (command: ${cmd})`);
+            foundPython = candidate.cmd;
+            foundPrefixArgs = candidate.prefixArgs;
+            const cmdDisplay = candidate.prefixArgs.length > 0
+              ? `${candidate.cmd} ${candidate.prefixArgs.join(' ')}`
+              : candidate.cmd;
+            console.log(`[BRIDGE] Python ${major}.${minor} detected (command: ${cmdDisplay})`);
             break;
           }
         }
@@ -627,17 +748,20 @@ class ModelBridge extends EventEmitter {
     }
 
     if (!foundPython) {
-      issues.push('Python 3.10+ not found (tried: python, python3, python3.13, python3.12, python3.11, python3.10)');
+      issues.push('Python 3.10+ not found (tried: py -3.13, py -3.12, py -3.11, py -3.10, py -3, python3.13, python3.12, python3.11, python3.10, python, python3)');
       return { ready: false, issues };
     }
 
     this.pythonCmd = foundPython;
+    this.pythonPrefixArgs = foundPrefixArgs;
 
     // Check CUDA availability (actually test GPU usability, not just detection)
     try {
-      const cudaCheck = await this._runCommand(foundPython, [
+      const cudaCheckArgs = [
+        ...foundPrefixArgs,
         '-c', 'import torch; t=torch.zeros(1,device="cuda"); print("usable")'
-      ]);
+      ];
+      const cudaCheck = await this._runCommand(foundPython, cudaCheckArgs);
       if (cudaCheck.trim() === 'usable') {
         console.log('[BRIDGE] CUDA GPU verified usable');
       } else {
@@ -649,9 +773,11 @@ class ModelBridge extends EventEmitter {
 
     // Check required Python packages
     try {
-      await this._runCommand(foundPython, [
+      const packageCheckArgs = [
+        ...foundPrefixArgs,
         '-c', 'import fastapi, diffusers, trimesh, PIL, pynvml'
-      ]);
+      ];
+      await this._runCommand(foundPython, packageCheckArgs);
       console.log('[BRIDGE] Required Python packages verified');
     } catch (_e) {
       issues.push('Missing Python packages (need: fastapi, diffusers, trimesh, Pillow, pynvml)');

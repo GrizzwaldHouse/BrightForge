@@ -188,7 +188,7 @@ Five modules in `src/forge3d/`:
 
 | Module | Purpose |
 |---|---|
-| `model-bridge.js` | Spawns/manages Python inference server subprocess, HTTP client |
+| `model-bridge.js` | Spawns/manages Python inference server subprocess, HTTP client. Uses `py` launcher on Windows for reliable Python discovery. |
 | `database.js` | SQLite persistence (projects, assets, generation_history) via `better-sqlite3` |
 | `generation-queue.js` | FIFO GPU queue, max 1 concurrent, pause/resume/cancel |
 | `forge-session.js` | Generation lifecycle (idle → generating → complete/failed) |
@@ -279,11 +279,27 @@ Cloned from `https://github.com/GrizzwaldHouse/cowork-skills.git`.
 
 ## Python Environment (Forge3D)
 
-The 3D generation pipeline requires a Python environment with GPU support:
-- `python/requirements.txt` — PyTorch 2.10.0+cu124, diffusers, transformers, FastAPI, trimesh, pynvml
+The 3D generation pipeline requires a Python environment:
+- `python/requirements.txt` — PyTorch 2.6.0+cu124, diffusers, transformers, FastAPI, trimesh, pynvml
 - Python server is auto-spawned by `model-bridge.js` as a subprocess
-- CUDA GPU required for mesh/image generation (SDXL + Shap-E models)
+- `model-bridge.js` discovers Python via `py` launcher first (most reliable on Windows), then direct commands
 - Data directory: `data/` (SQLite DB, output files, temp files)
+
+### Windows Python Discovery
+
+The bridge tries these candidates in order:
+1. `py -3.13`, `py -3.12`, `py -3.11`, `py -3.10`, `py -3` (py launcher — recommended)
+2. `python3.13`, `python3.12`, etc. (direct commands)
+3. `python`, `python3` (may be Windows Store stubs — unreliable)
+
+**Known issue**: `python` and `python3` on Windows may be Store alias stubs (exit code 49). The `py` launcher bypasses this.
+
+### GPU Status
+
+- RTX 5080 (Blackwell, sm_120) requires PyTorch nightly with cu128
+- Current PyTorch 2.6.0+cu124 supports up to sm_90 — CPU fallback is automatic
+- CPU mode works but is slow (~10 min per image)
+- To enable GPU: `py -3.13 -m pip install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu128`
 
 ## Commit & Attribution Guidelines
 

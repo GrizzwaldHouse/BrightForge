@@ -40,7 +40,10 @@ export class BaseAgent {
     const result = await this.llmClient.chat(messages, {
       task: this.taskKey,
       max_tokens: options.maxTokens || 4096,
-      temperature: options.temperature ?? 0.3
+      temperature: options.temperature ?? 0.3,
+      signal: options.signal,
+      onProviderTrying: options.onProviderTrying,
+      onProviderFailed: options.onProviderFailed
     });
 
     return result;
@@ -54,8 +57,13 @@ export class BaseAgent {
    * @returns {Array<{role: string, content: string}>}
    */
   buildMessages(task, context, conversationHistory = null) {
+    // Inject project memory into system prompt if available
+    const systemContent = context.memoryContext
+      ? this.systemPrompt + context.memoryContext
+      : this.systemPrompt;
+
     const messages = [
-      { role: 'system', content: this.systemPrompt }
+      { role: 'system', content: systemContent }
     ];
 
     // Build user message with task and file context
