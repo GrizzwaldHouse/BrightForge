@@ -1,0 +1,80 @@
+# BrightForge Orchestration Runtime Configuration
+# All values can be adjusted without code changes.
+# Loaded by src/orchestration/index.js at init time.
+
+storage:
+  db_path: "data/orchestration.db"
+  journal_mode: "WAL"
+  busy_timeout_ms: 5000
+
+event_bus:
+  ring_buffer_size: 100
+  valid_event_types:
+    - task_started
+    - analysis_completed
+    - architecture_decided
+    - implementation_started
+    - file_written
+    - research_logged
+    - risk_flagged
+    - todo_added
+    - task_paused
+    - task_resumed
+    - task_completed
+    - audit_warning
+    - audit_passed
+  forward_to_telemetry: true
+
+task_state:
+  id_length: 12
+  valid_statuses:
+    - active
+    - paused
+    - completed
+    - failed
+  valid_phases:
+    - analysis
+    - design
+    - implementation
+    - validation
+  valid_agents:
+    - Claude
+    - Ollama
+
+supervisor:
+  penalty_per_violation: 0.1
+  weights:
+    structural: 0.4
+    coding_standards: 0.3
+    continuity: 0.3
+  thresholds:
+    pass: 0.8
+    warning: 0.5
+  required_standards:
+    - observer_pattern
+    - no_hardcoded_values
+    - structured_logging
+    - typed_errors
+    - configuration_driven
+    - file_headers
+
+handoff:
+  require_audit: true
+  min_confidence: 0.5
+  max_handoffs_per_task: 10
+
+agents:
+  - name: Claude
+    type: cloud
+    capabilities:
+      planning: true
+      architecture: true
+      code_review: true
+      implementation: true
+  - name: Ollama
+    type: local
+    capabilities:
+      planning: true
+      architecture: false
+      code_review: false
+      implementation: true
