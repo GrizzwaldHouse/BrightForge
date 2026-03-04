@@ -152,7 +152,7 @@ System prompt is at `src/prompts/plan-system.txt`. Classification prompt at `cla
 Two singleton EventEmitter hubs provide cross-cutting observability:
 
 - **TelemetryBus** (`src/core/telemetry-bus.js`): Ring buffers (100 events) for LLM requests, operations, sessions, performance, and `forge3d` events. Tracks per-provider stats (requests, tokens, cost, failures, success rate). Latency percentiles (P50/P95/P99). `startTimer(category)` returns `endTimer()` function.
-- **ErrorHandler** (`src/core/error-handler.js`): Observer-pattern error broadcasting by category (`provider_error`, `plan_error`, `apply_error`, `session_error`, `server_error`, `fatal`, `forge3d_error`, `bridge_error`, `gpu_error`). JSONL persistent log at `sessions/errors.jsonl`. Crash reports with memory/telemetry snapshots. Exponential backoff retry tracking.
+- **ErrorHandler** (`src/core/error-handler.js`): Observer-pattern error broadcasting by category (`provider_error`, `plan_error`, `apply_error`, `session_error`, `server_error`, `fatal`, `forge3d_error`, `bridge_error`, `gpu_error`, `orchestration_error`, `handoff_error`, `supervisor_error`, `pipeline_error`). JSONL persistent log at `sessions/errors.jsonl`. Crash reports with memory/telemetry snapshots. Exponential backoff retry tracking.
 
 Both are imported and used throughout: `telemetryBus.emit(category, data)`, `errorHandler.report(category, error, context)`.
 
@@ -168,19 +168,26 @@ Express server (`src/api/server.js`) created via `createServer()` factory. Route
 
 | Route file | Mount point | Purpose |
 |---|---|---|
-| `routes/chat.js` | `/api/chat` | Plan generation, approval, rollback |
+| `routes/chat.js` | `/api/chat` | Plan generation, approval, rollback, SSE streaming, pipeline, upgrade |
 | `routes/sessions.js` | `/api/sessions` | Session history |
 | `routes/config.js` | `/api` | `/api/config`, `/api/health` |
 | `routes/errors.js` | `/api/errors` | Error log queries |
 | `routes/metrics.js` | `/api/metrics` | Telemetry dashboard |
 | `routes/design.js` | `/api/design` | Image generation + layout design |
-| `routes/forge3d.js` | `/api/forge3d` | 3D generation, projects, assets, queue |
+| `routes/forge3d.js` | `/api/forge3d` | 3D generation, projects, assets, queue, post-processing (26 endpoints) |
+| `routes/cost.js` | `/api/cost` | Cost summary and per-session cost breakdown |
+| `routes/memory.js` | `/api/memory` | Project memory CRUD (conventions, corrections, tech stack) |
 
-WebSession (`src/api/web-session.js`) separates plan generation from application (2-step API):
-1. `POST /api/chat/turn` → `generatePlan()` → returns pending plan
-2. `POST /api/chat/approve` → `approvePlan()` → applies to disk
+WebSession (`src/api/web-session.js`) extends `EventEmitter`. Separates plan generation from application:
+1. `POST /api/chat/turn` → returns `202 { status: 'generating' }` immediately
+2. `GET /api/chat/stream/:sessionId` → SSE stream for real-time progress
+3. `POST /api/chat/approve` → `approvePlan()` → applies to disk with git checkpoint
+4. `POST /api/chat/cancel/:sessionId` → Abort in-flight generation via AbortController
+5. `POST /api/chat/pipeline/detect` → Analyze prompt for multi-domain intent
+6. `POST /api/chat/pipeline/execute` → Start cross-domain creative pipeline
+7. `POST /api/chat/upgrade` → Re-run prompt on higher-tier provider
 
-Frontend at `public/` — modular JS classes: `App`, `ChatPanel`, `PlanViewer`, `SessionManager`, `SystemHealthPanel`, `FileBrowser`, `DesignViewer`, `Forge3DPanel`, `Forge3DViewer`. Dark theme, card-based UI. Tabs: Chat, Health, Design, Forge3D, Sessions.
+Frontend at `public/` — modular JS classes: `App`, `ChatPanel`, `PlanViewer`, `SessionManager`, `SystemHealthPanel`, `FileBrowser`, `DesignViewer`, `Forge3DPanel`, `Forge3DViewer`, `SSEClient`, `MemoryPanel`. Dark theme, card-based UI. Tabs: Chat, Health, Design, Forge3D, Sessions.
 
 ### ForgePipeline 3D Subsystem (Phase 8)
 
@@ -188,23 +195,64 @@ Five modules in `src/forge3d/`:
 
 | Module | Purpose |
 |---|---|
-| `model-bridge.js` | Spawns/manages Python inference server subprocess, HTTP client. Uses `py` launcher on Windows for reliable Python discovery. |
+| `model-bridge.js` | Spawns/manages Python inference server subprocess, HTTP client, post-processing proxy |
 | `database.js` | SQLite persistence (projects, assets, generation_history) via `better-sqlite3` |
 | `generation-queue.js` | FIFO GPU queue, max 1 concurrent, pause/resume/cancel |
 | `forge-session.js` | Generation lifecycle (idle → generating → complete/failed) |
 | `project-manager.js` | CRUD for projects + file I/O with path traversal protection |
 
-**Python Inference Server** (`python/inference_server.py`): FastAPI subprocess on localhost, manages SDXL (image gen) and Shap-E (mesh gen) models. Endpoints: `/generate/mesh`, `/generate/image`, `/generate/full`, `/health`, `/status`, `/download/{jobId}/{filename}`.
+**Python Inference Server** (`python/inference_server.py`): FastAPI subprocess on localhost, manages SDXL (image gen) and Shap-E (mesh gen) models. Endpoints: `/generate/mesh`, `/generate/image`, `/generate/full`, `/health`, `/status`, `/download/{jobId}/{filename}`, `/postprocess/optimize`, `/postprocess/lod`, `/postprocess/report`, `/postprocess/presets`.
 
-**Forge3D API** (17 endpoints at `/api/forge3d/`):
+**Forge3D API** (26 endpoints at `/api/forge3d/`):
 - `POST /generate` — Start generation (returns 202 + sessionId)
 - `GET /status/:id`, `GET /download/:id` — Progress + file download
 - `GET|POST|DELETE /projects`, `GET /projects/:id/assets` — Project CRUD
 - `DELETE /assets/:id` — Delete single asset
 - `GET /history`, `GET /stats` — Query history + aggregates
 - `GET /bridge`, `GET /queue`, `POST /queue/pause|resume`, `DELETE /queue/:id` — Infrastructure
+- `POST /optimize` — Mesh polygon reduction via trimesh quadric decimation
+- `POST /lod/:id` — Generate LOD chain (high/mid/low GLB files)
+- `GET /report/:id` — Mesh quality report (vertex/face count, VRAM estimate, platform recommendations)
+- `GET /presets` — Optimization presets (Mobile: 2000, Web: 5000, Desktop: 10000, Unreal: 50000)
 
 **Data Storage**: SQLite at `data/forge3d.db`, output files at `data/output/{projectId}/`.
+
+### SSE Streaming (Phase 10 - F1)
+
+WebSession extends `EventEmitter`. Chat generation is fire-and-forget with SSE progress:
+
+- `POST /api/chat/turn` returns `202` immediately, starts async generation
+- `GET /api/chat/stream/:sessionId` opens SSE connection
+- Events: `provider_trying`, `provider_failed`, `complete`, `failed`, `cancelled`, `cost_gate`
+- Pipeline events: `pipeline_step_start`, `pipeline_step_complete`, `pipeline_complete`, `pipeline_failed`
+- Error loop detection: pauses if same error repeats 3+ times
+- AbortController: `POST /api/chat/cancel/:sessionId` aborts in-flight LLM request
+
+Frontend `SSEClient` class (in `public/js/sse-client.js`) wraps EventSource with auto-reconnect and status indicator.
+
+### Creative Pipeline (Phase 10 - F6)
+
+Cross-domain orchestration for prompts spanning code + design + 3D:
+
+- `src/core/pipeline-detector.js` — Keyword scoring across 3 domains (forge3d, design, code) with strong/moderate/weak weights. Threshold: 2+ domains detected.
+- `src/core/creative-pipeline.js` — Extends `EventEmitter`. Executes steps sequentially: 3D first → design → code last (code references generated asset paths).
+- Frontend auto-detects pipeline intent before sending, shows multi-step progress bar.
+
+### Project Memory (Phase 10 - F4)
+
+Per-project persistent memory at `{projectRoot}/.brightforge/memory.json`:
+
+- `src/core/project-memory.js` — Stores tech stack, conventions, corrections, preferences
+- Auto-detects tech stack from file extensions and package.json
+- Injected into LLM system prompt via `getSystemPromptContext()`
+- API: `GET/POST/DELETE /api/memory/*`
+
+### Git-Based Rollback (Phase 10 - F5)
+
+- `src/core/git-checkpointer.js` — Creates git checkpoints before/after plan apply
+- `DiffApplier` auto-checkpoints if project is a git repo, falls back to .backup files
+- Timeline: `GET /api/chat/timeline` returns chronological BrightForge checkpoints
+- Revert: `POST /api/chat/revert/:commitHash` uses `git revert --no-edit`
 
 ### Electron Desktop
 
@@ -230,7 +278,7 @@ if (process.argv.includes('--test')) {
 
 **YAML config loading** — Provider and agent configs loaded with `readFileSync` + `parse` from the `yaml` package.
 
-**Logging** — Console output with `[PREFIX]` tags: `[MASTER]`, `[PLAN]`, `[APPLY]`, `[LLM]`, `[WEB]`, `[STORE]`, `[SERVER]`, `[ROUTE]`, `[CHAT]`, `[HISTORY]`, `[MULTI-STEP]`, `[ERROR-HANDLER]`, `[TELEMETRY]`, `[IMAGE]`, `[DESIGN]`, `[FORGE3D]`, `[BRIDGE]`, `[QUEUE]`, `[PROJECT]`.
+**Logging** — Console output with `[PREFIX]` tags: `[MASTER]`, `[PLAN]`, `[APPLY]`, `[LLM]`, `[WEB]`, `[STORE]`, `[SERVER]`, `[ROUTE]`, `[CHAT]`, `[HISTORY]`, `[MULTI-STEP]`, `[ERROR-HANDLER]`, `[TELEMETRY]`, `[IMAGE]`, `[DESIGN]`, `[FORGE3D]`, `[BRIDGE]`, `[QUEUE]`, `[PROJECT]`, `[PIPELINE]`, `[MEMORY]`, `[GIT]`, `[COST]`, `[APP]`.
 
 **Dependencies** — `dotenv`, `yaml`, `express`, `better-sqlite3` (+ `eslint`, `electron`, `electron-builder` as dev). Uses native `fetch` (Node 18+).
 
@@ -266,6 +314,9 @@ Skills are stored in two locations:
 | `provider-chain.md` | LLM provider chain configuration guide |
 | `testing-guide.md` | Self-test patterns and verification procedures |
 | `web-dashboard.md` | Web dashboard development patterns |
+| `mcp-builder.md` | MCP server development guide — wrapping BrightForge services as MCP tools |
+| `algorithmic-art.md` | p5.js generative art with seeded randomness, interactive parameter controls |
+| `web-artifacts-builder.md` | React + Tailwind + shadcn/ui artifact builder for standalone tools |
 
 ### Shared Skills (`.claude/cowork-skills/` — git submodule)
 

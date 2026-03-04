@@ -99,6 +99,35 @@ The discovered command and prefix args are stored as `pythonCmd` + `pythonPrefix
 - **Image too large**: 20MB max for uploaded images (model-bridge validates)
 - **Stale errors in UI**: Old generation errors persist in `data/forge3d.db`. Clear with `DELETE FROM generation_history WHERE status='failed'`
 
+## Post-Processing (F7)
+
+Game-ready 3D optimization via trimesh (already a dependency):
+
+### Python Methods (`model_manager.py`)
+- `optimize_mesh(input_path, target_faces, output_path)` — Quadric decimation
+- `generate_lod_chain(input_path, output_dir, levels=[1.0, 0.5, 0.25])` — Creates mesh_high/mid/low.glb
+- `mesh_quality_report(input_path)` — Returns vertex/face count, bounding box, VRAM estimate, platform recommendations
+
+### API Endpoints
+- `POST /api/forge3d/optimize` — Optimize asset by ID + target faces
+- `POST /api/forge3d/lod/:id` — Generate LOD chain for asset
+- `GET /api/forge3d/report/:id` — Quality report for asset
+- `GET /api/forge3d/presets` — Optimization presets (falls back to defaults if bridge offline)
+
+### Presets
+| Target | Faces | Use Case |
+|--------|-------|----------|
+| Mobile | 2,000 | Mobile games, AR |
+| Web | 5,000 | WebGL viewers |
+| Desktop | 10,000 | Desktop games |
+| Unreal | 50,000 | Unreal Engine |
+
+### Bridge Proxy Methods (`model-bridge.js`)
+- `optimizeMesh(glbBuffer, targetFaces, jobId)` — FormData upload
+- `generateLOD(glbBuffer, jobId)` — FormData upload
+- `getMeshReport(glbBuffer)` — FormData upload
+- `getOptimizationPresets()` — GET request
+
 ## Telemetry Events
 
 - `forge3d_job_queued` — Job entered queue
@@ -112,3 +141,4 @@ The discovered command and prefix args are stored as `pythonCmd` + `pythonPrefix
 - `forge3d_error` — General generation failures
 - `bridge_error` — Python subprocess communication issues
 - `gpu_error` — CUDA/VRAM problems
+- `pipeline_error` — Creative pipeline cross-domain failures

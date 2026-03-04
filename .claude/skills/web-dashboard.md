@@ -13,26 +13,43 @@ Express server at `src/api/server.js` via `createServer()` factory. Port 3847 (c
 
 | File | Mount | Purpose |
 |------|-------|---------|
-| `src/api/routes/chat.js` | `/api/chat` | Plan generation, approval, rollback |
+| `src/api/routes/chat.js` | `/api/chat` | Plan generation, SSE streaming, approval, rollback, pipeline, upgrade |
 | `src/api/routes/sessions.js` | `/api/sessions` | Session history |
 | `src/api/routes/config.js` | `/api` | Config + health endpoints |
 | `src/api/routes/errors.js` | `/api/errors` | Error log queries |
 | `src/api/routes/metrics.js` | `/api/metrics` | Telemetry dashboard data |
 | `src/api/routes/design.js` | `/api/design` | Image generation + layout |
-| `src/api/routes/forge3d.js` | `/api/forge3d` | 3D generation + projects |
+| `src/api/routes/forge3d.js` | `/api/forge3d` | 3D generation, projects, post-processing (26 endpoints) |
+| `src/api/routes/cost.js` | `/api/cost` | Daily cost summary, per-session cost breakdown |
+| `src/api/routes/memory.js` | `/api/memory` | Project memory CRUD (conventions, corrections) |
 
 ## Frontend Components (public/js/)
 
 | File | Class | Tab |
 |------|-------|-----|
-| `app.js` | `App` | Main orchestrator, tab switching |
-| `chat.js` | `ChatPanel` | Chat tab |
+| `app.js` | `App` | Main orchestrator, tab switching, SSE, pipeline, cost ticker |
+| `chat.js` | `ChatPanel` | Chat tab, provider badges, upgrade button |
 | `plan-viewer.js` | `PlanViewer` | Inline plan display |
 | `session-manager.js` | `SessionManager` | Sessions tab |
 | `system-health.js` | `SystemHealthPanel` | Health tab |
 | `design-viewer.js` | `DesignViewer` | Design tab |
 | `forge3d-panel.js` | `Forge3DPanel` | Forge3D tab (generation + projects) |
 | `forge3d-viewer.js` | `Forge3DViewer` | Three.js 3D viewport |
+| `sse-client.js` | `SSEClient` | SSE wrapper with auto-reconnect |
+| `memory-panel.js` | `MemoryPanel` | Project memory modal UI |
+
+## SSE Streaming Pattern
+
+Chat uses fire-and-forget with SSE progress (NOT polling):
+1. `POST /api/chat/turn` returns `202 { status: 'generating' }`
+2. Client opens `SSEClient('/api/chat/stream/:sessionId')`
+3. Events: `provider_trying`, `complete`, `failed`, `cancelled`, `pipeline_step_*`
+4. `POST /api/chat/cancel/:sessionId` aborts via AbortController
+
+## Cost Ticker
+
+Header cost ticker polls `/api/cost/summary` every 60s. Click opens breakdown panel.
+Color thresholds: green (normal), `budget-warning` (80%+), `budget-critical` (95%+).
 
 ## Adding a New Tab
 

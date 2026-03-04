@@ -40,9 +40,25 @@ Config: `config/image-providers.yaml`
 4. Add env var to `.env.local`
 5. Test with the appropriate `--test` command
 
+## Routing Log & Cost Tracking
+
+The LLM client builds a `routingLog[]` for each request showing every provider attempt:
+```json
+[
+  { "provider": "ollama", "model": "llama3:8b", "success": false, "error": "Connection refused" },
+  { "provider": "groq", "model": "llama-3.3-70b", "success": true, "latencyMs": 1200, "cost": 0.003 }
+]
+```
+
+- `getUsageSummary()` returns `{ date, cost_usd, budget_remaining, requests, tokens }`
+- `chatWithProvider(messages, providerName, options)` forces a specific provider (used by upgrade feature)
+- SSE events include provider info: `provider_trying`, `provider_failed`
+- Cost ticker at `/api/cost/summary` aggregates TelemetryBus provider counters
+
 ## Troubleshooting
 
 - **Provider skipped**: Check API key in `.env.local`, check `enabled: true` in YAML
-- **Budget exceeded**: Daily limit is $1.00, resets at midnight
+- **Budget exceeded**: Daily limit is $1.00, resets at midnight. Check via cost ticker or `/api/cost/summary`
 - **Ollama unavailable**: Run `ollama serve` or check if port 11434 is open
 - **Rate limited**: Provider chain auto-falls through to next available provider
+- **Upgrade a response**: `POST /api/chat/upgrade` re-runs the last prompt on a specified provider

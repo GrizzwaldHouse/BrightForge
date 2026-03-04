@@ -16,13 +16,13 @@ BrightForge uses self-contained `--test` blocks at the bottom of each module ins
 npm run test-llm           # LLM client provider chain
 npm run test-plan          # Plan engine parsing
 npm run test-context       # File context scanning
-npm run test-diff          # Diff applier + rollback
+npm run test-diff          # Diff applier + rollback + git checkpointer
 npm run test-session       # Session logging
 npm run test-terminal      # Terminal UI
 npm run test-history       # Message history
 npm run test-conversation  # Conversation session
 npm run test-multi-step    # Multi-step planner
-npm run test-api           # Web session API
+npm run test-api           # Web session API (also runs all dependency tests)
 npm run test-image         # Image client provider chain
 npm run test-design        # Design engine
 
@@ -32,6 +32,12 @@ npm run test-forge-session   # Generation lifecycle
 npm run test-forge-db        # SQLite database CRUD
 npm run test-project-manager # Project + asset management
 npm run test-queue           # Generation queue
+
+# Phase 10 modules (standalone --test)
+node src/core/pipeline-detector.js --test   # Multi-domain prompt detection (6 tests)
+node src/core/creative-pipeline.js --test   # Cross-domain orchestration (4 tests)
+node src/core/project-memory.js --test      # Per-project memory persistence (9 tests)
+node src/core/git-checkpointer.js --test    # Git checkpoint/revert (8 tests)
 
 # Run all core tests
 npm run test-all-core
