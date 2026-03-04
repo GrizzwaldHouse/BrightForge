@@ -12,7 +12,7 @@
  * - Process-level handlers (uncaughtException, unhandledRejection)
  * - Exponential backoff retry tracking
  *
- * Categories: provider_error, plan_error, apply_error, session_error, server_error, fatal, forge3d_error, bridge_error, gpu_error
+ * Categories: provider_error, plan_error, apply_error, session_error, server_error, fatal, forge3d_error, bridge_error, gpu_error, orchestration_error, handoff_error, supervisor_error
  * Severity:   warning, error, fatal
  *
  * @author Marcus Daley (GrizzwaldHouse)
@@ -30,7 +30,7 @@ import telemetryBus from './telemetry-bus.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const VALID_CATEGORIES = ['provider_error', 'plan_error', 'apply_error', 'session_error', 'server_error', 'fatal', 'forge3d_error', 'bridge_error', 'gpu_error'];
+const VALID_CATEGORIES = ['provider_error', 'plan_error', 'apply_error', 'session_error', 'server_error', 'fatal', 'forge3d_error', 'bridge_error', 'gpu_error', 'orchestration_error', 'handoff_error', 'supervisor_error'];
 const VALID_SEVERITIES = ['warning', 'error', 'fatal'];
 
 class ErrorHandler extends EventEmitter {

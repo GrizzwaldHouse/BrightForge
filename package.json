@@ -42,7 +42,13 @@
     "test-downloader": "node src/forge3d/model-downloader.js --test",
     "test-config": "node src/forge3d/config-loader.js --test",
     "test-monitor": "node src/forge3d/monitor.js --test",
-    "test-fbx-converter": "python python/fbx_converter.py --test"
+    "test-fbx-converter": "python python/fbx_converter.py --test",
+    "test-orch-db": "node src/orchestration/storage.js --test",
+    "test-event-bus": "node src/orchestration/event-bus.js --test",
+    "test-task-state": "node src/orchestration/task-state.js --test",
+    "test-supervisor": "node src/orchestration/supervisor.js --test",
+    "test-handoff": "node src/orchestration/handoff.js --test",
+    "test-orchestrator": "node src/orchestration/index.js --test"
   },
   "keywords": [
     "coding-agent",
