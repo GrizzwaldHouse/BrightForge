@@ -27,6 +27,15 @@ pygltflib>=1.16
 # Image handling
 Pillow>=11.0.0
 
+# Background removal (required by Hunyuan3D)
+rembg>=2.0.50
+
+# Tensor operations (required by Hunyuan3D)
+einops>=0.7.0
+
+# Shap-E (lightweight image-to-3D mesh generation)
+shap-e @ git+https://github.com/openai/shap-e.git
+
 # Model downloading
 huggingface-hub>=0.28.0
 

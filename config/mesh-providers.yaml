@@ -1,0 +1,75 @@
+# Mesh Provider Configuration for UniversalMeshClient
+# Mirrors the pattern from llm-providers.yaml
+# Loaded by src/forge3d/universal-mesh-client.js
+
+providers:
+  # LOCAL MODELS (free, GPU-powered via Python inference server)
+  hunyuan3d:
+    enabled: true
+    type: local
+    priority: 1
+    cost_per_generation: 0
+    vram_required_gb: 12
+    avg_generation_time_s: 300
+    tier: default
+    description: "High-quality textured mesh (Hunyuan3D 2.1)"
+
+  shap-e:
+    enabled: true
+    type: local
+    priority: 2
+    cost_per_generation: 0
+    vram_required_gb: 4
+    avg_generation_time_s: 30
+    tier: free
+    description: "Lightweight untextured mesh (OpenAI Shap-E)"
+
+  # CLOUD MODELS (paid, require API keys)
+  meshy:
+    enabled: false
+    type: cloud
+    base_url: "https://api.meshy.ai/v2"
+    api_key_env: MESHY_API_KEY
+    priority: 10
+    cost_per_generation: 0.25
+    avg_generation_time_s: 60
+    tier: premium
+    description: "Cloud 3D generation (Meshy.ai)"
+    poll_interval_ms: 5000
+    poll_timeout_ms: 300000
+
+  tencent-hunyuan3d:
+    enabled: false
+    type: cloud
+    base_url: "https://hunyuan3d.cloud.tencent.com/v1"
+    api_key_env: TENCENT_HUNYUAN3D_API_KEY
+    priority: 11
+    cost_per_generation: 0.10
+    avg_generation_time_s: 120
+    tier: premium
+    description: "Cloud Hunyuan3D Pro (TencentCloud)"
+    poll_interval_ms: 5000
+    poll_timeout_ms: 300000
+
+# Task routing: which providers to try for each use case
+task_routing:
+  default:
+    prefer: [hunyuan3d, shap-e]
+    fallback: meshy
+  low_vram:
+    prefer: [shap-e, meshy]
+    fallback: tencent-hunyuan3d
+  premium:
+    prefer: [hunyuan3d, tencent-hunyuan3d, meshy]
+    fallback: shap-e
+  batch:
+    prefer: [shap-e]
+    fallback: meshy
+  fast:
+    prefer: [shap-e, meshy]
+    fallback: hunyuan3d
+
+# Daily budget for cloud providers (local models are always free)
+budget:
+  daily_limit_usd: 5.0
+  alert_threshold_usd: 2.5

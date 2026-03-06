@@ -887,6 +887,46 @@
   margin-left: auto;
 }
 
+/* === Model/Provider Badges === */
+.forge3d-model-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: lowercase;
+}
+
+.forge3d-model-badge.tier-free {
+  background: rgba(0, 230, 118, 0.15);
+  color: var(--success, #00e676);
+}
+
+.forge3d-model-badge.tier-default {
+  background: rgba(37, 99, 235, 0.15);
+  color: var(--accent-primary, #2563eb);
+}
+
+.forge3d-model-badge.tier-premium {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--warning, #f59e0b);
+}
+
+/* === Cost Estimate === */
+.forge3d-cost-estimate {
+  font-size: 11px;
+  color: var(--warning, #f59e0b);
+  padding: 4px 8px;
+  margin-top: 4px;
+  background: rgba(245, 158, 11, 0.08);
+  border-radius: var(--radius-sm, 4px);
+  border-left: 2px solid var(--warning, #f59e0b);
+}
+
+.forge3d-cost-estimate.hidden {
+  display: none;
+}
+
 /* === Feature 10: Batch Generation === */
 .forge3d-generate-row {
   display: flex;
@@ -1154,6 +1194,195 @@
 .btn-view-materials:hover {
   background: rgba(139, 92, 246, 0.2);
   border-color: var(--accent-purple);
+}
+
+/* === Feature 13: Model Downloader Verification === */
+.model-status-banner {
+  grid-column: 1;
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.model-status-banner.success {
+  border-left: 4px solid var(--success);
+  background: rgba(0, 230, 118, 0.05);
+}
+
+.model-status-banner.warning {
+  border-left: 4px solid var(--warning);
+  background: rgba(245, 158, 11, 0.05);
+}
+
+.model-status-banner.error {
+  border-left: 4px solid var(--error);
+  background: rgba(255, 82, 82, 0.05);
+}
+
+.model-status-content {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+}
+
+.model-status-banner.success .model-status-content,
+.model-status-banner.error .model-status-content {
+  margin-bottom: 0;
+}
+
+.model-status-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.model-status-banner.success .model-status-icon {
+  color: var(--success);
+}
+
+.model-status-banner.warning .model-status-icon {
+  color: var(--warning);
+}
+
+.model-status-banner.error .model-status-icon {
+  color: var(--error);
+}
+
+.model-status-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.model-status-text strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.model-status-text span {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.model-cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.model-card {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.model-card .model-status-ok {
+  width: 18px;
+  height: 18px;
+  color: var(--success);
+  flex-shrink: 0;
+}
+
+.model-card .model-status-missing {
+  width: 18px;
+  height: 18px;
+  color: var(--warning);
+  flex-shrink: 0;
+}
+
+.model-card-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.model-card-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.model-card-size {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.model-card-action {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  min-width: 100px;
+}
+
+.model-card-installed {
+  font-size: 11px;
+  color: var(--success);
+  font-weight: 500;
+}
+
+.btn-model-download {
+  padding: 4px 10px;
+  background: var(--accent-primary);
+  border: 1px solid var(--accent-primary);
+  border-radius: var(--radius-sm);
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-model-download:hover {
+  background: var(--accent-secondary);
+  border-color: var(--accent-secondary);
+}
+
+.btn-model-download:active {
+  transform: scale(0.96);
+}
+
+.model-progress-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.model-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+  border-radius: var(--radius-sm);
+  transition: width 0.5s ease;
+  animation: progress-shimmer 2s infinite;
+}
+
+@keyframes progress-shimmer {
+  0% { opacity: 0.8; }
+  50% { opacity: 1; }
+  100% { opacity: 0.8; }
+}
+
+.model-progress-text {
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  min-width: 35px;
+  text-align: right;
 }
 
 /* === Utility classes === */

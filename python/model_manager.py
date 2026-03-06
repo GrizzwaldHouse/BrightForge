@@ -1,13 +1,9 @@
-"""
-ForgePipeline Model Manager
-
-VRAM-aware lifecycle management for AI models.
-Enforces single-model mutex to prevent OOM on 16GB GPUs.
-
-Models:
-  - Shap-E: Single-image to 3D mesh (~2-4 GB VRAM)
-  - SDXL: Text to image (~5-8 GB VRAM)
-"""
+# model_manager.py
+# Developer: Marcus Daley
+# Date: March 5, 2026
+# Purpose: VRAM-aware lifecycle management for AI model adapters.
+#          Enforces single-model mutex to prevent OOM on 16GB GPUs.
+#          Uses adapter pattern for pluggable model backends.
 
 import gc
 import os
@@ -17,6 +13,8 @@ import logging
 import yaml
 from pathlib import Path
 from enum import Enum
+
+from model_adapter import HunyuanAdapter, SDXLAdapter
 
 logger = logging.getLogger('forge3d.model_manager')
 
@@ -33,11 +31,7 @@ def _cfg(section, key, default=None):
     return CONFIG.get(section, {}).get(key, default)
 
 
-class ModelType(str, Enum):
-    SHAP_E = 'shap_e'
-    SDXL = 'sdxl'
-
-
+# Kept for backward compatibility with external references
 class ModelState(str, Enum):
     UNLOADED = 'unloaded'
     LOADING = 'loading'
@@ -52,6 +46,7 @@ class ModelManager:
 
     Enforces single-model-at-a-time policy to prevent OOM.
     Provides mutex-protected generation to prevent race conditions.
+    Uses adapter pattern: each model backend is a ModelAdapter subclass.
     """
 
     def __init__(self, models_dir=None, vram_buffer_gb=None):
@@ -62,14 +57,14 @@ class ModelManager:
             else CONFIG.get('vram', {}).get('buffer_gb', 2.0)
         )
 
-        # Model state tracking
-        self._models = {
-            ModelType.SHAP_E: {'state': ModelState.UNLOADED, 'pipeline': None, 'load_count': 0},
-            ModelType.SDXL: {'state': ModelState.UNLOADED, 'pipeline': None, 'load_count': 0},
-        }
+        # Adapter registry: name -> adapter instance
+        self._adapters = {}
+        self._active_adapter = None
+        self._register_adapters()
 
-        # Single generation mutex
+        # Single generation mutex — prevents concurrent GPU work
         self._generation_lock = threading.Lock()
+        # Model swap mutex — prevents concurrent load/unload
         self._model_lock = threading.Lock()
 
         # Stats
@@ -80,6 +75,30 @@ class ModelManager:
 
         # Device detection (cached after first call)
         self._device = None
+
+        # Background removal model (lazy-loaded)
+        self._rembg_session = None
+
+    def _register_adapters(self):
+        """Build adapter instances from config."""
+        models_cfg = CONFIG.get('models', {})
+
+        hunyuan_cfg = models_cfg.get('hunyuan3d', {})
+        self._adapters['hunyuan3d'] = HunyuanAdapter(hunyuan_cfg)
+
+        sdxl_cfg = models_cfg.get('sdxl', {})
+        self._adapters['sdxl'] = SDXLAdapter(sdxl_cfg)
+
+        # Shap-E: conditional registration (package may not be installed)
+        shap_e_cfg = models_cfg.get('shap_e', {})
+        if shap_e_cfg.get('enabled', True):
+            try:
+                from shap_e_adapter import ShapEAdapter
+                self._adapters['shap-e'] = ShapEAdapter(shap_e_cfg)
+            except ImportError:
+                logger.warning('[MODEL] shap-e package not installed, adapter disabled')
+
+        logger.info(f'[MODEL] Registered {len(self._adapters)} adapters: {list(self._adapters.keys())}')
 
     def _get_device(self):
         """Get the best available compute device ('cuda' or 'cpu').
@@ -188,13 +207,73 @@ class ModelManager:
             return False
         return True
 
+    def _ensure_adapter_loaded(self, name):
+        """Ensure the named adapter is loaded, unloading others first.
+
+        Acquires _model_lock internally. Does NOT touch _generation_lock.
+
+        Returns the adapter on success, raises RuntimeError on failure.
+        """
+        import torch
+
+        adapter = self._adapters.get(name)
+        if adapter is None:
+            raise RuntimeError(f'Unknown model adapter: {name}')
+
+        with self._model_lock:
+            if adapter.is_loaded():
+                logger.info(f'[MODEL] {name} already loaded')
+                return adapter
+
+            # Unload the currently active adapter to free VRAM
+            if self._active_adapter is not None:
+                active = self._adapters.get(self._active_adapter)
+                if active is not None and active.is_loaded():
+                    logger.info(f'[MODEL] Unloading {self._active_adapter} to make room for {name}...')
+                    active.unload()
+                self._clear_vram()
+
+            device = self._get_device()
+
+            if device == 'cuda':
+                if not self._check_vram_budget(adapter.vram_requirement_gb):
+                    raise RuntimeError(f'Not enough VRAM for {name}')
+
+            dtype = torch.float16 if device == 'cuda' else torch.float32
+            success = adapter.load(device, dtype)
+
+            if not success:
+                self._clear_vram()
+                raise RuntimeError(f'Failed to load {name}')
+
+            self._active_adapter = name
+
+            if device == 'cuda':
+                vram = self.get_vram_info()
+                logger.info(
+                    f'[MODEL] {name} loaded on CUDA. '
+                    f'VRAM: {vram.get("allocated_mb", 0):.0f} MB allocated'
+                )
+            else:
+                logger.info(f'[MODEL] {name} loaded on CPU (generation will be slow)')
+
+            return adapter
+
+    def get_available_models(self):
+        """Return info for all registered adapters (for GET /models)."""
+        return [adapter.get_info() for adapter in self._adapters.values()]
+
     def get_status(self):
         """Get status of all models."""
         states = {}
-        for model_type, info in self._models.items():
-            states[model_type.value] = {
-                'state': info['state'].value,
-                'load_count': info['load_count'],
+        for name, adapter in self._adapters.items():
+            if adapter.is_loaded():
+                state = ModelState.READY.value
+            else:
+                state = ModelState.UNLOADED.value
+            states[name] = {
+                'state': state,
+                'loaded': adapter.is_loaded(),
             }
 
         return {
@@ -208,309 +287,96 @@ class ModelManager:
             'needs_restart': self.generation_count >= self._restart_threshold,
         }
 
-    def _unload_all(self):
-        """Unload all models from VRAM."""
-        for model_type in ModelType:
-            self._unload_model(model_type)
+    def _get_rembg_session(self):
+        """Lazy-load the rembg background removal session."""
+        if self._rembg_session is None:
+            try:
+                from rembg import new_session
+                logger.info('[MODEL] Loading rembg background removal model...')
+                self._rembg_session = new_session('u2net')
+                logger.info('[MODEL] rembg loaded')
+            except ImportError:
+                logger.warning('[MODEL] rembg not installed — background removal disabled')
+                return None
+            except Exception as e:
+                logger.warning(f'[MODEL] rembg load failed (non-fatal): {e}')
+                return None
+        return self._rembg_session
 
-    def _unload_model(self, model_type):
-        """Unload a specific model."""
-        info = self._models[model_type]
-        if info['state'] == ModelState.UNLOADED:
-            return
+    def _remove_background(self, image):
+        """Remove background from an image using rembg.
 
-        logger.info(f'[MODEL] Unloading {model_type.value}...')
-        info['state'] = ModelState.UNLOADING
+        Args:
+            image: PIL Image.
+
+        Returns:
+            PIL Image with background removed (RGBA), or original if rembg unavailable.
+        """
+        remove_bg = CONFIG.get('models', {}).get('hunyuan3d', {}).get('remove_background', True)
+        if not remove_bg:
+            return image
+
+        session = self._get_rembg_session()
+        if session is None:
+            return image
 
         try:
-            if info['pipeline'] is not None:
-                del info['pipeline']
-                info['pipeline'] = None
-
-            self._clear_vram()
-            info['state'] = ModelState.UNLOADED
-            logger.info(f'[MODEL] {model_type.value} unloaded')
-
+            from rembg import remove
+            logger.info('[MODEL] Removing image background...')
+            result = remove(image, session=session)
+            logger.info('[MODEL] Background removed')
+            return result
         except Exception as e:
-            logger.error(f'[MODEL] Failed to unload {model_type.value}: {e}')
-            info['pipeline'] = None
-            info['state'] = ModelState.ERROR
-            self._clear_vram()
+            logger.warning(f'[MODEL] Background removal failed (non-fatal): {e}')
+            return image
 
-    def load_shap_e(self):
-        """Load Shap-E model for image-to-3D mesh generation."""
-        import torch
-
-        with self._model_lock:
-            info = self._models[ModelType.SHAP_E]
-
-            if info['state'] == ModelState.READY:
-                logger.info('[MODEL] Shap-E already loaded')
-                return True
-
-            # Unload any other model first
-            self._unload_all()
-            self._clear_vram()
-
-            device = self._get_device()
-
-            if device == 'cuda':
-                shap_e_vram = CONFIG.get('models', {}).get('shap_e', {}).get('required_vram_gb', 4.0)
-                if not self._check_vram_budget(shap_e_vram):
-                    logger.error('[MODEL] Not enough VRAM for Shap-E')
-                    return False
-
-            logger.info(f'[MODEL] Loading Shap-E on {device}...')
-            info['state'] = ModelState.LOADING
-
-            try:
-                from diffusers import ShapEImg2ImgPipeline
-
-                shap_e_repo = CONFIG.get('models', {}).get('shap_e', {}).get('repo_id', 'openai/shap-e-img2img')
-                model_path = self.models_dir / 'shap-e-img2img'
-
-                if model_path.exists():
-                    logger.info('[MODEL] Loading Shap-E from local cache...')
-                    pipeline = ShapEImg2ImgPipeline.from_pretrained(
-                        str(model_path),
-                        local_files_only=True,
-                    )
-                elif device == 'cuda':
-                    logger.info('[MODEL] Downloading Shap-E from HuggingFace (fp16)...')
-                    pipeline = ShapEImg2ImgPipeline.from_pretrained(
-                        shap_e_repo,
-                        torch_dtype=torch.float16,
-                        variant='fp16',
-                    )
-                else:
-                    logger.info('[MODEL] Downloading Shap-E from HuggingFace...')
-                    pipeline = ShapEImg2ImgPipeline.from_pretrained(
-                        shap_e_repo,
-                    )
-
-                pipeline = pipeline.to(device)
-
-                info['pipeline'] = pipeline
-                info['state'] = ModelState.READY
-                info['load_count'] += 1
-
-                if device == 'cuda':
-                    vram = self.get_vram_info()
-                    logger.info(
-                        f'[MODEL] Shap-E loaded on CUDA. '
-                        f'VRAM: {vram.get("allocated_mb", 0):.0f} MB allocated'
-                    )
-                else:
-                    logger.info('[MODEL] Shap-E loaded on CPU (generation will be slow)')
-                return True
-
-            except Exception as e:
-                logger.error(f'[MODEL] Shap-E load failed: {e}')
-                info['state'] = ModelState.ERROR
-                info['pipeline'] = None
-                self._clear_vram()
-                return False
-
-    def load_sdxl(self):
-        """Load SDXL model for text-to-image generation."""
-        import torch
-
-        with self._model_lock:
-            info = self._models[ModelType.SDXL]
-
-            if info['state'] == ModelState.READY:
-                logger.info('[MODEL] SDXL already loaded')
-                return True
-
-            # Unload any other model first
-            self._unload_all()
-            self._clear_vram()
-
-            device = self._get_device()
-            dtype = torch.float16 if device == 'cuda' else torch.float32
-
-            if device == 'cuda':
-                sdxl_vram = CONFIG.get('models', {}).get('sdxl', {}).get('required_vram_gb', 8.0)
-                if not self._check_vram_budget(sdxl_vram):
-                    logger.error('[MODEL] Not enough VRAM for SDXL')
-                    return False
-
-            logger.info(f'[MODEL] Loading SDXL on {device} (this may take a minute)...')
-            info['state'] = ModelState.LOADING
-
-            try:
-                from diffusers import StableDiffusionXLPipeline, DPMSolverMultistepScheduler
-
-                sdxl_repo = CONFIG.get('models', {}).get('sdxl', {}).get('repo_id', 'stabilityai/stable-diffusion-xl-base-1.0')
-                # Always download fp16 variant (smaller). from_pretrained
-                # auto-converts to the requested torch_dtype on load.
-                pipeline = StableDiffusionXLPipeline.from_pretrained(
-                    sdxl_repo,
-                    torch_dtype=dtype,
-                    variant='fp16',
-                    use_safetensors=True,
-                )
-
-                # Use DPM++ scheduler for faster inference
-                pipeline.scheduler = DPMSolverMultistepScheduler.from_config(
-                    pipeline.scheduler.config
-                )
-
-                pipeline = pipeline.to(device)
-
-                # Enable memory optimizations
-                pipeline.enable_attention_slicing()
-
-                info['pipeline'] = pipeline
-                info['state'] = ModelState.READY
-                info['load_count'] += 1
-
-                if device == 'cuda':
-                    vram = self.get_vram_info()
-                    logger.info(
-                        f'[MODEL] SDXL loaded on CUDA. '
-                        f'VRAM: {vram.get("allocated_mb", 0):.0f} MB allocated'
-                    )
-                else:
-                    logger.info('[MODEL] SDXL loaded on CPU (generation will be slow)')
-                return True
-
-            except Exception as e:
-                logger.error(f'[MODEL] SDXL load failed: {e}')
-                info['state'] = ModelState.ERROR
-                info['pipeline'] = None
-                self._clear_vram()
-                return False
-
-    def generate_mesh(self, image_data, output_path):
-        """Generate 3D mesh from image using Shap-E.
+    def generate_mesh(self, image_data, output_path, model=None):
+        """Generate 3D mesh from image using the specified mesh adapter.
 
         Args:
             image_data: PIL Image or path to image file.
             output_path: Path to write output .glb file.
+            model: Adapter name (default from config).
 
         Returns:
             dict with 'success', 'output_path', 'generation_time', 'vram_after'.
         """
+        if model is None:
+            registry = CONFIG.get('model_registry', {})
+            model = registry.get('default_mesh_model', 'hunyuan3d')
+
         if not self._generation_lock.acquire(blocking=False):
             return {'success': False, 'error': 'Another generation is in progress'}
 
         try:
-            info = self._models[ModelType.SHAP_E]
+            adapter = self._ensure_adapter_loaded(model)
 
-            if info['state'] != ModelState.READY:
-                if not self.load_shap_e():
-                    return {'success': False, 'error': 'Failed to load Shap-E'}
-
-            info['state'] = ModelState.GENERATING
-            start = time.time()
-
-            logger.info('[MODEL] Generating mesh from image (Shap-E)...')
-
-            from PIL import Image
-            if isinstance(image_data, (str, Path)):
-                image = Image.open(image_data).convert('RGB')
-            else:
-                image = image_data.convert('RGB')
-
-            # Resize to model's expected input
-            input_dims = CONFIG.get('models', {}).get('shap_e', {}).get('input_dimensions', [256, 256])
-            image = image.resize(tuple(input_dims), Image.LANCZOS)
-
-            pipeline = info['pipeline']
-            shap_e_steps = CONFIG.get('models', {}).get('shap_e', {}).get('inference_steps', 64)
-            shap_e_guidance = CONFIG.get('models', {}).get('shap_e', {}).get('guidance_scale', 3.0)
-            shap_e_frame_size = CONFIG.get('models', {}).get('shap_e', {}).get('frame_size', 256)
-
-            result = pipeline(
-                image,
-                guidance_scale=shap_e_guidance,
-                num_inference_steps=shap_e_steps,
-                frame_size=shap_e_frame_size,
-                output_type='mesh',
-            )
-
-            # Export mesh: Shap-E -> PLY (intermediate) -> GLB via trimesh
-            output_path = Path(output_path)
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-
-            import tempfile
-            import trimesh
-            import numpy as np
-            from diffusers.utils import export_to_ply
-
-            mesh_output = result.images[0]
-
-            with tempfile.NamedTemporaryFile(suffix='.ply', delete=False, dir=str(output_path.parent)) as tmp:
-                ply_path = tmp.name
-
-            try:
-                export_to_ply(mesh_output, ply_path)
-
-                mesh = trimesh.load(ply_path)
-
-                # Fix orientation (Shap-E outputs bottom-up by default)
-                rot = trimesh.transformations.rotation_matrix(-np.pi / 2, [1, 0, 0])
-                mesh = mesh.apply_transform(rot)
-
-                mesh.export(str(output_path), file_type='glb')
-            finally:
-                # Clean up intermediate PLY
-                if os.path.exists(ply_path):
-                    os.unlink(ply_path)
-
-            elapsed = time.time() - start
-            self.generation_count += 1
-            self.total_generation_time += elapsed
-
-            info['state'] = ModelState.READY
-            self._clear_vram()
-
-            vram = self.get_vram_info()
-            logger.info(f'[MODEL] Mesh generated in {elapsed:.1f}s -> {output_path}')
-
-            # FBX conversion (non-fatal if it fails)
-            fbx_path_result = None
-            fbx_size = 0
-            try:
-                from fbx_converter import fbx_converter
-                if fbx_converter.is_available():
-                    fbx_out = output_path.with_suffix('.fbx')
-                    fbx_result = fbx_converter.convert_glb_to_fbx(str(output_path), str(fbx_out))
-                    if fbx_result['success']:
-                        fbx_path_result = str(fbx_out)
-                        fbx_size = fbx_result.get('file_size_bytes', 0)
-                        logger.info(f'[MODEL] FBX exported: {fbx_out} ({fbx_size} bytes)')
-                    else:
-                        logger.warning(f'[MODEL] FBX conversion failed (non-fatal): {fbx_result.get("error")}')
-                else:
-                    logger.info('[MODEL] FBX converter not available, skipping FBX export')
-            except ImportError:
-                logger.info('[MODEL] fbx_converter module not found, skipping FBX export')
-            except Exception as fbx_err:
-                logger.warning(f'[MODEL] FBX conversion error (non-fatal): {fbx_err}')
-
-            return {
-                'success': True,
-                'output_path': str(output_path),
-                'fbx_path': fbx_path_result,
-                'generation_time': round(elapsed, 2),
-                'vram_after': vram,
-                'file_size_bytes': output_path.stat().st_size,
-                'fbx_size_bytes': fbx_size,
+            params = {
+                'image': image_data,
+                'output_path': output_path,
+                'remove_background_fn': self._remove_background,
             }
 
+            result = adapter.generate(params)
+
+            self.generation_count += 1
+            self.total_generation_time += result.get('generation_time', 0)
+            self._clear_vram()
+            result['vram_after'] = self.get_vram_info()
+            return result
+
+        except RuntimeError as e:
+            logger.error(f'[MODEL] Mesh generation failed: {e}')
+            return {'success': False, 'error': str(e)}
         except Exception as e:
             logger.error(f'[MODEL] Mesh generation failed: {e}')
-            info = self._models[ModelType.SHAP_E]
-            info['state'] = ModelState.READY if info['pipeline'] else ModelState.ERROR
             return {'success': False, 'error': str(e)}
 
         finally:
             self._generation_lock.release()
 
-    def generate_image(self, prompt, output_path, width=1024, height=1024, steps=25):
-        """Generate image from text prompt using SDXL.
+    def generate_image(self, prompt, output_path, width=1024, height=1024, steps=25, model=None):
+        """Generate image from text prompt using the specified image adapter.
 
         Args:
             prompt: Text description of desired image.
@@ -518,84 +384,70 @@ class ModelManager:
             width: Image width (default 1024).
             height: Image height (default 1024).
             steps: Number of inference steps (default 25).
+            model: Adapter name (default from config).
 
         Returns:
             dict with 'success', 'output_path', 'generation_time', 'vram_after'.
         """
+        if model is None:
+            registry = CONFIG.get('model_registry', {})
+            model = registry.get('default_image_model', 'sdxl')
+
         if not self._generation_lock.acquire(blocking=False):
             return {'success': False, 'error': 'Another generation is in progress'}
 
         try:
-            info = self._models[ModelType.SDXL]
+            adapter = self._ensure_adapter_loaded(model)
 
-            if info['state'] != ModelState.READY:
-                if not self.load_sdxl():
-                    return {'success': False, 'error': 'Failed to load SDXL'}
-
-            info['state'] = ModelState.GENERATING
-            start = time.time()
-
-            logger.info(f'[MODEL] Generating image: "{prompt[:80]}..."')
-
-            pipeline = info['pipeline']
-            sdxl_guidance = CONFIG.get('models', {}).get('sdxl', {}).get('guidance_scale', 7.5)
-            result = pipeline(
-                prompt=prompt,
-                width=width,
-                height=height,
-                num_inference_steps=steps,
-                guidance_scale=sdxl_guidance,
-            )
-
-            image = result.images[0]
-            output_path = Path(output_path)
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            image.save(str(output_path), 'PNG')
-
-            elapsed = time.time() - start
-            self.generation_count += 1
-            self.total_generation_time += elapsed
-
-            info['state'] = ModelState.READY
-            self._clear_vram()
-
-            vram = self.get_vram_info()
-            logger.info(f'[MODEL] Image generated in {elapsed:.1f}s -> {output_path}')
-
-            return {
-                'success': True,
-                'output_path': str(output_path),
-                'generation_time': round(elapsed, 2),
+            params = {
+                'prompt': prompt,
+                'output_path': output_path,
                 'width': width,
                 'height': height,
-                'vram_after': vram,
-                'file_size_bytes': output_path.stat().st_size,
+                'steps': steps,
             }
 
+            result = adapter.generate(params)
+
+            self.generation_count += 1
+            self.total_generation_time += result.get('generation_time', 0)
+            self._clear_vram()
+            result['vram_after'] = self.get_vram_info()
+            return result
+
+        except RuntimeError as e:
+            logger.error(f'[MODEL] Image generation failed: {e}')
+            return {'success': False, 'error': str(e)}
         except Exception as e:
             logger.error(f'[MODEL] Image generation failed: {e}')
-            info = self._models[ModelType.SDXL]
-            info['state'] = ModelState.READY if info['pipeline'] else ModelState.ERROR
             return {'success': False, 'error': str(e)}
 
         finally:
             self._generation_lock.release()
 
-    def generate_full_pipeline(self, prompt, output_dir, steps=25):
-        """Full text-to-3D pipeline: SDXL image -> Shap-E mesh.
+    def generate_full_pipeline(self, prompt, output_dir, steps=25, image_model=None, mesh_model=None):
+        """Full text-to-3D pipeline: image generation -> mesh generation.
 
-        This is the two-stage pipeline with sequential VRAM management:
-        1. Load SDXL, generate image, unload SDXL
-        2. Load Shap-E, generate mesh from image, unload Shap-E
+        Acquires _generation_lock ONCE for the entire pipeline. Calls
+        _ensure_adapter_loaded() + adapter.generate() directly for each
+        stage, avoiding the release/re-acquire race condition.
 
         Args:
             prompt: Text description of desired 3D object.
             output_dir: Directory for output files.
-            steps: SDXL inference steps.
+            steps: Image generation inference steps.
+            image_model: Image adapter name (default from config).
+            mesh_model: Mesh adapter name (default from config).
 
         Returns:
             dict with stage results.
         """
+        registry = CONFIG.get('model_registry', {})
+        if image_model is None:
+            image_model = registry.get('default_image_model', 'sdxl')
+        if mesh_model is None:
+            mesh_model = registry.get('default_mesh_model', 'hunyuan3d')
+
         if not self._generation_lock.acquire(blocking=False):
             return {'success': False, 'error': 'Another generation is in progress', 'stage': 'blocked'}
 
@@ -606,33 +458,42 @@ class ModelManager:
             total_start = time.time()
             result = {'success': False, 'stages': {}}
 
-            # Stage 1: Text -> Image (SDXL)
-            logger.info('[MODEL] === Stage 1/2: Text -> Image (SDXL) ===')
+            # Stage 1: Text -> Image
+            logger.info(f'[MODEL] === Stage 1/2: Text -> Image ({image_model}) ===')
             image_path = output_dir / 'generated_image.png'
 
-            # Temporarily release the lock so generate_image can acquire it
-            self._generation_lock.release()
-            stage1 = self.generate_image(prompt, image_path, steps=steps)
-            self._generation_lock.acquire()
+            image_adapter = self._ensure_adapter_loaded(image_model)
+            stage1 = image_adapter.generate({
+                'prompt': prompt,
+                'output_path': image_path,
+                'steps': steps,
+            })
 
+            self.generation_count += 1
+            self.total_generation_time += stage1.get('generation_time', 0)
             result['stages']['image'] = stage1
 
-            if not stage1['success']:
+            if not stage1.get('success'):
                 result['error'] = f'Image generation failed: {stage1.get("error")}'
                 result['stage'] = 'image'
                 return result
 
-            # Stage 2: Image -> Mesh (Shap-E)
-            logger.info('[MODEL] === Stage 2/2: Image -> Mesh (Shap-E) ===')
+            # Stage 2: Image -> Textured Mesh
+            logger.info(f'[MODEL] === Stage 2/2: Image -> Textured Mesh ({mesh_model}) ===')
             mesh_path = output_dir / 'generated_mesh.glb'
 
-            self._generation_lock.release()
-            stage2 = self.generate_mesh(image_path, mesh_path)
-            self._generation_lock.acquire()
+            mesh_adapter = self._ensure_adapter_loaded(mesh_model)
+            stage2 = mesh_adapter.generate({
+                'image': image_path,
+                'output_path': mesh_path,
+                'remove_background_fn': self._remove_background,
+            })
 
+            self.generation_count += 1
+            self.total_generation_time += stage2.get('generation_time', 0)
             result['stages']['mesh'] = stage2
 
-            if not stage2['success']:
+            if not stage2.get('success'):
                 result['error'] = f'Mesh generation failed: {stage2.get("error")}'
                 result['stage'] = 'mesh'
                 return result
@@ -645,6 +506,7 @@ class ModelManager:
             result['mesh_path'] = str(mesh_path)
             result['fbx_path'] = stage2.get('fbx_path')
             result['vram_after'] = self.get_vram_info()
+            result['textured'] = stage2.get('textured', False)
 
             logger.info(f'[MODEL] Full pipeline complete in {total_time:.1f}s')
             return result
@@ -654,10 +516,7 @@ class ModelManager:
             return {'success': False, 'error': str(e), 'stage': 'unknown'}
 
         finally:
-            try:
-                self._generation_lock.release()
-            except RuntimeError:
-                pass  # Already released
+            self._generation_lock.release()
 
     def optimize_mesh(self, input_path, target_faces, output_path=None):
         """Optimize a mesh by reducing face count via quadric decimation.
@@ -697,7 +556,6 @@ class ModelManager:
                     'skipped': True,
                 }
 
-            # Quadric decimation
             optimized = mesh.simplify_quadric_decimation(target_faces)
 
             output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -760,7 +618,6 @@ class ModelManager:
                 out_path = output_dir / f'mesh_{name}.glb'
 
                 if ratio >= 1.0:
-                    # Copy original
                     mesh.export(str(out_path), file_type='glb')
                     faces = original_faces
                 else:
@@ -809,10 +666,9 @@ class ModelManager:
             bounds = mesh.bounding_box.extents.tolist()
             file_size = input_path.stat().st_size
 
-            # Estimated VRAM: ~32 bytes per vertex (position + normal + UV + tangent)
+            # ~32 bytes per vertex (position + normal + UV + tangent)
             estimated_vram_mb = (vertex_count * 32) / (1024 * 1024)
 
-            # Recommendations per target platform
             recommendations = {}
             presets = {
                 'mobile': 2000,
@@ -864,10 +720,14 @@ class ModelManager:
             return {'success': False, 'error': str(e)}
 
     def shutdown(self):
-        """Clean shutdown — unload all models."""
+        """Clean shutdown — unload all model adapters."""
         logger.info('[MODEL] Shutting down model manager...')
         with self._model_lock:
-            self._unload_all()
+            for name, adapter in self._adapters.items():
+                if adapter.is_loaded():
+                    adapter.unload()
+            self._active_adapter = None
+            self._clear_vram()
         logger.info('[MODEL] Model manager shut down')
 
 

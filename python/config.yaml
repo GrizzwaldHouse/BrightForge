@@ -12,19 +12,31 @@ paths:
   models_dir: "data/models"
 
 models:
-  shap_e:
-    repo_id: "openai/shap-e-img2img"
-    required_vram_gb: 4.0
-    input_dimensions: [256, 256]
-    inference_steps: 64
-    guidance_scale: 3.0
-    frame_size: 256
-    size_mb: 1000
+  hunyuan3d:
+    repo_id: "tencent/Hunyuan3D-2"
+    required_vram_gb: 12.0
+    input_dimensions: [512, 512]
+    inference_steps: 50
+    guidance_scale: 5.5
+    size_mb: 8000
+    texture_enabled: true
+    remove_background: true
   sdxl:
     repo_id: "stabilityai/stable-diffusion-xl-base-1.0"
     required_vram_gb: 8.0
     guidance_scale: 7.5
     memory_optimization: "attention_slicing"
+  shap_e:
+    enabled: true
+    repo_id: "openai/shap-e"
+    required_vram_gb: 4.0
+    input_dimensions: [256, 256]
+    inference_steps: 64
+    guidance_scale: 15.0
+
+model_registry:
+  default_mesh_model: "hunyuan3d"
+  default_image_model: "sdxl"
 
 vram:
   buffer_gb: 2.0

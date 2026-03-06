@@ -1,7 +1,7 @@
 /**
  * Forge3D Routes - API endpoints for 3D generation
  *
- * 26 endpoints for generation, projects, assets, queue, models, FBX, post-processing:
+ * 27 endpoints for generation, projects, assets, queue, models, providers, FBX, post-processing:
  *
  * POST /api/forge3d/generate        - Start generation (image or text)
  * GET  /api/forge3d/status/:id      - Check generation progress
@@ -23,6 +23,7 @@
  * POST /api/forge3d/queue/pause     - Pause queue
  * POST /api/forge3d/queue/resume    - Resume queue
  * DELETE /api/forge3d/queue/:id     - Cancel queued job
+ * GET  /api/forge3d/providers        - Mesh provider info (tier, cost, availability)
  * GET  /api/forge3d/models          - List installed models
  * POST /api/forge3d/models/download - Start model download
  * GET  /api/forge3d/models/status   - Download progress for all active
@@ -34,10 +35,10 @@
  * STATUS: Complete. All endpoints have error handling + telemetry.
  *         Localhost-only by default (Express binds to 127.0.0.1).
  *
- * TODO(P1): Add rate limiting on /generate endpoint (prevent GPU queue flooding)
- * TODO(P1): Add API key authentication for non-localhost access
+ * DONE: Rate limiting on /generate, /optimize, /lod (forge3dLimiter)
+ * DONE: API key authentication via auth middleware
  * DONE: SSE endpoint at GET /stream/:id for real-time generation progress
- * TODO(P1): Add request body size limit middleware (prevent OOM from large uploads)
+ * DONE: Request body size limit via express.json({ limit: '1mb' })
  * TODO(P2): Add OpenAPI/Swagger spec generation from route definitions
  * TODO(P2): Add /api/forge3d/models/delete endpoint for model cleanup
  *
@@ -53,11 +54,13 @@ import telemetryBus from '../../core/telemetry-bus.js';
 import llmClient from '../../core/llm-client.js';
 import modelBridge from '../../forge3d/model-bridge.js';
 import forgeSession from '../../forge3d/forge-session.js';
+import universalMeshClient from '../../forge3d/universal-mesh-client.js';
 import projectManager from '../../forge3d/project-manager.js';
 import generationQueue from '../../forge3d/generation-queue.js';
 import modelDownloader from '../../forge3d/model-downloader.js';
 import forge3dConfig from '../../forge3d/config-loader.js';
 import forge3dDb from '../../forge3d/database.js';
+import { forge3dLimiter } from '../middleware/rate-limit.js';
 
 const router = express.Router();
 
@@ -108,7 +111,7 @@ async function ensureBridge() {
  *   type: 'mesh'
  *   projectId: string (optional)
  */
-router.post('/generate', express.raw({ type: 'image/*', limit: forge3dConfig.api.raw_body_limit }), async (req, res) => {
+router.post('/generate', forge3dLimiter, express.raw({ type: 'image/*', limit: forge3dConfig.api.raw_body_limit }), async (req, res) => {
   await ensureBridge();
   console.log('[ROUTE] POST /api/forge3d/generate');
 
@@ -128,7 +131,7 @@ router.post('/generate', express.raw({ type: 'image/*', limit: forge3dConfig.api
 
     if (contentType.includes('application/json')) {
       // JSON body: text-to-image or text-to-3D
-      const { type, prompt, projectId, options } = req.body;
+      const { type, prompt, projectId, options, model } = req.body;
 
       if (!type || !['mesh', 'image', 'full'].includes(type)) {
         return res.status(400).json({ error: 'Invalid type. Must be mesh, image, or full.' });
@@ -138,7 +141,7 @@ router.post('/generate', express.raw({ type: 'image/*', limit: forge3dConfig.api
         return res.status(400).json({ error: 'Prompt required (at least 3 characters).' });
       }
 
-      sessionId = forgeSession.create({ type, prompt, options });
+      sessionId = forgeSession.create({ type, prompt, options, model });
 
       // Record in history
       const histId = projectManager.recordGeneration({
@@ -266,6 +269,11 @@ router.get('/stream/:id', (req, res) => {
 
   const sessionId = req.params.id;
 
+  // Heartbeat keepalive every 15s
+  const heartbeat = setInterval(() => {
+    res.write(':keepalive\n\n');
+  }, 15000);
+
   const onProgress = (data) => {
     if (data.sessionId === sessionId) {
       res.write(`data: ${JSON.stringify(data)}\n\n`);
@@ -274,6 +282,7 @@ router.get('/stream/:id', (req, res) => {
 
   const onComplete = (data) => {
     if (data.sessionId === sessionId) {
+      clearInterval(heartbeat);
       res.write(`data: ${JSON.stringify({ ...data, done: true })}\n\n`);
       cleanup();
       res.end();
@@ -281,6 +290,7 @@ router.get('/stream/:id', (req, res) => {
   };
 
   const cleanup = () => {
+    clearInterval(heartbeat);
     forgeSession.off('progress', onProgress);
     forgeSession.off('complete', onComplete);
     forgeSession.off('failed', onComplete);
@@ -890,6 +900,56 @@ router.delete('/queue/:id', (req, res) => {
 // --- Models ---
 
 /**
+ * GET /api/forge3d/models/available
+ * List available generation models from the Python bridge adapter registry.
+ * Returns model info with config defaults for frontend model selector.
+ */
+router.get('/models/available', async (_req, res) => {
+  ensureInit();
+  try {
+    // Return config defaults even when bridge is offline
+    const defaults = {
+      default_mesh_model: forge3dConfig.generation.default_mesh_model,
+      default_image_model: forge3dConfig.generation.default_image_model
+    };
+
+    if (modelBridge.state !== 'running') {
+      return res.json({ models: [], defaults });
+    }
+
+    const result = await modelBridge.getModels();
+    res.json({ models: result.models || [], defaults });
+  } catch (err) {
+    console.error(`[ROUTE] Models available error: ${err.message}`);
+    errorHandler.report('forge3d_error', err, { endpoint: 'models_available' });
+    // Return defaults with empty models on error so frontend can still function
+    res.json({
+      models: [],
+      defaults: {
+        default_mesh_model: forge3dConfig.generation.default_mesh_model,
+        default_image_model: forge3dConfig.generation.default_image_model
+      }
+    });
+  }
+});
+
+/**
+ * GET /api/forge3d/providers
+ * List mesh generation providers with tier, cost, and availability info.
+ * Used by frontend for cost estimates and model selector labels.
+ */
+router.get('/providers', (_req, res) => {
+  try {
+    const providers = universalMeshClient.getProviderInfo();
+    const usage = universalMeshClient.getUsageSummary();
+    res.json({ providers, usage });
+  } catch (err) {
+    errorHandler.report('forge3d_error', err, { endpoint: 'providers' });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * GET /api/forge3d/models
  * List all known models and their installation status.
  */
@@ -907,7 +967,7 @@ router.get('/models', (_req, res) => {
 /**
  * POST /api/forge3d/models/download
  * Start downloading a model. Returns 202 for async operation.
- * Body: { model: "shap_e" | "sdxl" }
+ * Body: { model: "hunyuan3d" | "sdxl" }
  */
 router.post('/models/download', async (req, res) => {
   ensureInit();
@@ -1029,7 +1089,7 @@ router.post('/enhance-prompt', async (req, res) => {
  * Optimize a generated mesh by reducing face count.
  * Body: { assetId: string, targetFaces: number }
  */
-router.post('/optimize', async (req, res) => {
+router.post('/optimize', forge3dLimiter, async (req, res) => {
   ensureInit();
   const { assetId, targetFaces } = req.body;
 
@@ -1073,7 +1133,7 @@ router.post('/optimize', async (req, res) => {
  * POST /api/forge3d/lod/:id
  * Generate LOD chain for a generated asset.
  */
-router.post('/lod/:id', async (req, res) => {
+router.post('/lod/:id', forge3dLimiter, async (req, res) => {
   ensureInit();
   const assetId = req.params.id;
 

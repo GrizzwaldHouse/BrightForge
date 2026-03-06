@@ -24,6 +24,7 @@ import { EventEmitter } from 'events';
 import { fileURLToPath } from 'url';
 import telemetryBus from '../core/telemetry-bus.js';
 import modelBridge from './model-bridge.js';
+import universalMeshClient from './universal-mesh-client.js';
 import forge3dDb from './database.js';
 import forge3dConfig from './config-loader.js';
 
@@ -31,6 +32,7 @@ const SESSION_STATES = {
   IDLE: 'idle',
   GENERATING_IMAGE: 'generating_image',
   GENERATING_MESH: 'generating_mesh',
+  GENERATING_TEXTURE: 'generating_texture',
   COMPLETE: 'complete',
   FAILED: 'failed'
 };
@@ -100,6 +102,7 @@ class ForgeSession extends EventEmitter {
       imageBuffer: params.imageBuffer || null,
       filename: params.filename || null,
       options: params.options || {},
+      model: params.model || null,
       state: SESSION_STATES.IDLE,
       createdAt: Date.now(),
       startedAt: null,
@@ -146,6 +149,7 @@ class ForgeSession extends EventEmitter {
     telemetryBus.emit('forge3d_generation_start', {
       sessionId,
       type: session.type,
+      model: session.model || 'auto',
       prompt: session.prompt ? session.prompt.slice(0, 80) : null
     });
 
@@ -228,10 +232,11 @@ class ForgeSession extends EventEmitter {
     session.progress = { stage: 'mesh', percent: forge3dConfig.session.progress.mesh_start_pct };
     this.emit('progress', { sessionId: session.id, progress: session.progress });
 
-    const result = await modelBridge.generateMesh(
+    const result = await universalMeshClient.generateMesh(
       session.imageBuffer,
       session.filename || 'input.png',
-      session.id
+      session.id,
+      { model: session.model, task: session.options?.task }
     );
 
     session.progress = { stage: 'mesh', percent: forge3dConfig.session.progress.mesh_end_pct };
@@ -256,7 +261,8 @@ class ForgeSession extends EventEmitter {
 
     const result = await modelBridge.generateImage(session.prompt, {
       ...session.options,
-      jobId: session.id
+      jobId: session.id,
+      model: session.model
     });
 
     session.progress = { stage: 'image', percent: forge3dConfig.session.progress.mesh_end_pct };
@@ -272,35 +278,46 @@ class ForgeSession extends EventEmitter {
    * Text -> Image -> Mesh (full pipeline).
    */
   async _runFull(session) {
-    // Stage 1: Image generation
+    // Stage 1: Image generation (always via bridge — no provider chain for images yet)
     session.state = SESSION_STATES.GENERATING_IMAGE;
     session.progress = { stage: 'image', percent: forge3dConfig.session.progress.image_start_pct };
     this.emit('progress', { sessionId: session.id, progress: session.progress });
 
-    const fullResult = await modelBridge.generateFull(session.prompt, {
+    const imageResult = await modelBridge.generateImage(session.prompt, {
       ...session.options,
-      jobId: session.id
+      jobId: session.id,
+      model: session.model
     });
 
-    // Stage 2 happened server-side; update progress
+    // Stage 2: Mesh generation via provider chain
     session.state = SESSION_STATES.GENERATING_MESH;
     session.progress = { stage: 'mesh', percent: forge3dConfig.session.progress.mesh_after_image_pct };
     this.emit('progress', { sessionId: session.id, progress: session.progress });
 
-    // Download the generated image (GLB + FBX already downloaded by generateFull)
-    const imageBuffer = await modelBridge.downloadFile(session.id, 'generated_image.png');
+    const meshResult = await universalMeshClient.generateMesh(
+      imageResult.buffer,
+      'generated_image.png',
+      session.id,
+      { model: session.model, task: session.options?.task }
+    );
+
+    // Download the generated image for thumbnail
+    const thumbnailBuffer = imageResult.buffer;
 
     session.progress = { stage: 'complete', percent: 100 };
 
     return {
       type: 'full',
-      imageBuffer,
-      meshBuffer: fullResult.glbBuffer,
-      fbxBuffer: fullResult.fbxBuffer || null,
-      thumbnailBuffer: imageBuffer, // Use generated image as thumbnail
-      totalTime: fullResult.total_time,
-      stages: fullResult.stages,
-      vramAfter: fullResult.vram_after
+      imageBuffer: thumbnailBuffer,
+      meshBuffer: meshResult.glbBuffer,
+      fbxBuffer: meshResult.fbxBuffer || null,
+      thumbnailBuffer,
+      totalTime: (parseFloat(imageResult.headers?.generationTime) || 0) + (meshResult.metadata?.generationTime || 0),
+      stages: {
+        image: { generationTime: parseFloat(imageResult.headers?.generationTime) || 0 },
+        mesh: { generationTime: meshResult.metadata?.generationTime || 0, provider: meshResult.provider }
+      },
+      vramAfter: null
     };
   }
 
@@ -329,7 +346,8 @@ class ForgeSession extends EventEmitter {
             hasResult: !!row.result_path
           };
         }
-      } catch (_e) { /* non-fatal */ }
+      // eslint-disable-next-line no-empty
+      } catch (_e) { } // non-fatal
     }
 
     if (!session) return null;
@@ -338,6 +356,7 @@ class ForgeSession extends EventEmitter {
       id: session.id,
       type: session.type,
       state: session.state,
+      model: session.model || null,
       progress: session.progress,
       createdAt: session.createdAt,
       startedAt: session.startedAt,
@@ -361,6 +380,7 @@ class ForgeSession extends EventEmitter {
       id: s.id,
       type: s.type,
       state: s.state,
+      model: s.model || null,
       createdAt: s.createdAt,
       completedAt: s.completedAt,
       error: s.error

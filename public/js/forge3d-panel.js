@@ -7,6 +7,7 @@
  * @author Marcus Daley (GrizzwaldHouse)
  * @date February 14, 2026
  */
+/* global lucide */
 
 import { Forge3DViewer } from './forge3d-viewer.js';
 
@@ -32,6 +33,8 @@ class Forge3DPanel {
     this._syncHandler = null; // Feature 11: camera sync handler
     this._syncing = false; // Feature 11: re-entrancy guard
     this._eventSource = null; // SSE connection for generation progress
+    this._availableModels = []; // Available generation models from bridge
+    this._providerInfo = {}; // Provider tier/cost info from /api/forge3d/providers
   }
 
   /**
@@ -67,6 +70,125 @@ class Forge3DPanel {
   }
 
   /**
+   * Fetch available generation models from the Python bridge.
+   * Populates the model selector dropdown.
+   */
+  async _loadModels() {
+    // Fetch models and providers in parallel
+    let defaults = {};
+    try {
+      const [modelsRes, providersRes] = await Promise.all([
+        fetch('/api/forge3d/models/available').catch(() => null),
+        fetch('/api/forge3d/providers').catch(() => null)
+      ]);
+
+      if (modelsRes?.ok) {
+        const data = await modelsRes.json();
+        this._availableModels = data.models || [];
+        defaults = data.defaults || {};
+        console.log(`[FORGE3D-PANEL] Loaded ${this._availableModels.length} available models`);
+      }
+
+      if (providersRes?.ok) {
+        const provData = await providersRes.json();
+        // Build a lookup map: provider name -> info
+        this._providerInfo = {};
+        for (const p of (provData.providers || [])) {
+          this._providerInfo[p.name] = p;
+        }
+        console.log(`[FORGE3D-PANEL] Loaded ${Object.keys(this._providerInfo).length} provider configs`);
+      }
+
+      this._renderModelSelector(defaults);
+    } catch (_e) {
+      console.warn('[FORGE3D-PANEL] Could not load models, selector will show default only');
+    }
+  }
+
+  /**
+   * Render model options in the model selector dropdown.
+   * Uses createElement + textContent for security (no innerHTML with dynamic data).
+   * @param {Object} defaults - Config defaults (default_mesh_model, default_image_model)
+   */
+  _renderModelSelector(defaults) {
+    const select = document.getElementById('forge3d-model-select');
+    if (!select) return;
+
+    // Keep the "Auto (default)" option, clear the rest
+    while (select.options.length > 1) {
+      select.remove(1);
+    }
+
+    for (const model of this._availableModels) {
+      const opt = document.createElement('option');
+      opt.value = model.name;
+
+      // Show model type and default indicator
+      const isDefault = model.name === defaults.default_mesh_model
+        || model.name === defaults.default_image_model;
+      const suffix = isDefault ? ' (default)' : '';
+
+      // Append tier/cost info from provider data
+      const provInfo = this._providerInfo[model.name];
+      let costLabel = '';
+      if (provInfo) {
+        if (provInfo.cost_per_generation > 0) {
+          costLabel = ` - $${provInfo.cost_per_generation.toFixed(2)}/gen`;
+        } else {
+          costLabel = ' - Free';
+        }
+      }
+
+      opt.textContent = `${model.name} [${model.model_type || model.type || 'unknown'}]${suffix}${costLabel}`;
+      select.appendChild(opt);
+    }
+
+    // Also add cloud providers that aren't in the models list but are available
+    for (const [name, prov] of Object.entries(this._providerInfo)) {
+      if (prov.type === 'cloud' && prov.available) {
+        const alreadyListed = this._availableModels.some(m => m.name === name);
+        if (!alreadyListed) {
+          const opt = document.createElement('option');
+          opt.value = name;
+          const cost = prov.cost_per_generation > 0 ? ` - $${prov.cost_per_generation.toFixed(2)}/gen` : ' - Free';
+          opt.textContent = `${name} [mesh]${cost}`;
+          select.appendChild(opt);
+        }
+      }
+    }
+
+    // Bind change event for cost estimate
+    select.removeEventListener('change', this._onModelSelectChange);
+    this._onModelSelectChange = () => this._showCostEstimate(select.value);
+    select.addEventListener('change', this._onModelSelectChange);
+  }
+
+  /**
+   * Show/hide cost estimate below model selector based on selected model.
+   * @param {string} modelName - Selected model name (empty = auto)
+   */
+  _showCostEstimate(modelName) {
+    const el = document.getElementById('forge3d-cost-estimate');
+    if (!el) return;
+
+    if (!modelName) {
+      el.classList.add('hidden');
+      el.textContent = '';
+      return;
+    }
+
+    const provInfo = this._providerInfo[modelName];
+    if (!provInfo || provInfo.cost_per_generation === 0) {
+      el.classList.add('hidden');
+      el.textContent = '';
+      return;
+    }
+
+    el.textContent = `Estimated cost: $${provInfo.cost_per_generation.toFixed(2)} per generation`;
+    el.classList.remove('hidden');
+  }
+
+  /**
    * Initialize the panel when tab is activated.
    */
   async init() {
@@ -76,6 +198,7 @@ class Forge3DPanel {
     if (!panel) return;
 
     await this._loadConfig();
+    await this._loadModels();
 
     this.viewer = new Forge3DViewer('forge3d-viewport', this._cfg('viewer', {}));
 
@@ -86,6 +209,8 @@ class Forge3DPanel {
     this._loadStats();
     this._loadHistory();
     this._startVramPolling();
+
+    await this._checkModelStatus();
 
     this.initialized = true;
     console.log('[FORGE3D-PANEL] Panel initialized');
@@ -548,6 +673,11 @@ class Forge3DPanel {
       const body = { type, projectId: projectId || undefined };
       if (prompt) body.prompt = prompt;
 
+      // Include model selection if user chose one
+      const modelSelect = document.getElementById('forge3d-model-select');
+      const selectedModel = modelSelect?.value || '';
+      if (selectedModel) body.model = selectedModel;
+
       const res = await fetch('/api/forge3d/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -840,23 +970,79 @@ class Forge3DPanel {
         return;
       }
 
-      gallery.innerHTML = data.assets.map((asset) => `
-        <div class="gallery-item" data-id="${asset.id}">
-          <div class="gallery-thumb">
-            <span class="gallery-type">${asset.type === 'mesh' ? '3D' : 'IMG'}</span>
-          </div>
-          <div class="gallery-info">
-            <span class="gallery-name" title="${asset.name}">${asset.name}</span>
-            <span class="gallery-size">${this._formatSize(asset.file_size)}</span>
-          </div>
-          <div class="gallery-actions">
-            <button class="btn-small" onclick="window.forge3dPanel.downloadAsset('${asset.id}')">GLB</button>
-            ${asset.fbx_path ? `<button class="btn-small" onclick="window.forge3dPanel.downloadAsset('${asset.id}', 'fbx')">FBX</button>` : `<button class="btn-small btn-muted" onclick="window.forge3dPanel.convertToFbx('${asset.id}')">Convert FBX</button>`}
-            ${asset.has_materials ? `<button class="btn-view-materials" onclick="window.forge3dPanel.showTexturePreview('${asset.id}')">View Materials</button>` : `<button class="btn-small btn-muted" onclick="window.forge3dPanel.extractMaterials('${asset.id}')">Extract Materials</button>`}
-            <button class="btn-small btn-danger" onclick="window.forge3dPanel.deleteAsset('${asset.id}')">Delete</button>
-          </div>
-        </div>
-      `).join('');
+      gallery.innerHTML = '';
+      data.assets.forEach((asset) => {
+        const item = document.createElement('div');
+        item.className = 'gallery-item';
+        item.dataset.id = asset.id;
+
+        const thumb = document.createElement('div');
+        thumb.className = 'gallery-thumb';
+        const typeSpan = document.createElement('span');
+        typeSpan.className = 'gallery-type';
+        typeSpan.textContent = asset.type === 'mesh' ? '3D' : 'IMG';
+        thumb.appendChild(typeSpan);
+        item.appendChild(thumb);
+
+        const info = document.createElement('div');
+        info.className = 'gallery-info';
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'gallery-name';
+        nameSpan.title = asset.name;
+        nameSpan.textContent = asset.name;
+        const sizeSpan = document.createElement('span');
+        sizeSpan.className = 'gallery-size';
+        sizeSpan.textContent = this._formatSize(asset.file_size);
+        info.appendChild(nameSpan);
+        info.appendChild(sizeSpan);
+        item.appendChild(info);
+
+        const actions = document.createElement('div');
+        actions.className = 'gallery-actions';
+
+        const glbBtn = document.createElement('button');
+        glbBtn.className = 'btn-small';
+        glbBtn.textContent = 'GLB';
+        glbBtn.addEventListener('click', () => this.downloadAsset(asset.id));
+        actions.appendChild(glbBtn);
+
+        if (asset.fbx_path) {
+          const fbxBtn = document.createElement('button');
+          fbxBtn.className = 'btn-small';
+          fbxBtn.textContent = 'FBX';
+          fbxBtn.addEventListener('click', () => this.downloadAsset(asset.id, 'fbx'));
+          actions.appendChild(fbxBtn);
+        } else {
+          const convertBtn = document.createElement('button');
+          convertBtn.className = 'btn-small btn-muted';
+          convertBtn.textContent = 'Convert FBX';
+          convertBtn.addEventListener('click', () => this.convertToFbx(asset.id));
+          actions.appendChild(convertBtn);
+        }
+
+        if (asset.has_materials) {
+          const matBtn = document.createElement('button');
+          matBtn.className = 'btn-view-materials';
+          matBtn.textContent = 'View Materials';
+          matBtn.addEventListener('click', () => this.showTexturePreview(asset.id));
+          actions.appendChild(matBtn);
+        } else {
+          const extractBtn = document.createElement('button');
+          extractBtn.className = 'btn-small btn-muted';
+          extractBtn.textContent = 'Extract Materials';
+          extractBtn.addEventListener('click', () => this.extractMaterials(asset.id));
+          actions.appendChild(extractBtn);
+        }
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'btn-small btn-danger';
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.addEventListener('click', () => this.deleteAsset(asset.id));
+        actions.appendChild(deleteBtn);
+
+        item.appendChild(actions);
+        gallery.appendChild(item);
+      });
     } catch (err) {
       console.warn('[FORGE3D-PANEL] Failed to load assets:', err.message);
       gallery.innerHTML = '<div class="gallery-empty">Failed to load assets</div>';
@@ -874,24 +1060,26 @@ class Forge3DPanel {
 
       const statsEl = document.getElementById('forge3d-stats');
       if (statsEl) {
-        statsEl.innerHTML = `
-          <div class="stat-item">
-            <span class="stat-value">${stats.totalGenerations}</span>
-            <span class="stat-label">Total</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-value">${stats.completedGenerations}</span>
-            <span class="stat-label">Completed</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-value">${stats.failureRate}%</span>
-            <span class="stat-label">Fail Rate</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-value">${stats.avgGenerationTime.toFixed(1)}s</span>
-            <span class="stat-label">Avg Time</span>
-          </div>
-        `;
+        statsEl.innerHTML = '';
+        const items = [
+          { value: stats.totalGenerations, label: 'Total' },
+          { value: stats.completedGenerations, label: 'Completed' },
+          { value: `${stats.failureRate}%`, label: 'Fail Rate' },
+          { value: `${stats.avgGenerationTime.toFixed(1)}s`, label: 'Avg Time' }
+        ];
+        items.forEach((item) => {
+          const div = document.createElement('div');
+          div.className = 'stat-item';
+          const val = document.createElement('span');
+          val.className = 'stat-value';
+          val.textContent = item.value;
+          const lbl = document.createElement('span');
+          lbl.className = 'stat-label';
+          lbl.textContent = item.label;
+          div.appendChild(val);
+          div.appendChild(lbl);
+          statsEl.appendChild(div);
+        });
       }
     } catch (err) {
       console.warn('[FORGE3D-PANEL] Failed to load stats:', err.message);
@@ -915,13 +1103,30 @@ class Forge3DPanel {
         return;
       }
 
-      queueEl.innerHTML = data.sessions.slice(0, 10).map((s) => `
-        <div class="queue-item queue-${s.state}">
-          <span class="queue-type">${s.type}</span>
-          <span class="queue-state">${s.state}</span>
-          <span class="queue-time">${this._formatTime(s.createdAt)}</span>
-        </div>
-      `).join('');
+      queueEl.innerHTML = '';
+      data.sessions.slice(0, 10).forEach((s) => {
+        const queueItem = document.createElement('div');
+        // Validate state to prevent class injection
+        const safeState = ['idle', 'generating', 'complete', 'failed', 'queued'].includes(s.state) ? s.state : 'unknown';
+        queueItem.className = `queue-item queue-${safeState}`;
+
+        const typeSpan = document.createElement('span');
+        typeSpan.className = 'queue-type';
+        typeSpan.textContent = s.type;
+
+        const stateSpan = document.createElement('span');
+        stateSpan.className = 'queue-state';
+        stateSpan.textContent = s.state;
+
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'queue-time';
+        timeSpan.textContent = this._formatTime(s.createdAt);
+
+        queueItem.appendChild(typeSpan);
+        queueItem.appendChild(stateSpan);
+        queueItem.appendChild(timeSpan);
+        queueEl.appendChild(queueItem);
+      });
     } catch (err) {
       console.warn('[FORGE3D-PANEL] Failed to load queue:', err.message);
     }
@@ -1230,29 +1435,67 @@ class Forge3DPanel {
         return;
       }
 
-      grid.innerHTML = data.history.map((item) => {
+      grid.innerHTML = '';
+      data.history.forEach((item) => {
         const promptSnippet = (item.prompt || 'No prompt').slice(0, 40);
-        const statusClass = item.status === 'complete' ? 'complete'
-          : item.status === 'failed' ? 'failed' : 'processing';
-        const thumbHtml = item.thumbnail
-          ? `<img src="${item.thumbnail}" alt="thumb">`
-          : `<span class="history-placeholder">${item.type || '3D'}</span>`;
+        const statusClass = ['complete', 'failed', 'processing'].includes(item.status) ? item.status : 'processing';
 
-        return `
-          <div class="history-card" data-session-id="${item.id || ''}" title="${item.prompt || ''}">
-            <div class="history-card-thumb">${thumbHtml}</div>
-            <div class="history-card-prompt">${this._escapeHtml(promptSnippet)}</div>
-            <div class="history-card-meta">
-              <span class="history-badge history-badge-type">${item.type || 'full'}</span>
-              <span class="history-badge history-badge-${statusClass}">${item.status || 'unknown'}</span>
-              <span class="history-card-time">${this._relativeTime(item.created_at)}</span>
-            </div>
-          </div>
-        `;
-      }).join('');
+        const card = document.createElement('div');
+        card.className = 'history-card';
+        card.dataset.sessionId = item.id || '';
+        card.title = item.prompt || '';
 
-      // Bind click to load model
-      grid.querySelectorAll('.history-card').forEach((card) => {
+        const thumbDiv = document.createElement('div');
+        thumbDiv.className = 'history-card-thumb';
+        if (item.thumbnail) {
+          const img = document.createElement('img');
+          img.src = item.thumbnail;
+          img.alt = 'thumb';
+          thumbDiv.appendChild(img);
+        } else {
+          const span = document.createElement('span');
+          span.className = 'history-placeholder';
+          span.textContent = item.type || '3D';
+          thumbDiv.appendChild(span);
+        }
+        card.appendChild(thumbDiv);
+
+        const promptDiv = document.createElement('div');
+        promptDiv.className = 'history-card-prompt';
+        promptDiv.textContent = promptSnippet;
+        card.appendChild(promptDiv);
+
+        const metaDiv = document.createElement('div');
+        metaDiv.className = 'history-card-meta';
+
+        const typeBadge = document.createElement('span');
+        typeBadge.className = 'history-badge history-badge-type';
+        typeBadge.textContent = item.type || 'full';
+        metaDiv.appendChild(typeBadge);
+
+        // Model/provider badge with tier coloring
+        if (item.model) {
+          const modelBadge = document.createElement('span');
+          const provInfo = this._providerInfo[item.model];
+          const tier = provInfo?.tier || 'free';
+          modelBadge.className = `forge3d-model-badge tier-${tier}`;
+          modelBadge.textContent = item.model;
+          metaDiv.appendChild(modelBadge);
+        }
+
+        const statusBadge = document.createElement('span');
+        statusBadge.className = `history-badge history-badge-${statusClass}`;
+        statusBadge.textContent = item.status || 'unknown';
+        metaDiv.appendChild(statusBadge);
+
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'history-card-time';
+        timeSpan.textContent = this._relativeTime(item.created_at);
+        metaDiv.appendChild(timeSpan);
+
+        card.appendChild(metaDiv);
+
+        // Bind click to load model
         card.addEventListener('click', () => {
           const sessionId = card.dataset.sessionId;
           if (sessionId && this.viewer) {
@@ -1261,6 +1504,8 @@ class Forge3DPanel {
             this._showStatus(`Loading model from history (${sessionId})`, 'info');
           }
         });
+
+        grid.appendChild(card);
       });
     } catch (err) {
       console.warn('[FORGE3D-PANEL] Failed to load history:', err.message);
@@ -1345,10 +1590,9 @@ class Forge3DPanel {
 
     if (genBtn) {
       const icon = genBtn.querySelector('i, svg');
-      const iconHtml = icon ? icon.outerHTML : '';
-      genBtn.innerHTML = this._batchMode
-        ? `${iconHtml} Generate Batch`
-        : `${iconHtml} Generate`;
+      const clonedIcon = icon ? icon.cloneNode(true) : null;
+      genBtn.textContent = this._batchMode ? ' Generate Batch' : ' Generate';
+      if (clonedIcon) genBtn.prepend(clonedIcon);
     }
 
     this._showStatus(
@@ -1548,14 +1792,24 @@ class Forge3DPanel {
       if (!res.ok) return;
       const data = await res.json();
 
-      const options = (data.history || []).map((item) => {
-        const label = (item.prompt || 'No prompt').slice(0, 40);
-        return `<option value="${item.id}">${this._escapeHtml(label)} (${item.type || 'full'})</option>`;
-      }).join('');
+      const buildOptions = (selectEl) => {
+        selectEl.innerHTML = '';
+        const defaultOpt = document.createElement('option');
+        defaultOpt.value = '';
+        defaultOpt.textContent = 'Select model...';
+        selectEl.appendChild(defaultOpt);
 
-      const defaultOpt = '<option value="">Select model...</option>';
-      selectA.innerHTML = defaultOpt + options;
-      selectB.innerHTML = defaultOpt + options;
+        (data.history || []).forEach((item) => {
+          const label = (item.prompt || 'No prompt').slice(0, 40);
+          const opt = document.createElement('option');
+          opt.value = item.id;
+          opt.textContent = `${label} (${item.type || 'full'})`;
+          selectEl.appendChild(opt);
+        });
+      };
+
+      buildOptions(selectA);
+      buildOptions(selectB);
 
       // Bind change events
       selectA.onchange = () => this._loadCompareModel('a', selectA.value);
@@ -1717,17 +1971,33 @@ class Forge3DPanel {
         return;
       }
 
-      // Build texture cards
-      strip.innerHTML = data.textures.map((tex) => `
-        <div class="texture-card" title="${this._escapeHtml(tex.name)}">
-          <img src="${tex.url}" alt="${this._escapeHtml(tex.name)}" loading="lazy">
-          <span class="texture-card-label">${this._escapeHtml(tex.label || tex.name)}</span>
-        </div>
-      `).join('') + '<button class="texture-strip-close" title="Close">Close</button>';
+      // Build texture cards using DOM APIs
+      strip.innerHTML = '';
+      data.textures.forEach((tex) => {
+        const card = document.createElement('div');
+        card.className = 'texture-card';
+        card.title = tex.name;
 
-      // Bind close button
-      const closeBtn = strip.querySelector('.texture-strip-close');
-      if (closeBtn) closeBtn.addEventListener('click', () => this._hideTexturePreview());
+        const img = document.createElement('img');
+        img.src = tex.url;
+        img.alt = tex.name;
+        img.loading = 'lazy';
+        card.appendChild(img);
+
+        const label = document.createElement('span');
+        label.className = 'texture-card-label';
+        label.textContent = tex.label || tex.name;
+        card.appendChild(label);
+
+        strip.appendChild(card);
+      });
+
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'texture-strip-close';
+      closeBtn.title = 'Close';
+      closeBtn.textContent = 'Close';
+      closeBtn.addEventListener('click', () => this._hideTexturePreview());
+      strip.appendChild(closeBtn);
 
       strip.classList.remove('hidden');
       this._showStatus(`${data.textures.length} textures loaded`, 'success');
@@ -1791,6 +2061,279 @@ class Forge3DPanel {
     const saved = localStorage.getItem('forge3d-env') || 'dark';
     const activeBtn = dropdown.querySelector(`[data-env="${saved}"]`);
     if (activeBtn) activeBtn.classList.add('active');
+  }
+
+  // =============================================
+  // Feature 13: Model Downloader Verification
+  // =============================================
+
+  /**
+   * Check model installation status and GPU availability.
+   * Shows banner if models are missing or GPU is unavailable.
+   */
+  async _checkModelStatus() {
+    try {
+      const res = await fetch('/api/forge3d/models');
+      if (!res.ok) return;
+      const data = await res.json();
+      const gpu = await this._checkGPUStatus();
+      this._renderModelStatus(data.models, gpu);
+    } catch (e) {
+      console.warn('[FORGE3D-PANEL] Model check failed:', e.message);
+    }
+  }
+
+  /**
+   * Check GPU availability from bridge status.
+   * @returns {Promise<{available: boolean, reason: string|null}>}
+   */
+  async _checkGPUStatus() {
+    try {
+      const res = await fetch('/api/forge3d/bridge');
+      if (!res.ok) return { available: false, reason: 'Bridge not running' };
+      const data = await res.json();
+      return {
+        available: data.health?.gpu_available || false,
+        reason: data.bridge?.unavailableReason || null
+      };
+    } catch (e) {
+      return { available: false, reason: 'Bridge check failed' };
+    }
+  }
+
+  /**
+   * Render model status banner.
+   * @param {Array} models - Model status array
+   * @param {{available: boolean, reason: string|null}} gpu - GPU status
+   */
+  _renderModelStatus(models, gpu) {
+    const banner = document.getElementById('forge3d-model-status');
+    if (!banner) return;
+
+    const missing = models.filter((m) => !m.installed);
+
+    if (!gpu.available) {
+      banner.className = 'model-status-banner error';
+      banner.innerHTML = '';
+      const content = document.createElement('div');
+      content.className = 'model-status-content';
+      content.innerHTML = '<i data-lucide="alert-triangle" class="model-status-icon"></i>';
+      const textDiv = document.createElement('div');
+      textDiv.className = 'model-status-text';
+      const strong = document.createElement('strong');
+      strong.textContent = 'GPU not available';
+      const reasonSpan = document.createElement('span');
+      reasonSpan.textContent = '3D generation requires CUDA GPU. ' + (gpu.reason || '');
+      textDiv.appendChild(strong);
+      textDiv.appendChild(reasonSpan);
+      content.appendChild(textDiv);
+      banner.appendChild(content);
+      banner.classList.remove('hidden');
+      lucide.createIcons();
+      return;
+    }
+
+    if (missing.length === 0) {
+      banner.className = 'model-status-banner success';
+      banner.innerHTML = '';
+      const content = document.createElement('div');
+      content.className = 'model-status-content';
+      content.innerHTML = '<i data-lucide="check-circle" class="model-status-icon"></i>';
+      const textDiv = document.createElement('div');
+      textDiv.className = 'model-status-text';
+      const strong = document.createElement('strong');
+      strong.textContent = 'All models ready';
+      textDiv.appendChild(strong);
+      content.appendChild(textDiv);
+      banner.appendChild(content);
+      banner.classList.remove('hidden');
+      lucide.createIcons();
+      setTimeout(() => { banner.classList.add('hidden'); }, 3000);
+      return;
+    }
+
+    banner.className = 'model-status-banner warning';
+    banner.innerHTML = '';
+    const content = document.createElement('div');
+    content.className = 'model-status-content';
+    content.innerHTML = '<i data-lucide="alert-circle" class="model-status-icon"></i>';
+    const textDiv = document.createElement('div');
+    textDiv.className = 'model-status-text';
+    const strong = document.createElement('strong');
+    strong.textContent = 'Models missing';
+    const infoSpan = document.createElement('span');
+    infoSpan.textContent = 'Download required models before generating';
+    textDiv.appendChild(strong);
+    textDiv.appendChild(infoSpan);
+    content.appendChild(textDiv);
+    banner.appendChild(content);
+
+    const cardsDiv = document.createElement('div');
+    cardsDiv.className = 'model-cards';
+
+    models.forEach((m) => {
+      const card = this._createModelCard(m);
+      cardsDiv.appendChild(card);
+    });
+
+    banner.appendChild(cardsDiv);
+    banner.classList.remove('hidden');
+    lucide.createIcons();
+  }
+
+  /**
+   * Create a single model card DOM element.
+   * @param {Object} model - Model data
+   * @returns {HTMLElement}
+   */
+  _createModelCard(model) {
+    const card = document.createElement('div');
+    card.className = 'model-card';
+
+    // Status icon (static lucide markup)
+    const iconWrapper = document.createElement('span');
+    iconWrapper.innerHTML = model.installed
+      ? '<i data-lucide="check-circle" class="model-status-ok"></i>'
+      : '<i data-lucide="download-cloud" class="model-status-missing"></i>';
+    card.appendChild(iconWrapper);
+
+    const info = document.createElement('div');
+    info.className = 'model-card-info';
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'model-card-name';
+    nameSpan.textContent = model.name;
+    const sizeSpan = document.createElement('span');
+    sizeSpan.className = 'model-card-size';
+    sizeSpan.textContent = this._formatSize(model.size);
+    info.appendChild(nameSpan);
+    info.appendChild(sizeSpan);
+    card.appendChild(info);
+
+    const actionDiv = document.createElement('div');
+    actionDiv.className = 'model-card-action';
+    if (model.installed) {
+      const installedSpan = document.createElement('span');
+      installedSpan.className = 'model-card-installed';
+      installedSpan.textContent = 'Installed';
+      actionDiv.appendChild(installedSpan);
+    } else {
+      const downloadBtn = document.createElement('button');
+      downloadBtn.className = 'btn-model-download';
+      downloadBtn.dataset.model = model.key;
+      downloadBtn.textContent = 'Download';
+      downloadBtn.addEventListener('click', () => this._startDownload(model.key));
+      actionDiv.appendChild(downloadBtn);
+    }
+    card.appendChild(actionDiv);
+
+    return card;
+  }
+
+  /**
+   * Start downloading a model.
+   * @param {string} modelKey - Model identifier
+   */
+  async _startDownload(modelKey) {
+    this._showStatus(`Starting download for ${modelKey}...`, 'info');
+
+    try {
+      const res = await fetch('/api/forge3d/models/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: modelKey })
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(err.error || res.statusText);
+      }
+
+      const data = await res.json();
+
+      if (data.status === 'already_installed') {
+        this._showStatus(`${modelKey} is already installed`, 'info');
+        this._checkModelStatus();
+        return;
+      }
+
+      this._showStatus(`Downloading ${modelKey}...`, 'info');
+      this._pollDownloadProgress(modelKey);
+
+    } catch (err) {
+      this._showStatus(`Download failed: ${err.message}`, 'error');
+      console.error('[FORGE3D-PANEL] Download error:', err.message);
+    }
+  }
+
+  /**
+   * Poll download progress and update UI.
+   * @param {string} modelKey - Model identifier
+   */
+  _pollDownloadProgress(modelKey) {
+    const pollMs = 2000;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch('/api/forge3d/models/status');
+        if (!res.ok) return;
+
+        const data = await res.json();
+        const download = data.activeDownloads?.[modelKey];
+
+        if (!download) {
+          clearInterval(interval);
+          this._showStatus(`${modelKey} download complete`, 'success');
+          this._checkModelStatus();
+          return;
+        }
+
+        const pct = download.progress?.percent || 0;
+        const downloaded = this._formatSize(download.progress?.downloaded || 0);
+        const total = this._formatSize(download.progress?.total || 0);
+        const speed = this._formatSize(download.progress?.speed || 0);
+
+        this._showStatus(
+          `Downloading ${modelKey}: ${pct}% (${downloaded}/${total} @ ${speed}/s)`,
+          'info'
+        );
+
+        this._updateModelCardProgress(modelKey, pct);
+
+      } catch (err) {
+        console.warn('[FORGE3D-PANEL] Download poll error:', err.message);
+      }
+    }, pollMs);
+  }
+
+  /**
+   * Update model card with download progress.
+   * @param {string} modelKey - Model identifier
+   * @param {number} percent - Progress percentage
+   */
+  _updateModelCardProgress(modelKey, percent) {
+    const banner = document.getElementById('forge3d-model-status');
+    if (!banner) return;
+
+    const card = banner.querySelector(`[data-model="${modelKey}"]`)?.closest('.model-card');
+    if (!card) return;
+
+    const actionDiv = card.querySelector('.model-card-action');
+    if (!actionDiv) return;
+
+    const safePct = Math.min(Math.max(Number(percent) || 0, 0), 100);
+
+    actionDiv.innerHTML = '';
+    const barOuter = document.createElement('div');
+    barOuter.className = 'model-progress-bar';
+    const barFill = document.createElement('div');
+    barFill.className = 'model-progress-fill';
+    barFill.style.width = `${safePct}%`;
+    barOuter.appendChild(barFill);
+    actionDiv.appendChild(barOuter);
+
+    const pctText = document.createElement('span');
+    pctText.className = 'model-progress-text';
+    pctText.textContent = `${safePct}%`;
+    actionDiv.appendChild(pctText);
   }
 
   // --- UI Helpers ---
