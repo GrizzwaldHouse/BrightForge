@@ -54,9 +54,13 @@ class DesignViewer {
   populateStyleSelect() {
     if (!this.elements.styleSelect) return;
 
-    this.elements.styleSelect.innerHTML = this.styles.map(style =>
-      `<option value="${style.name}">${style.label}</option>`
-    ).join('');
+    this.elements.styleSelect.innerHTML = '';
+    this.styles.forEach(style => {
+      const opt = document.createElement('option');
+      opt.value = style.name;
+      opt.textContent = style.label;
+      this.elements.styleSelect.appendChild(opt);
+    });
   }
 
   async generateDesign() {
@@ -103,40 +107,55 @@ class DesignViewer {
     // Show preview container
     this.elements.previewContainer.classList.remove('hidden');
 
-    // Render images
-    this.elements.imagesContainer.innerHTML = preview.images.map((img, _i) => `
-      <div class="design-image-card">
-        <img src="${img.path}" alt="${img.alt}" loading="lazy">
-        <div class="image-meta">
-          <div class="image-role">${img.role}</div>
-          <div class="image-provider">${img.provider}</div>
-        </div>
-      </div>
-    `).join('');
+    // Render images using DOM APIs
+    this.elements.imagesContainer.innerHTML = '';
+    preview.images.forEach((img) => {
+      const card = document.createElement('div');
+      card.className = 'design-image-card';
 
-    // Render metadata
-    this.elements.metadataContainer.innerHTML = `
-      <div class="metadata-row">
-        <span class="label">Style:</span>
-        <span class="value">${preview.style}</span>
-      </div>
-      <div class="metadata-row">
-        <span class="label">Images:</span>
-        <span class="value">${preview.images.length}</span>
-      </div>
-      <div class="metadata-row">
-        <span class="label">HTML Size:</span>
-        <span class="value">${(preview.htmlLength / 1024).toFixed(1)} KB</span>
-      </div>
-      <div class="metadata-row">
-        <span class="label">Cost:</span>
-        <span class="value">$${preview.cost.toFixed(4)}</span>
-      </div>
-      <div class="metadata-row">
-        <span class="label">Generated:</span>
-        <span class="value">${new Date(preview.timestamp).toLocaleString()}</span>
-      </div>
-    `;
+      const imgEl = document.createElement('img');
+      imgEl.src = img.path;
+      imgEl.alt = img.alt;
+      imgEl.loading = 'lazy';
+      card.appendChild(imgEl);
+
+      const meta = document.createElement('div');
+      meta.className = 'image-meta';
+      const roleDiv = document.createElement('div');
+      roleDiv.className = 'image-role';
+      roleDiv.textContent = img.role;
+      const providerDiv = document.createElement('div');
+      providerDiv.className = 'image-provider';
+      providerDiv.textContent = img.provider;
+      meta.appendChild(roleDiv);
+      meta.appendChild(providerDiv);
+      card.appendChild(meta);
+
+      this.elements.imagesContainer.appendChild(card);
+    });
+
+    // Render metadata using DOM APIs
+    this.elements.metadataContainer.innerHTML = '';
+    const metaRows = [
+      { label: 'Style:', value: preview.style },
+      { label: 'Images:', value: preview.images.length },
+      { label: 'HTML Size:', value: `${(preview.htmlLength / 1024).toFixed(1)} KB` },
+      { label: 'Cost:', value: `$${preview.cost.toFixed(4)}` },
+      { label: 'Generated:', value: new Date(preview.timestamp).toLocaleString() }
+    ];
+    metaRows.forEach((row) => {
+      const div = document.createElement('div');
+      div.className = 'metadata-row';
+      const labelSpan = document.createElement('span');
+      labelSpan.className = 'label';
+      labelSpan.textContent = row.label;
+      const valueSpan = document.createElement('span');
+      valueSpan.className = 'value';
+      valueSpan.textContent = row.value;
+      div.appendChild(labelSpan);
+      div.appendChild(valueSpan);
+      this.elements.metadataContainer.appendChild(div);
+    });
 
     // Enable action buttons
     this.elements.approveBtn.disabled = false;

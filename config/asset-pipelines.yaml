@@ -1,0 +1,139 @@
+# Asset Pipeline Definitions
+# Config-driven pipeline stages for the Forge3D asset orchestration system.
+# Each pipeline defines an ordered list of stages with handler references,
+# configuration, and optional supervisor validation gates.
+#
+# Stages execute sequentially. If a stage fails or a gate rejects,
+# the pipeline halts with status 'failed'.
+
+defaults:
+  timeout_ms: 600000        # 10 min total pipeline timeout
+  stage_timeout_ms: 300000  # 5 min per stage
+  retry_on_failure: false
+  emit_sse_events: true
+
+pipelines:
+  generate_game_asset:
+    description: "Full game-ready asset pipeline: generate, optimize, LOD, validate, export"
+    stages:
+      - name: generate_mesh
+        handler: generate-mesh
+        config:
+          type: full
+          default_model: auto
+        gate: null
+
+      - name: optimize_mesh
+        handler: optimize-mesh
+        config:
+          target_faces: 10000
+          preset: desktop
+        gate: null
+
+      - name: generate_lods
+        handler: generate-lods
+        config:
+          levels:
+            - label: high
+              ratio: 1.0
+            - label: mid
+              ratio: 0.5
+            - label: low
+              ratio: 0.25
+        gate: null
+
+      - name: quality_check
+        handler: quality-check
+        config:
+          max_faces: 50000
+          min_faces: 100
+          require_manifold: false
+        gate: supervisor
+
+      - name: export_asset
+        handler: export-asset
+        config:
+          formats:
+            - glb
+          save_to_project: true
+        gate: null
+
+  generate_prop_asset:
+    description: "Lightweight prop pipeline: generate, optimize for web/mobile, validate"
+    stages:
+      - name: generate_mesh
+        handler: generate-mesh
+        config:
+          type: full
+          default_model: auto
+        gate: null
+
+      - name: optimize_mesh
+        handler: optimize-mesh
+        config:
+          target_faces: 5000
+          preset: web
+        gate: null
+
+      - name: quality_check
+        handler: quality-check
+        config:
+          max_faces: 10000
+          min_faces: 50
+          require_manifold: false
+        gate: supervisor
+
+      - name: export_asset
+        handler: export-asset
+        config:
+          formats:
+            - glb
+          save_to_project: true
+        gate: null
+
+  generate_environment_asset:
+    description: "Environment asset pipeline: generate, high-poly optimize, full LOD chain, validate"
+    stages:
+      - name: generate_mesh
+        handler: generate-mesh
+        config:
+          type: full
+          default_model: auto
+        gate: null
+
+      - name: optimize_mesh
+        handler: optimize-mesh
+        config:
+          target_faces: 50000
+          preset: unreal
+        gate: null
+
+      - name: generate_lods
+        handler: generate-lods
+        config:
+          levels:
+            - label: high
+              ratio: 1.0
+            - label: mid
+              ratio: 0.5
+            - label: low
+              ratio: 0.2
+            - label: cull
+              ratio: 0.05
+        gate: null
+
+      - name: quality_check
+        handler: quality-check
+        config:
+          max_faces: 100000
+          min_faces: 500
+          require_manifold: false
+        gate: supervisor
+
+      - name: export_asset
+        handler: export-asset
+        config:
+          formats:
+            - glb
+          save_to_project: true
+        gate: null

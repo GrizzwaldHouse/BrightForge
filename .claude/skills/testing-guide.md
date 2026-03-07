@@ -79,10 +79,23 @@ if (process.argv.includes('--test')) {
 - Mock external services (LLM APIs, Python server) rather than calling them
 - Prefix unused mock parameters with underscore: `function mockFetch(_url, _opts) {}`
 
+## Frontend Testing Notes
+
+- Frontend JS files use `<script>` tags, NOT ES modules
+- Classes must be exposed via `window.ClassName = ClassName;` (LS-017)
+- Add `/* global ClassName */` declarations for ESLint
+- Test in browser via dashboard (no automated frontend tests yet)
+- Check `sessions/bridge-errors.log` for Python subprocess issues
+
 ## Before Committing
 
 ```bash
-npm run lint:fix    # Auto-fix formatting
-npm run lint        # Check for remaining issues
+npm run lint:fix    # Auto-fix formatting (single quotes, semicolons, etc.)
+npm run lint        # Check for remaining issues (especially no-undef for globals)
 npm run test-all-core  # Run core test suite
 ```
+
+Common ESLint issues to check:
+- `no-undef` on global classes: add `/* global ClassName */` at file top
+- Double quotes: ESLint enforces single quotes
+- `no-unused-vars`: prefix unused params with underscore (`_param`)

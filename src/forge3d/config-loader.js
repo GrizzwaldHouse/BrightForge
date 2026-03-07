@@ -57,7 +57,9 @@ class Forge3DConfig {
       max_image_size_bytes: 20 * 1024 * 1024,
       min_prompt_length: 3,
       max_prompt_length: 2000,
-      download_timeout_ms: 30000
+      download_timeout_ms: 30000,
+      default_mesh_model: 'hunyuan3d',
+      default_image_model: 'sdxl'
     });
 
     this.database = this._section('database', {
@@ -195,7 +197,9 @@ class Forge3DConfig {
       ui: this.ui,
       generation: {
         max_image_size_bytes: this.generation.max_image_size_bytes,
-        min_prompt_length: this.generation.min_prompt_length
+        min_prompt_length: this.generation.min_prompt_length,
+        default_mesh_model: this.generation.default_mesh_model,
+        default_image_model: this.generation.default_image_model
       },
       promptTemplates: this.promptTemplates,
       hasEnhancer: true,

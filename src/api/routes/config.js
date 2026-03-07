@@ -31,7 +31,8 @@ export function configRoutes() {
     try {
       try {
         console.log('[ROUTE] /api/config - loading config');
-      } catch (e) { /* ignore EPIPE */ }
+      // eslint-disable-next-line no-empty
+      } catch (_e) { }
 
       const configPath = join(__dirname, '../../../config/llm-providers.yaml');
 
@@ -68,10 +69,7 @@ export function configRoutes() {
 
     } catch (error) {
       console.error(`[ROUTE] /api/config error: ${error.message}`);
-      res.status(500).json({
-        error: 'Internal server error',
-        message: error.message
-      });
+      res.status(500).json({ error: 'Internal server error' });
     }
   });
 
@@ -120,10 +118,10 @@ export function configRoutes() {
         timestamp: new Date().toISOString()
       });
 
-    } catch (error) {
+    } catch (_error) {
       res.status(503).json({
         ready: false,
-        error: error.message,
+        error: 'Readiness check failed',
         timestamp: new Date().toISOString()
       });
     }
@@ -138,7 +136,8 @@ export function configRoutes() {
     try {
       try {
         console.log('[ROUTE] /api/health - checking system health');
-      } catch (e) { /* ignore EPIPE */ }
+      // eslint-disable-next-line no-empty
+      } catch (_e) { }
 
       const client = new UniversalLLMClient();
 
@@ -188,7 +187,7 @@ export function configRoutes() {
       console.error(`[ROUTE] /api/health error: ${error.message}`);
       res.status(500).json({
         status: 'error',
-        error: error.message,
+        error: 'Internal server error',
         timestamp: new Date().toISOString()
       });
     }

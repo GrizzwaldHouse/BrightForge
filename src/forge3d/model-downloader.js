@@ -9,7 +9,7 @@
  *         but not yet tested against live HuggingFace downloads.
  *
  * TODO(P0): Test downloadModel() end-to-end with real HuggingFace repos
- * TODO(P0): Verify Shap-E and SDXL actual file lists match repo contents
+ * TODO(P0): Verify Hunyuan3D and SDXL actual file lists match repo contents
  *           (current files[] may be incomplete — diffusers downloads many shards)
  * TODO(P1): Add SHA-256 content hash verification (currently hashes file sizes only)
  * TODO(P1): Coordinate with python/setup.py — it has its own download logic;
@@ -49,12 +49,12 @@ class ModelDownloader extends EventEmitter {
 
     // Known models with metadata
     this.models = new Map([
-      ['shap_e', {
-        name: 'Shap-E Img2Img',
-        repo: 'openai/shap-e-img2img',
-        description: 'Single image to 3D mesh generation',
+      ['hunyuan3d', {
+        name: 'Hunyuan3D 2.1',
+        repo: 'tencent/Hunyuan3D-2',
+        description: 'Image/text to textured 3D mesh generation',
         files: ['model_index.json'],
-        totalSize: 1_000_000_000
+        totalSize: 8_000_000_000
       }],
       ['sdxl', {
         name: 'Stable Diffusion XL',
@@ -138,7 +138,7 @@ class ModelDownloader extends EventEmitter {
 
   /**
    * Check if a specific model is installed (has .download_complete marker).
-   * @param {string} modelName - Model key (e.g. 'shap_e')
+   * @param {string} modelName - Model key (e.g. 'hunyuan3d')
    * @returns {boolean}
    */
   isModelInstalled(modelName) {
@@ -149,7 +149,7 @@ class ModelDownloader extends EventEmitter {
 
   /**
    * Download all files for a model from HuggingFace.
-   * @param {string} modelName - Model key (e.g. 'shap_e')
+   * @param {string} modelName - Model key (e.g. 'hunyuan3d')
    * @returns {Promise<boolean>} true if download completed successfully
    */
   async downloadModel(modelName) {
@@ -594,23 +594,23 @@ if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(pr
 
     // Test 4: isModelInstalled
     console.log('\n[TEST] Test 4: isModelInstalled...');
-    const shap_eInstalled = downloader.isModelInstalled('shap_e');
-    console.assert(typeof shap_eInstalled === 'boolean', 'Should return boolean');
-    console.log(`  shap_e installed: ${shap_eInstalled}`);
+    const hunyuan3dInstalled = downloader.isModelInstalled('hunyuan3d');
+    console.assert(typeof hunyuan3dInstalled === 'boolean', 'Should return boolean');
+    console.log(`  hunyuan3d installed: ${hunyuan3dInstalled}`);
     console.log('[TEST] isModelInstalled: PASSED');
 
     // Test 5: getDownloadProgress (no active download)
     console.log('\n[TEST] Test 5: getDownloadProgress (idle)...');
-    const progress = downloader.getDownloadProgress('shap_e');
+    const progress = downloader.getDownloadProgress('hunyuan3d');
     console.assert(progress === null, 'Should return null when no download active');
     console.log('[TEST] getDownloadProgress: PASSED');
 
     // Test 6: verifyModel
     console.log('\n[TEST] Test 6: verifyModel...');
-    const verification = await downloader.verifyModel('shap_e');
+    const verification = await downloader.verifyModel('hunyuan3d');
     console.assert(typeof verification.valid === 'boolean', 'Should have valid flag');
     console.assert(typeof verification.details === 'object', 'Should have details');
-    console.log(`  shap_e valid: ${verification.valid}`);
+    console.log(`  hunyuan3d valid: ${verification.valid}`);
     console.log('[TEST] verifyModel: PASSED');
 
     // Test 7: Unknown model errors

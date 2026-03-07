@@ -18,3 +18,6 @@ MarcusDaleyComputer Graphics_lab4/
 BrightForge/
 DeveloperProductivityTracker/
 StructuredLogging/
+__pycache__/
+*.pyc
+.claude/worktrees/

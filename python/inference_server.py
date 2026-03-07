@@ -1,22 +1,8 @@
-"""
-ForgePipeline Inference Server
-
-FastAPI server for AI-powered 3D mesh generation.
-Bridges Node.js BrightForge with Python GPU inference.
-
-Endpoints:
-  POST /generate/mesh   - Image -> GLB mesh via Shap-E (+ optional FBX)
-  POST /generate/image  - Text prompt -> PNG image
-  POST /generate/full   - Text prompt -> SDXL image -> Shap-E mesh + FBX (two-stage)
-  POST /convert/glb-to-fbx - Convert existing GLB to FBX
-  GET  /convert/status  - FBX converter availability
-  POST /extract-materials - Extract PBR textures + UE5 manifest from GLB
-  GET  /material-presets  - List available UE5 material presets
-  GET  /health          - GPU status, model loaded state
-  GET  /status          - VRAM usage, current operation
-
-Usage: python python/inference_server.py [--port 8001] [--host 127.0.0.1]
-"""
+# inference_server.py
+# Developer: Marcus Daley
+# Date: March 5, 2026
+# Purpose: FastAPI server bridging Node.js BrightForge with Python GPU inference.
+#          Supports pluggable model adapters via model param on generation endpoints.
 
 import asyncio
 import os
@@ -168,18 +154,28 @@ async def status():
     return model_manager.get_status()
 
 
+@app.get('/models')
+async def list_models():
+    """List all registered model adapters and their current state."""
+    return {
+        'models': model_manager.get_available_models(),
+    }
+
+
 # --- Generation Endpoints ---
 
 @app.post('/generate/mesh')
 async def generate_mesh(
     image: UploadFile = File(...),
     job_id: str = Form(default=None),
+    model: str = Form(default=None),
     format: str = Query(default='file', description='Response format: "file" (raw GLB) or "json" (metadata with download paths)'),
 ):
-    """Generate 3D mesh from uploaded image.
+    """Generate 3D textured mesh from uploaded image.
 
     Accepts: PNG, JPG image file
     Returns: GLB mesh file (default) or JSON with download paths (?format=json)
+    model: Adapter name (default from config, e.g. 'hunyuan3d')
     """
     if job_id is None:
         job_id = generate_job_id()
@@ -213,7 +209,7 @@ async def generate_mesh(
         if max(img.size) > max_dim:
             raise HTTPException(400, f'Image too large: {img.size}. Maximum {max_dim}x{max_dim}.')
 
-        result = await asyncio.to_thread(model_manager.generate_mesh, img, output_path)
+        result = await asyncio.to_thread(model_manager.generate_mesh, img, output_path, model)
 
         if not result['success']:
             raise HTTPException(500, f'Generation failed: {result.get("error")}')
@@ -274,10 +270,12 @@ async def generate_image(
     height: int = Form(default=1024),
     steps: int = Form(default=25),
     job_id: str = Form(default=None),
+    model: str = Form(default=None),
 ):
-    """Generate image from text prompt using SDXL.
+    """Generate image from text prompt.
 
     Returns: PNG image file
+    model: Adapter name (default from config, e.g. 'sdxl')
     """
     if job_id is None:
         job_id = generate_job_id()
@@ -312,6 +310,7 @@ async def generate_image(
             width=width,
             height=height,
             steps=steps,
+            model=model,
         )
 
         if not result['success']:
@@ -347,11 +346,14 @@ async def generate_full(
     prompt: str = Form(...),
     steps: int = Form(default=25),
     job_id: str = Form(default=None),
+    image_model: str = Form(default=None),
+    mesh_model: str = Form(default=None),
 ):
-    """Full text-to-3D pipeline: Text -> SDXL Image -> Shap-E Mesh.
+    """Full text-to-3D pipeline: image generation -> mesh generation.
 
     Two-stage pipeline with sequential VRAM management.
     Returns: JSON with paths to both image and mesh.
+    image_model / mesh_model: Adapter names (default from config).
     """
     if job_id is None:
         job_id = generate_job_id()
@@ -376,6 +378,8 @@ async def generate_full(
             prompt=prompt.strip(),
             output_dir=output_dir,
             steps=steps,
+            image_model=image_model,
+            mesh_model=mesh_model,
         )
 
         if not result['success']:

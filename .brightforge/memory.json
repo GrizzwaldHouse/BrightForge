@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "techStack": {
+    "detected": [
+      "JavaScript",
+      "Node.js"
+    ],
+    "confirmed": []
+  },
+  "conventions": {
+    "code": [],
+    "design": [],
+    "forge3d": []
+  },
+  "corrections": [],
+  "preferences": {},
+  "successfulPatterns": []
+}

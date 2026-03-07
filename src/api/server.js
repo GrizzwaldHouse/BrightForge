@@ -13,8 +13,11 @@
  */
 
 import express from 'express';
+import helmet from 'helmet';
+import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { parse } from 'yaml';
 import { SessionStore } from './session-store.js';
 import { chatRoutes } from './routes/chat.js';
 import { sessionRoutes } from './routes/sessions.js';
@@ -25,6 +28,9 @@ import designRoutes from './routes/design.js';
 import forge3dRoutes from './routes/forge3d.js';
 import { memoryRoutes } from './routes/memory.js';
 import { costRoutes } from './routes/cost.js';
+import pipelineRoutes from './routes/pipelines.js';
+import { authMiddleware } from './middleware/auth.js';
+import { generalLimiter } from './middleware/rate-limit.js';
 import errorHandler from '../core/error-handler.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -40,19 +46,47 @@ export function createServer(options = {}) {
 
   console.log('[SERVER] Creating Express server...');
 
-  // Middleware
+  // Load security config for CORS origins
+  let allowedOrigins = ['http://localhost:3847'];
+  try {
+    const configPath = join(__dirname, '../../config/agent-config.yaml');
+    const raw = readFileSync(configPath, 'utf8');
+    const config = parse(raw);
+    if (config.security?.cors_origins) {
+      allowedOrigins = config.security.cors_origins;
+    }
+  } catch (_e) {
+    // Use defaults
+  }
+
+  // 1. Security headers (helmet)
+  app.use(helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false
+  }));
+
+  // 2. Body parser
   app.use(express.json({ limit: '1mb' }));
 
-  // CORS for local development
+  // 3. CORS — config-driven allowed origins
   app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
+    const origin = req.headers.origin;
+    if (!origin || allowedOrigins.includes(origin)) {
+      res.header('Access-Control-Allow-Origin', origin || allowedOrigins[0]);
+    }
     res.header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     if (req.method === 'OPTIONS') return res.sendStatus(204);
     next();
   });
 
-  // Attach store to all requests
+  // 4. Bearer token auth (disabled when BRIGHTFORGE_API_KEY not set)
+  app.use(authMiddleware);
+
+  // 5. General rate limit on all /api/* routes
+  app.use('/api', generalLimiter);
+
+  // 6. Attach store to all requests
   app.use((req, res, next) => {
     req.store = store;
     req.sessionsDir = options.sessionsDir || join(__dirname, '../../sessions');
@@ -68,6 +102,7 @@ export function createServer(options = {}) {
   app.use('/api/forge3d', forge3dRoutes);
   app.use('/api/memory', memoryRoutes());
   app.use('/api/cost', costRoutes());
+  app.use('/api/pipelines', pipelineRoutes);
   app.use('/api', configRoutes());
 
   // Static frontend
@@ -83,7 +118,7 @@ export function createServer(options = {}) {
     }
   });
 
-  // Error handling middleware (enhanced with observer-pattern error reporting)
+  // Error handling middleware (sanitized — no stack traces in response)
   app.use((err, req, res, _next) => {
     console.error(`[SERVER] Error: ${err.message}`);
     const errorId = errorHandler.report('server_error', err, {
@@ -93,7 +128,6 @@ export function createServer(options = {}) {
     });
     res.status(500).json({
       error: 'Internal server error',
-      message: err.message,
       errorId
     });
   });

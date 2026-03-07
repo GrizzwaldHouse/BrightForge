@@ -29,7 +29,7 @@ export function memoryRoutes() {
       res.json(projectMemory.getData());
     } catch (error) {
       console.error(`[ROUTE] /api/memory error: ${error.message}`);
-      res.status(500).json({ error: 'Internal server error', message: error.message });
+      res.status(500).json({ error: 'Internal server error' });
     }
   });
 
@@ -56,7 +56,7 @@ export function memoryRoutes() {
       res.json({ status: 'added', category, text });
     } catch (error) {
       console.error(`[ROUTE] /api/memory/convention error: ${error.message}`);
-      res.status(500).json({ error: 'Internal server error', message: error.message });
+      res.status(500).json({ error: 'Internal server error' });
     }
   });
 
@@ -80,7 +80,7 @@ export function memoryRoutes() {
       }
     } catch (error) {
       console.error(`[ROUTE] /api/memory/convention delete error: ${error.message}`);
-      res.status(500).json({ error: 'Internal server error', message: error.message });
+      res.status(500).json({ error: 'Internal server error' });
     }
   });
 
@@ -97,7 +97,7 @@ export function memoryRoutes() {
       res.json({ status: 'cleared' });
     } catch (error) {
       console.error(`[ROUTE] /api/memory/clear error: ${error.message}`);
-      res.status(500).json({ error: 'Internal server error', message: error.message });
+      res.status(500).json({ error: 'Internal server error' });
     }
   });
 

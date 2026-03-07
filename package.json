@@ -50,7 +50,8 @@
     "test-supervisor": "node src/orchestration/supervisor.js --test",
     "test-handoff": "node src/orchestration/handoff.js --test",
     "test-orchestrator": "node src/orchestration/index.js --test",
-    "test-multi-model": "node src/forge3d/test-multi-model.js --test"
+    "test-multi-model": "node src/forge3d/test-multi-model.js --test",
+    "test-pipeline": "node src/forge3d/pipeline/test-pipeline.js --test"
   },
   "keywords": [
     "coding-agent",

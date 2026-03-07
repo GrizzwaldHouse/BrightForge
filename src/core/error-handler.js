@@ -25,12 +25,13 @@ import { join } from 'path';
 import { randomUUID } from 'crypto';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { createStream } from 'rotating-file-stream';
 import telemetryBus from './telemetry-bus.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const VALID_CATEGORIES = ['provider_error', 'plan_error', 'apply_error', 'session_error', 'server_error', 'fatal', 'forge3d_error', 'bridge_error', 'gpu_error', 'orchestration_error', 'handoff_error', 'supervisor_error'];
+const VALID_CATEGORIES = ['provider_error', 'plan_error', 'apply_error', 'session_error', 'server_error', 'fatal', 'forge3d_error', 'bridge_error', 'gpu_error', 'orchestration_error', 'handoff_error', 'supervisor_error', 'pipeline_error'];
 const VALID_SEVERITIES = ['warning', 'error', 'fatal'];
 
 class ErrorHandler extends EventEmitter {
@@ -44,6 +45,7 @@ class ErrorHandler extends EventEmitter {
     this.crashReportsEnabled = true;
     this.initialized = false;
     this.startTime = Date.now();
+    this._rotatingStream = null;
 
     // Retry tracking: { key: { attempts: 0, lastAttempt: 0 } }
     this.retryState = new Map();
@@ -83,6 +85,22 @@ class ErrorHandler extends EventEmitter {
     this.logFilePath = logFile.startsWith('/')
       ? logFile
       : join(sessionsDir, logFile.replace('sessions/', ''));
+
+    // Set up rotating file stream for log rotation
+    const rotation = config.log_rotation || {};
+    try {
+      this._rotatingStream = createStream(logFile.replace('sessions/', ''), {
+        path: sessionsDir,
+        size: rotation.max_size || '10M',
+        maxFiles: rotation.max_files || 30,
+        compress: rotation.compress !== false ? 'gzip' : false
+      });
+      this._rotatingStream.on('error', (err) => {
+        console.error(`[ERROR-HANDLER] Log rotation stream error: ${err.message}`);
+      });
+    } catch (rotErr) {
+      console.warn(`[ERROR-HANDLER] Log rotation init failed, using appendFileSync: ${rotErr.message}`);
+    }
 
     // Register process-level handlers
     this._registerProcessHandlers();
@@ -125,12 +143,17 @@ class ErrorHandler extends EventEmitter {
     this.errorCounts.byCategory[category] = (this.errorCounts.byCategory[category] || 0) + 1;
     this.errorCounts.bySeverity[severity] = (this.errorCounts.bySeverity[severity] || 0) + 1;
 
-    // 3. Append to JSONL file
-    if (this.logFilePath) {
+    // 3. Append to JSONL file (rotating stream preferred, appendFileSync fallback)
+    if (this._rotatingStream) {
+      try {
+        this._rotatingStream.write(JSON.stringify(entry) + '\n');
+      } catch (streamError) {
+        console.error(`[ERROR-HANDLER] Failed to write rotating log: ${streamError.message}`);
+      }
+    } else if (this.logFilePath) {
       try {
         appendFileSync(this.logFilePath, JSON.stringify(entry) + '\n', 'utf8');
       } catch (fileError) {
-        // Don't recurse — just log to console
         console.error(`[ERROR-HANDLER] Failed to write JSONL: ${fileError.message}`);
       }
     }

@@ -50,7 +50,7 @@ export function costRoutes() {
       });
     } catch (error) {
       console.error(`[ROUTE] /api/cost/summary error: ${error.message}`);
-      res.status(500).json({ error: 'Internal server error', message: error.message });
+      res.status(500).json({ error: 'Internal server error' });
     }
   });
 
@@ -86,7 +86,7 @@ export function costRoutes() {
       });
     } catch (error) {
       console.error(`[ROUTE] /api/cost/session/:id error: ${error.message}`);
-      res.status(500).json({ error: 'Internal server error', message: error.message });
+      res.status(500).json({ error: 'Internal server error' });
     }
   });
 

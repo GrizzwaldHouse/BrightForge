@@ -54,8 +54,7 @@ export function metricsRoutes() {
     } catch (error) {
       console.error(`[ROUTE] /api/metrics error: ${error.message}`);
       res.status(500).json({
-        error: 'Internal server error',
-        message: error.message
+        error: 'Internal server error'
       });
     }
   });
@@ -81,8 +80,7 @@ export function metricsRoutes() {
     } catch (error) {
       console.error(`[ROUTE] /api/metrics/providers error: ${error.message}`);
       res.status(500).json({
-        error: 'Internal server error',
-        message: error.message
+        error: 'Internal server error'
       });
     }
   });
@@ -128,8 +126,7 @@ export function metricsRoutes() {
     } catch (error) {
       console.error(`[ROUTE] /api/metrics/stream error: ${error.message}`);
       res.status(500).json({
-        error: 'Internal server error',
-        message: error.message
+        error: 'Internal server error'
       });
     }
   });

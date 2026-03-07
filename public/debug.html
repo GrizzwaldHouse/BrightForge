@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BrightForge Debug Console</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: 'Courier New', monospace;
+      background: #0a0e27;
+      color: #e0e7ff;
+    }
+    h1 {
+      color: #5096ff;
+      border-bottom: 2px solid #5096ff;
+      padding-bottom: 10px;
+    }
+    .status {
+      background: #16213e;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 10px 0;
+    }
+    .status.ok {
+      border-left: 4px solid #22c55e;
+    }
+    .status.error {
+      border-left: 4px solid #ef4444;
+    }
+    pre {
+      background: #1a1e3a;
+      padding: 15px;
+      border-radius: 8px;
+      overflow: auto;
+    }
+    button {
+      background: #5096ff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    button:hover {
+      background: #4080e8;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔍 BrightForge Debug Console</h1>
+
+  <div class="status ok">
+    <h2>✓ Debug page loaded successfully</h2>
+    <p>Server is responding. Time: <span id="time"></span></p>
+  </div>
+
+  <div class="status">
+    <h2>Server Health Check</h2>
+    <button onclick="checkHealth()">Check /api/health</button>
+    <button onclick="checkConfig()">Check /api/config</button>
+    <pre id="health-output">Click a button to test API endpoints</pre>
+  </div>
+
+  <div class="status">
+    <h2>Module Loading Test</h2>
+    <button onclick="testModuleLoad()">Test ES Module Import</button>
+    <pre id="module-output">Click to test module imports</pre>
+  </div>
+
+  <div class="status">
+    <h2>Instructions</h2>
+    <ol>
+      <li>Open the main dashboard at <a href="/" style="color: #5096ff;">http://localhost:3847/</a></li>
+      <li>Open Chrome DevTools (F12 or Ctrl+Shift+I)</li>
+      <li>Go to the <strong>Console</strong> tab</li>
+      <li>Look for messages starting with <code>[APP]</code></li>
+      <li>Check for any errors in red</li>
+    </ol>
+    <p><strong>Expected console output sequence:</strong></p>
+    <pre>[APP] ===== app.js LOADING =====
+[APP] Importing ChatPanel...
+[APP] Importing PlanViewer...
+...
+[APP] ===== SCRIPT LOADED =====
+[APP] Waiting for DOMContentLoaded...
+[APP] ===== DOM CONTENT LOADED =====
+[APP] Creating App instance...
+[APP] Constructor started
+...</pre>
+  </div>
+
+  <script>
+    document.getElementById('time').textContent = new Date().toLocaleTimeString();
+
+    async function checkHealth() {
+      const output = document.getElementById('health-output');
+      try {
+        output.textContent = 'Fetching...';
+        const res = await fetch('/api/health');
+        const data = await res.json();
+        output.textContent = JSON.stringify(data, null, 2);
+      } catch (error) {
+        output.textContent = 'ERROR: ' + error.message;
+      }
+    }
+
+    async function checkConfig() {
+      const output = document.getElementById('health-output');
+      try {
+        output.textContent = 'Fetching...';
+        const res = await fetch('/api/config');
+        const data = await res.json();
+        output.textContent = JSON.stringify(data, null, 2);
+      } catch (error) {
+        output.textContent = 'ERROR: ' + error.message;
+      }
+    }
+
+    async function testModuleLoad() {
+      const output = document.getElementById('module-output');
+      try {
+        output.textContent = 'Testing module import...';
+        const module = await import('/js/chat.js');
+        output.textContent = 'SUCCESS: ChatPanel module loaded\n\n' + JSON.stringify(Object.keys(module), null, 2);
+      } catch (error) {
+        output.textContent = 'ERROR: ' + error.message + '\n\nStack:\n' + error.stack;
+      }
+    }
+
+    console.log('[DEBUG] Debug page console.log test - if you see this, console is working');
+  </script>
+</body>
+</html>

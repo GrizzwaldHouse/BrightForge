@@ -16,19 +16,24 @@
  * TODO(P2): Windows service mode for persistent background operation
  *
  * @author Marcus Daley (GrizzwaldHouse)
- * @date February 14, 2026
+ * @date March 4, 2026
  */
 
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { createWriteStream, statSync } from 'fs';
 import { EventEmitter } from 'events';
 import forge3dConfig from './config-loader.js';
+import telemetryBus from '../core/telemetry-bus.js';
+import errorHandler from '../core/error-handler.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const PYTHON_DIR = join(__dirname, '../../python');
+const ERROR_LOG_PATH = join(__dirname, '../../sessions/bridge-errors.log');
+const MAX_LOG_SIZE = 1024 * 1024; // 1MB
 
 class ModelBridge extends EventEmitter {
   constructor(options = {}) {
@@ -40,12 +45,14 @@ class ModelBridge extends EventEmitter {
     this.healthInterval = null;
     this.state = 'stopped'; // stopped | starting | running | error | unavailable
     this.restartCount = 0;
+    this.totalRestarts = 0; // Cumulative across entire lifecycle
     this.lastHealthCheck = null;
     this.startTime = null;
     this.consecutiveHealthFailures = 0;
     this.unavailableReason = null;
     this.pythonCmd = null; // Discovered Python command (python, python3, python3.13, etc.)
     this.pythonPrefixArgs = []; // Prefix args for py launcher (e.g., ['-3.13'])
+    this.stderrStream = null;
   }
 
   /**
@@ -64,6 +71,10 @@ class ModelBridge extends EventEmitter {
     }
 
     this.state = 'starting';
+    const startupStart = Date.now();
+
+    // Initialize stderr logging stream
+    this._initErrorLog();
 
     // Pre-flight environment checks before spawning Python
     const envCheck = await this._checkEnvironment();
@@ -82,6 +93,13 @@ class ModelBridge extends EventEmitter {
     for (let port = startPort; port <= endPort; port++) {
       this.port = port;
       this.baseUrl = `http://${this.host}:${this.port}`;
+
+      // Skip ports already occupied by another server
+      if (await this._isPortOccupied(port)) {
+        console.warn(`[BRIDGE] Port ${port} is already occupied, skipping`);
+        continue;
+      }
+
       console.log(`[BRIDGE] Starting Python inference server on ${this.host}:${this.port}...`);
 
       try {
@@ -91,8 +109,15 @@ class ModelBridge extends EventEmitter {
         this.startTime = Date.now();
         this.restartCount = 0;
         this._startHealthChecks();
-        console.log('[BRIDGE] Python server is running');
+        const startupTime = Date.now() - startupStart;
+        console.log(`[BRIDGE] Python server is running (startup: ${startupTime}ms)`);
         this.emit('started');
+        telemetryBus.emit('forge3d', {
+          type: 'bridge_started',
+          port: this.port,
+          startupTime,
+          totalRestarts: this.totalRestarts
+        });
         return true;
       } catch (err) {
         console.warn(`[BRIDGE] Failed on port ${port}: ${err.message}`);
@@ -145,9 +170,16 @@ class ModelBridge extends EventEmitter {
       this.pythonProcess = null;
     }
 
+    // Close stderr log stream
+    if (this.stderrStream) {
+      this.stderrStream.end();
+      this.stderrStream = null;
+    }
+
     this.state = 'stopped';
     console.log('[BRIDGE] Python server stopped');
     this.emit('stopped');
+    telemetryBus.emit('forge3d', { type: 'bridge_stopped' });
   }
 
   /**
@@ -180,6 +212,12 @@ class ModelBridge extends EventEmitter {
     this.pythonProcess.stderr.on('data', (data) => {
       const lines = data.toString().trim().split('\n');
       for (const line of lines) {
+        // Log to file with timestamp
+        if (this.stderrStream) {
+          const timestamp = new Date().toISOString();
+          this.stderrStream.write(`[${timestamp}] ${line}\n`);
+        }
+
         // Uvicorn logs to stderr by default
         if (line.includes('ERROR') || line.includes('Traceback')) {
           console.error(`[BRIDGE:PY] ${line}`);
@@ -190,13 +228,21 @@ class ModelBridge extends EventEmitter {
     });
 
     this.pythonProcess.on('exit', (code, signal) => {
-      console.log(`[BRIDGE] Python process exited (code=${code}, signal=${signal})`);
+      const uptime = this.startTime ? Date.now() - this.startTime : 0;
+      console.log(`[BRIDGE] Python process exited (code=${code}, signal=${signal}, uptime=${(uptime / 1000).toFixed(1)}s)`);
       this.pythonProcess = null;
 
       if (this.state === 'running') {
         this.state = 'error';
         this.emit('crash', { code, signal });
-        this._attemptRestart();
+        errorHandler.report('bridge_error', new Error('Python process crashed'), {
+          code,
+          signal,
+          uptime,
+          restartCount: this.restartCount,
+          totalRestarts: this.totalRestarts
+        });
+        this._attemptRestart('crash');
       }
     });
 
@@ -207,12 +253,34 @@ class ModelBridge extends EventEmitter {
   }
 
   /**
+   * Check if a port is already occupied by a running server.
+   * @param {number} port - Port to check
+   * @returns {Promise<boolean>} true if port is already in use
+   */
+  async _isPortOccupied(port) {
+    try {
+      const url = `http://${this.host}:${port}/health`;
+      const health = await this._fetchWithTimeout(url, 2000);
+      return !!(health && health.status === 'healthy');
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  /**
    * Wait for the server to respond to health checks.
+   * Verifies the spawned subprocess is still alive during startup.
    */
   async _waitForStartup() {
     const start = Date.now();
 
     while (Date.now() - start < forge3dConfig.pythonServer.startup_timeout_ms) {
+      // If the spawned process died, abort immediately instead of
+      // polling a zombie server that may be holding the port.
+      if (!this.pythonProcess) {
+        throw new Error('Python process exited during startup');
+      }
+
       try {
         const health = await this._fetchWithTimeout(`${this.baseUrl}/health`, 3000);
         if (health && health.status === 'healthy') {
@@ -229,16 +297,30 @@ class ModelBridge extends EventEmitter {
 
   /**
    * Auto-restart on crash.
+   * @param {string} reason - Reason for restart ('crash' or 'health_timeout')
    */
-  async _attemptRestart() {
+  async _attemptRestart(reason = 'unknown') {
+    const uptime = this.startTime ? Date.now() - this.startTime : 0;
+
     if (this.restartCount >= forge3dConfig.pythonServer.max_restart_attempts) {
       console.error(`[BRIDGE] Max restart attempts (${forge3dConfig.pythonServer.max_restart_attempts}) reached. Giving up.`);
+      console.error(`[BRIDGE] Restart stats: reason=${reason}, uptime=${(uptime / 1000).toFixed(1)}s, totalRestarts=${this.totalRestarts}`);
       this.emit('restart_failed');
       return;
     }
 
     this.restartCount++;
+    this.totalRestarts++;
     console.log(`[BRIDGE] Attempting restart ${this.restartCount}/${forge3dConfig.pythonServer.max_restart_attempts} in ${forge3dConfig.pythonServer.restart_cooldown_ms / 1000}s...`);
+    console.log(`[BRIDGE] Restart reason: ${reason}, uptime before crash: ${(uptime / 1000).toFixed(1)}s, total restarts: ${this.totalRestarts}`);
+
+    telemetryBus.emit('forge3d', {
+      type: 'bridge_restart',
+      restartCount: this.restartCount,
+      totalRestarts: this.totalRestarts,
+      reason,
+      uptime
+    });
 
     await new Promise((r) => setTimeout(r, forge3dConfig.pythonServer.restart_cooldown_ms));
     await this.start();
@@ -272,6 +354,10 @@ class ModelBridge extends EventEmitter {
         // After N consecutive failures, kill and restart
         if (this.consecutiveHealthFailures >= forge3dConfig.healthCheck.max_consecutive_failures) {
           console.error(`[BRIDGE] ${forge3dConfig.healthCheck.max_consecutive_failures} consecutive health failures — killing Python process`);
+          telemetryBus.emit('forge3d', {
+            type: 'bridge_health_failure',
+            consecutiveFailures: this.consecutiveHealthFailures
+          });
           this._stopHealthChecks();
           if (this.pythonProcess) {
             this.pythonProcess.kill('SIGKILL');
@@ -279,7 +365,7 @@ class ModelBridge extends EventEmitter {
           }
           this.state = 'error';
           this.emit('crash', { code: null, signal: 'health_timeout' });
-          this._attemptRestart();
+          this._attemptRestart('health_timeout');
         }
       }
     }, forge3dConfig.healthCheck.interval_ms);
@@ -299,9 +385,10 @@ class ModelBridge extends EventEmitter {
    * @param {Buffer} imageBuffer - Image file bytes
    * @param {string} filename - Original filename
    * @param {string} [jobId] - Optional job ID
+   * @param {string} [model] - Optional model override (e.g. 'hunyuan3d')
    * @returns {Promise<{glbBuffer: Buffer, fbxBuffer: Buffer|null, metadata: Object}>}
    */
-  async generateMesh(imageBuffer, filename = 'input.png', jobId = null) {
+  async generateMesh(imageBuffer, filename = 'input.png', jobId = null, model = null) {
     this._ensureRunning();
 
     // Validate image before sending to Python
@@ -317,6 +404,7 @@ class ModelBridge extends EventEmitter {
     const formData = new FormData();
     formData.append('image', new Blob([imageBuffer]), filename);
     if (jobId) formData.append('job_id', jobId);
+    if (model) formData.append('model', model);
 
     const response = await this._fetchRaw(`${this.baseUrl}/generate/mesh?format=json`, {
       method: 'POST',
@@ -375,6 +463,7 @@ class ModelBridge extends EventEmitter {
     if (options.height) formData.append('height', String(options.height));
     if (options.steps) formData.append('steps', String(options.steps));
     if (options.jobId) formData.append('job_id', options.jobId);
+    if (options.model) formData.append('model', options.model);
 
     const response = await this._fetchRaw(`${this.baseUrl}/generate/image`, {
       method: 'POST',
@@ -399,7 +488,7 @@ class ModelBridge extends EventEmitter {
   }
 
   /**
-   * Full text-to-3D pipeline (SDXL -> Shap-E).
+   * Full text-to-3D pipeline (SDXL -> Hunyuan3D).
    * @param {string} prompt - Text description
    * @param {Object} [options] - steps, jobId
    * @returns {Promise<Object>} Pipeline result with image and mesh paths + buffers
@@ -412,6 +501,8 @@ class ModelBridge extends EventEmitter {
     formData.append('prompt', prompt);
     if (options.steps) formData.append('steps', String(options.steps));
     if (options.jobId) formData.append('job_id', options.jobId);
+    if (options.imageModel) formData.append('image_model', options.imageModel);
+    if (options.meshModel) formData.append('mesh_model', options.meshModel);
 
     const response = await this._fetchRaw(`${this.baseUrl}/generate/full`, {
       method: 'POST',
@@ -646,6 +737,15 @@ class ModelBridge extends EventEmitter {
   }
 
   /**
+   * Get available generation models from the Python server.
+   * @returns {Promise<Object>} Available models with metadata
+   */
+  async getModels() {
+    this._ensureRunning();
+    return this._fetchWithTimeout(`${this.baseUrl}/models`, forge3dConfig.healthCheck.timeout_ms);
+  }
+
+  /**
    * Download a generated file from the Python server.
    * @param {string} jobId - Job ID
    * @param {string} filename - File to download
@@ -700,6 +800,34 @@ class ModelBridge extends EventEmitter {
   }
 
   // --- Internal Helpers ---
+
+  /**
+   * Initialize stderr logging stream to file.
+   * Truncates file if it exceeds MAX_LOG_SIZE.
+   */
+  _initErrorLog() {
+    try {
+      // Check if log file exists and is too large
+      try {
+        const stats = statSync(ERROR_LOG_PATH);
+        if (stats.size > MAX_LOG_SIZE) {
+          console.log(`[BRIDGE] Truncating error log (${(stats.size / 1024).toFixed(1)} KB > ${MAX_LOG_SIZE / 1024} KB)`);
+          // Truncate by creating new stream (flags 'w' instead of 'a')
+          this.stderrStream = createWriteStream(ERROR_LOG_PATH, { flags: 'w' });
+          this.stderrStream.write(`[${new Date().toISOString()}] === Log truncated (size exceeded ${MAX_LOG_SIZE / 1024} KB) ===\n`);
+          return;
+        }
+      } catch (_e) {
+        // File doesn't exist, will be created
+      }
+
+      // Append mode
+      this.stderrStream = createWriteStream(ERROR_LOG_PATH, { flags: 'a' });
+      this.stderrStream.write(`\n[${new Date().toISOString()}] === Bridge started ===\n`);
+    } catch (err) {
+      console.warn(`[BRIDGE] Failed to initialize error log: ${err.message}`);
+    }
+  }
 
   /**
    * Pre-flight check: verify Python, CUDA, and required packages are available.

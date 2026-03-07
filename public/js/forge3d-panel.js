@@ -212,6 +212,13 @@ class Forge3DPanel {
 
     await this._checkModelStatus();
 
+    // Initialize pipeline panel if container exists
+    const pipelineContainer = document.getElementById('forge3d-pipeline-container');
+    if (pipelineContainer && window.Forge3DPipelinePanel) {
+      this._pipelinePanel = new window.Forge3DPipelinePanel(pipelineContainer);
+      console.log('[FORGE3D-PANEL] Pipeline panel initialized');
+    }
+
     this.initialized = true;
     console.log('[FORGE3D-PANEL] Panel initialized');
   }

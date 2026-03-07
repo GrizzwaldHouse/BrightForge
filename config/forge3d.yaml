@@ -26,6 +26,8 @@ generation:
   min_prompt_length: 3
   max_prompt_length: 2000
   download_timeout_ms: 30000
+  default_mesh_model: "hunyuan3d"
+  default_image_model: "sdxl"
 
 database:
   path: "data/forge3d.db"

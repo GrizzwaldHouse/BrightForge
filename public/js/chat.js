@@ -141,10 +141,18 @@ class ChatPanel {
 
         const routingDetail = document.createElement('div');
         routingDetail.className = 'routing-detail hidden';
-        routingDetail.innerHTML = meta.routingLog.map(entry => {
-          const icon = entry.status === 'success' ? '&#10003;' : entry.status === 'failed' ? '&#10007;' : '&#8212;';
-          return `<span class="routing-entry routing-${entry.status}">${icon} ${entry.provider}${entry.reason ? ': ' + entry.reason : ''}${entry.error ? ': ' + entry.error : ''}</span>`;
-        }).join('');
+        meta.routingLog.forEach(entry => {
+          const span = document.createElement('span');
+          // Validate status to prevent class injection
+          const safeStatus = ['success', 'failed', 'skipped'].includes(entry.status) ? entry.status : 'unknown';
+          span.className = `routing-entry routing-${safeStatus}`;
+          const icon = entry.status === 'success' ? '\u2713' : entry.status === 'failed' ? '\u2717' : '\u2014';
+          let label = `${icon} ${entry.provider || ''}`;
+          if (entry.reason) label += ': ' + entry.reason;
+          if (entry.error) label += ': ' + entry.error;
+          span.textContent = label;
+          routingDetail.appendChild(span);
+        });
         metaEl.appendChild(routingDetail);
       }
 
@@ -179,14 +187,19 @@ class ChatPanel {
 
     this.loadingElement = document.createElement('div');
     this.loadingElement.className = 'loading-indicator';
-    this.loadingElement.innerHTML = `
-      <span class="loading-text">${text || 'Agent is thinking'}</span>
-      <div class="loading-dots">
-        <span></span>
-        <span></span>
-        <span></span>
-      </div>
-    `;
+
+    const loadingText = document.createElement('span');
+    loadingText.className = 'loading-text';
+    loadingText.textContent = text || 'Agent is thinking';
+
+    const loadingDots = document.createElement('div');
+    loadingDots.className = 'loading-dots';
+    loadingDots.appendChild(document.createElement('span'));
+    loadingDots.appendChild(document.createElement('span'));
+    loadingDots.appendChild(document.createElement('span'));
+
+    this.loadingElement.appendChild(loadingText);
+    this.loadingElement.appendChild(loadingDots);
 
     this.container.appendChild(this.loadingElement);
     this.scrollToBottom();
@@ -255,6 +268,98 @@ class ChatPanel {
       <p>Enter a coding task below to get started. The agent will analyze your project and generate a plan.</p>
     `;
     this.container.appendChild(welcome);
+  }
+
+  /**
+   * Add a plan applied timeline entry with rollback button
+   * @param {Object} data - Response data from plan approval { status, applied, failed, cost, provider, model }
+   */
+  addPlanAppliedEntry(data) {
+    const entry = document.createElement('div');
+    entry.className = 'rollback-entry';
+    entry.dataset.rollbackId = Date.now(); // Unique ID for this entry
+
+    // Timestamp
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    // Summary
+    const appliedCount = data.applied || 0;
+    const failedCount = data.failed || 0;
+    let summary = `${appliedCount} file(s) modified`;
+    if (failedCount > 0) {
+      summary += `, ${failedCount} failed`;
+    }
+
+    // Meta (provider + cost)
+    let meta = '';
+    if (data.provider) {
+      meta += `${data.provider}${data.model ? '/' + data.model : ''}`;
+    }
+    if (data.cost !== undefined) {
+      meta += ` · $${data.cost.toFixed(4)}`;
+    }
+
+    entry.innerHTML = `
+      <div class="rollback-entry-dot applied"></div>
+      <div class="rollback-entry-content">
+        <div class="rollback-entry-header">
+          <span class="rollback-entry-time">${this.escapeHtml(timeStr)}</span>
+          <span class="rollback-entry-badge applied">Applied</span>
+        </div>
+        <div class="rollback-entry-summary">${this.escapeHtml(summary)}</div>
+        ${meta ? `<div class="rollback-entry-meta">${this.escapeHtml(meta)}</div>` : ''}
+        <button class="btn btn-secondary btn-sm rollback-btn">Rollback</button>
+      </div>
+    `;
+
+    // Wire rollback button
+    const rollbackBtn = entry.querySelector('.rollback-btn');
+    rollbackBtn.addEventListener('click', async () => {
+      if (!confirm('Are you sure you want to rollback this change?')) {
+        return;
+      }
+
+      rollbackBtn.disabled = true;
+      rollbackBtn.textContent = 'Rolling back...';
+
+      try {
+        const result = await window.app.rollback();
+
+        // Update entry on success
+        if (result !== false) {
+          const dot = entry.querySelector('.rollback-entry-dot');
+          const badge = entry.querySelector('.rollback-entry-badge');
+
+          dot.classList.remove('applied');
+          dot.classList.add('rolled-back');
+          badge.classList.remove('applied');
+          badge.classList.add('rolled-back');
+          badge.textContent = 'Rolled Back';
+          rollbackBtn.style.display = 'none';
+        } else {
+          // Rollback failed, re-enable button
+          rollbackBtn.disabled = false;
+          rollbackBtn.textContent = 'Rollback';
+        }
+      } catch (error) {
+        console.error('[ROLLBACK] Timeline entry rollback failed:', error);
+        rollbackBtn.disabled = false;
+        rollbackBtn.textContent = 'Rollback Failed';
+      }
+    });
+
+    this.container.appendChild(entry);
+    this.scrollToBottom();
+  }
+
+  /**
+   * Escape HTML to prevent XSS
+   */
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 
   /**

@@ -39,8 +39,7 @@ export function errorRoutes() {
     } catch (error) {
       console.error(`[ROUTE] /api/errors/recent error: ${error.message}`);
       res.status(500).json({
-        error: 'Internal server error',
-        message: error.message
+        error: 'Internal server error'
       });
     }
   });
@@ -57,8 +56,7 @@ export function errorRoutes() {
     } catch (error) {
       console.error(`[ROUTE] /api/errors/diagnostics error: ${error.message}`);
       res.status(500).json({
-        error: 'Internal server error',
-        message: error.message
+        error: 'Internal server error'
       });
     }
   });
@@ -78,8 +76,7 @@ export function errorRoutes() {
     } catch (error) {
       console.error(`[ROUTE] /api/errors/clear error: ${error.message}`);
       res.status(500).json({
-        error: 'Internal server error',
-        message: error.message
+        error: 'Internal server error'
       });
     }
   });

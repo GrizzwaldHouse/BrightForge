@@ -37,10 +37,10 @@ MODELS_DIR_DEFAULT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspat
 
 # Model registry: name -> (repo_id, subfolder, expected_size_mb)
 MODELS = {
-    'shap_e': {
-        'repo_id': CONFIG.get('models', {}).get('shap_e', {}).get('repo_id', 'openai/shap-e-img2img'),
-        'description': 'Single-image to 3D mesh generation (Shap-E)',
-        'size_mb': CONFIG.get('models', {}).get('shap_e', {}).get('size_mb', 1000),
+    'hunyuan3d': {
+        'repo_id': CONFIG.get('models', {}).get('hunyuan3d', {}).get('repo_id', 'tencent/Hunyuan3D-2'),
+        'description': 'Image/text to textured 3D mesh generation (Hunyuan3D 2.1)',
+        'size_mb': CONFIG.get('models', {}).get('hunyuan3d', {}).get('size_mb', 8000),
     },
 }
 

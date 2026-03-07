@@ -15,6 +15,7 @@ import express from 'express';
 import { designEngine } from '../../core/design-engine.js';
 import errorHandler from '../../core/error-handler.js';
 import telemetryBus from '../../core/telemetry-bus.js';
+import { designLimiter } from '../middleware/rate-limit.js';
 
 const router = express.Router();
 
@@ -25,7 +26,7 @@ const pendingDesigns = new Map();
  * POST /api/design/generate
  * Generate design from prompt
  */
-router.post('/generate', async (req, res) => {
+router.post('/generate', designLimiter, async (req, res) => {
   const { prompt, style, options } = req.body;
 
   if (!prompt) {

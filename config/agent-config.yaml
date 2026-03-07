@@ -209,6 +209,24 @@ error_handling:
     max_attempts: 3
     backoff_ms: 1000
 
+# Security configuration
+security:
+  auth_enabled: auto          # auto = enabled if BRIGHTFORGE_API_KEY is set
+  public_endpoints:
+    - "GET /api/health"
+    - "GET /api/config"
+  cors_origins:
+    - "http://localhost:3847"
+  rate_limits:
+    chat: 10                  # req/min
+    forge3d: 2
+    design: 5
+    general: 60
+  log_rotation:
+    max_size: "10M"
+    max_files: 30
+    compress: true
+
 # Conversation mode configuration
 conversation:
   max_turns: 20

@@ -87,17 +87,31 @@ The discovered command and prefix args are stored as `pythonCmd` + `pythonPrefix
 - CPU mode works but is slow (~10 min per image generation)
 - Install GPU support: `pip install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu128`
 
+## Bridge Hardening (Sprint 2)
+
+The `model-bridge.js` includes reliability features:
+
+- **Health watchdog**: Periodic health checks with configurable failure threshold. After N consecutive failures, kills the Python process and restarts.
+- **Stderr logging**: Python subprocess stderr is piped to `sessions/bridge-errors.log` with 1MB rotation. Useful for debugging CUDA errors and model loading failures.
+- **Port conflict detection**: `_isPortOccupied(port)` checks if a port has a healthy server before spawning. Skips occupied ports to prevent crash loops (LS-016).
+- **Process liveness check**: `_waitForStartup()` verifies the spawned process is still alive during startup, preventing false-positive health checks against zombie servers (LS-018).
+- **Telemetry integration**: Emits `bridge_started`, `bridge_stopped`, `bridge_restart`, `bridge_health_failure` events to TelemetryBus.
+- **Error reporting**: Crashes are reported to ErrorHandler with uptime, restart count, and exit code context.
+- **Graceful shutdown**: SIGTERM with configurable grace period before SIGKILL.
+
 ## Common Issues
 
-- **Python not found**: Windows Store `python`/`python3` are stubs (exit 49). Use `py` launcher or `python3.13` directly.
-- **Bridge offline**: Check error logs at `sessions/errors.jsonl` for `bridge_error` category
-- **Server startup timeout**: Default 120s. First-run downloads ~3GB model. Increase `startup_timeout_ms` in `config/forge3d.yaml` if needed.
-- **Generation timeout**: Default 600s (10 min) for single, 1200s for full pipeline
-- **CUDA not usable**: RTX 5080 needs PyTorch nightly cu128. Falls back to CPU automatically.
-- **OOM errors**: Check VRAM via `GET /api/forge3d/bridge` (health endpoint)
-- **Path traversal**: ProjectManager validates all paths stay within `data/output/`
-- **Image too large**: 20MB max for uploaded images (model-bridge validates)
-- **Stale errors in UI**: Old generation errors persist in `data/forge3d.db`. Clear with `DELETE FROM generation_history WHERE status='failed'`
+- **Python not found**: Windows Store `python`/`python3` are stubs (exit 49). Use `py` launcher or `python3.13` directly (LS-003, LS-010).
+- **Bridge offline**: Check error logs at `sessions/errors.jsonl` for `bridge_error` category and `sessions/bridge-errors.log` for Python stderr.
+- **Bridge crash loop**: Usually caused by port conflicts — a zombie Python process holds the port. Kill all python3.13 processes, then restart the server. Bridge now auto-detects occupied ports (LS-016).
+- **Server startup timeout**: Default 120s. First-run downloads ~10GB model. Increase `startup_timeout_ms` in `config/forge3d.yaml` if needed (LS-011).
+- **Generation timeout**: Default 600s (10 min) for single, 1200s for full pipeline.
+- **CUDA not usable**: RTX 5080 (sm_120) needs PyTorch nightly cu128. Falls back to CPU automatically (LS-006, LS-009).
+- **CPU mode performance**: SDXL on CPU: ~50s at 512x512/10 steps, ~10 min at 1024x1024/25 steps.
+- **OOM errors**: Check VRAM via `GET /api/forge3d/bridge` (health endpoint).
+- **Path traversal**: ProjectManager validates all paths stay within `data/output/`.
+- **Image too large**: 20MB max for uploaded images (model-bridge validates).
+- **Stale errors in UI**: Old generation errors persist in `data/forge3d.db`. Clear with `DELETE FROM generation_history WHERE status='failed'`.
 
 ## Post-Processing (F7)
 

@@ -25,6 +25,7 @@ import gitCheckpointer from '../../core/git-checkpointer.js';
 import llmClient from '../../core/llm-client.js';
 import pipelineDetector from '../../core/pipeline-detector.js';
 import creativePipeline from '../../core/creative-pipeline.js';
+import { chatLimiter } from '../middleware/rate-limit.js';
 
 export function chatRoutes() {
   const router = Router();
@@ -53,7 +54,7 @@ export function chatRoutes() {
    * Without: returns 202 immediately, stream progress via GET /stream/:sessionId.
    * Body: { sessionId?, message, projectRoot? }
    */
-  router.post('/turn', async (req, res) => {
+  router.post('/turn', chatLimiter, async (req, res) => {
     try {
       const { sessionId, message, projectRoot } = req.body;
       const sync = req.query.sync === 'true';
@@ -90,8 +91,7 @@ export function chatRoutes() {
     } catch (error) {
       console.error(`[ROUTE] /api/chat/turn error: ${error.message}`);
       res.status(500).json({
-        error: 'Internal server error',
-        message: error.message
+        error: 'Internal server error'
       });
     }
   });
@@ -121,6 +121,11 @@ export function chatRoutes() {
       res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
     };
 
+    // Heartbeat keepalive every 15s
+    const heartbeat = setInterval(() => {
+      res.write(':keepalive\n\n');
+    }, 15000);
+
     // If generation already completed before client connected, send result immediately
     if (!session._generating && session.pendingPlan) {
       send('complete', {
@@ -131,6 +136,7 @@ export function chatRoutes() {
         cost: session.pendingPlan.cost || 0,
         totalCost: session.totalCost
       });
+      clearInterval(heartbeat);
       res.end();
       return;
     }
@@ -146,6 +152,7 @@ export function chatRoutes() {
 
     const onComplete = (data) => {
       if (data.sessionId === sessionId) {
+        clearInterval(heartbeat);
         send('complete', data);
         cleanup();
         res.end();
@@ -154,6 +161,7 @@ export function chatRoutes() {
 
     const onFailed = (data) => {
       if (data.sessionId === sessionId) {
+        clearInterval(heartbeat);
         send('failed', data);
         cleanup();
         res.end();
@@ -162,6 +170,7 @@ export function chatRoutes() {
 
     const onCancelled = (data) => {
       if (data.sessionId === sessionId) {
+        clearInterval(heartbeat);
         send('cancelled', data);
         cleanup();
         res.end();
@@ -177,6 +186,7 @@ export function chatRoutes() {
     };
     const onPipelineComplete = (data) => {
       if (data.sessionId === sessionId) {
+        clearInterval(heartbeat);
         send('pipeline_complete', data);
         cleanup();
         res.end();
@@ -184,6 +194,7 @@ export function chatRoutes() {
     };
     const onPipelineFailed = (data) => {
       if (data.sessionId === sessionId) {
+        clearInterval(heartbeat);
         send('pipeline_failed', data);
         cleanup();
         res.end();
@@ -191,6 +202,7 @@ export function chatRoutes() {
     };
 
     const cleanup = () => {
+      clearInterval(heartbeat);
       session.off('plan:provider_trying', onProviderTrying);
       session.off('plan:provider_failed', onProviderFailed);
       session.off('plan:complete', onComplete);
@@ -245,7 +257,7 @@ export function chatRoutes() {
    * Body: { sessionId, planId?, action: "apply"|"reject" }
    * Returns: { status, applied, failed, errors, cost, provider, model }
    */
-  router.post('/approve', async (req, res) => {
+  router.post('/approve', chatLimiter, async (req, res) => {
     try {
       const { sessionId, planId, action } = req.body;
 
@@ -283,8 +295,7 @@ export function chatRoutes() {
     } catch (error) {
       console.error(`[ROUTE] /api/chat/approve error: ${error.message}`);
       res.status(500).json({
-        error: 'Internal server error',
-        message: error.message
+        error: 'Internal server error'
       });
     }
   });
@@ -321,8 +332,7 @@ export function chatRoutes() {
     } catch (error) {
       console.error(`[ROUTE] /api/chat/rollback error: ${error.message}`);
       res.status(500).json({
-        error: 'Internal server error',
-        message: error.message
+        error: 'Internal server error'
       });
     }
   });
@@ -353,8 +363,7 @@ export function chatRoutes() {
     } catch (error) {
       console.error(`[ROUTE] /api/chat/status/:id error: ${error.message}`);
       res.status(500).json({
-        error: 'Internal server error',
-        message: error.message
+        error: 'Internal server error'
       });
     }
   });
@@ -373,7 +382,7 @@ export function chatRoutes() {
       res.json({ timeline, projectRoot });
     } catch (error) {
       console.error(`[ROUTE] /api/chat/timeline error: ${error.message}`);
-      res.status(500).json({ error: 'Internal server error', message: error.message });
+      res.status(500).json({ error: 'Internal server error' });
     }
   });
 
@@ -400,7 +409,7 @@ export function chatRoutes() {
       }
     } catch (error) {
       console.error(`[ROUTE] /api/chat/revert error: ${error.message}`);
-      res.status(500).json({ error: 'Internal server error', message: error.message });
+      res.status(500).json({ error: 'Internal server error' });
     }
   });
 
@@ -418,7 +427,7 @@ export function chatRoutes() {
       res.json({ diff, commitHash });
     } catch (error) {
       console.error(`[ROUTE] /api/chat/diff error: ${error.message}`);
-      res.status(500).json({ error: 'Internal server error', message: error.message });
+      res.status(500).json({ error: 'Internal server error' });
     }
   });
 
@@ -439,7 +448,7 @@ export function chatRoutes() {
       res.json(analysis);
     } catch (error) {
       console.error(`[ROUTE] /api/chat/pipeline/detect error: ${error.message}`);
-      res.status(500).json({ error: 'Internal server error', message: error.message });
+      res.status(500).json({ error: 'Internal server error' });
     }
   });
 
@@ -449,7 +458,7 @@ export function chatRoutes() {
    * Body: { sessionId?, message, projectRoot? }
    * Returns: 202 with sessionId, stream progress via SSE.
    */
-  router.post('/pipeline/execute', async (req, res) => {
+  router.post('/pipeline/execute', chatLimiter, async (req, res) => {
     try {
       const { sessionId, message, projectRoot } = req.body;
 
@@ -493,7 +502,7 @@ export function chatRoutes() {
 
     } catch (error) {
       console.error(`[ROUTE] /api/chat/pipeline/execute error: ${error.message}`);
-      res.status(500).json({ error: 'Internal server error', message: error.message });
+      res.status(500).json({ error: 'Internal server error' });
     }
   });
 
@@ -563,7 +572,7 @@ export function chatRoutes() {
 
     } catch (error) {
       console.error(`[ROUTE] /api/chat/upgrade error: ${error.message}`);
-      res.status(500).json({ error: 'Internal server error', message: error.message });
+      res.status(500).json({ error: 'Internal server error' });
     }
   });
 

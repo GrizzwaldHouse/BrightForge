@@ -3,6 +3,8 @@
  * @author Marcus Daley (GrizzwaldHouse)
  * @date February 11, 2026
  */
+/* global SSEClient */
+/* global MemoryPanel */
 
 console.log('[APP] ===== app.js LOADING =====');
 
@@ -31,6 +33,7 @@ class App {
       this.currentPlan = null;
       this.config = null;
       this.health = null;
+      this.costData = null; // Store cost breakdown data for panel
 
       // Initialize modules
       console.log('[APP] Initializing ChatPanel...');
@@ -58,6 +61,7 @@ class App {
       console.log('[APP] Forge3DPanel initialized');
 
       this.fileBrowser = null; // Initialized after DOM ready
+      this.memoryPanel = null; // Initialized after DOM ready
 
       console.log('[APP] Constructor complete, calling init()');
       this.init();
@@ -114,6 +118,12 @@ class App {
         console.log('[APP] ✓ No saved project root');
       }
 
+      // Initialize memory panel
+      console.log('[APP] Step 6b: Initializing memory panel...');
+      this.memoryPanel = new MemoryPanel(this);
+      await this.memoryPanel.init();
+      console.log('[APP] ✓ Memory panel initialized');
+
       // Start provider status polling (every 30 seconds)
       console.log('[APP] Step 7: Starting provider status polling...');
       this.startProviderStatusPolling();
@@ -152,12 +162,16 @@ class App {
     const newSessionBtn = document.getElementById('new-session-btn');
     const projectRootContainer = document.getElementById('project-root-container');
     const settingsBtn = document.getElementById('settings-btn');
+    const costTicker = document.getElementById('cost-ticker');
+    const memoryExpandBtn = document.getElementById('memory-expand-btn');
 
     console.log('[APP] bindEvents: send-btn =', sendBtn ? '✓ found' : '✗ NOT FOUND');
     console.log('[APP] bindEvents: chat-input =', chatInput ? '✓ found' : '✗ NOT FOUND');
     console.log('[APP] bindEvents: new-session-btn =', newSessionBtn ? '✓ found' : '✗ NOT FOUND');
     console.log('[APP] bindEvents: project-root-container =', projectRootContainer ? '✓ found' : '✗ NOT FOUND');
     console.log('[APP] bindEvents: settings-btn =', settingsBtn ? '✓ found' : '✗ NOT FOUND');
+    console.log('[APP] bindEvents: cost-ticker =', costTicker ? '✓ found' : '✗ NOT FOUND');
+    console.log('[APP] bindEvents: memory-expand-btn =', memoryExpandBtn ? '✓ found' : '✗ NOT FOUND');
 
     if (!sendBtn || !chatInput) {
       console.error('[APP] bindEvents: CRITICAL - send-btn or chat-input not found!');
@@ -194,10 +208,15 @@ class App {
 
     // File browser selection change
     if (projectRootContainer) {
-      projectRootContainer.addEventListener('filebrowser:select', (e) => {
+      projectRootContainer.addEventListener('filebrowser:select', async (e) => {
         this.projectRoot = e.detail.path;
         localStorage.setItem('brightforge-project-root', this.projectRoot);
         console.log('[APP] Project root selected:', this.projectRoot);
+
+        // Reload memory panel for new project
+        if (this.memoryPanel) {
+          await this.memoryPanel.load();
+        }
       });
       console.log('[APP] bindEvents: ✓ File browser listener added');
     }
@@ -209,6 +228,33 @@ class App {
       });
       console.log('[APP] bindEvents: ✓ Settings button listener added');
     }
+
+    // Cost ticker toggle
+    if (costTicker) {
+      costTicker.addEventListener('click', () => {
+        this._toggleCostBreakdown();
+      });
+      console.log('[APP] bindEvents: ✓ Cost ticker click listener added');
+    }
+
+    // Memory panel expand button
+    if (memoryExpandBtn) {
+      memoryExpandBtn.addEventListener('click', () => {
+        if (this.memoryPanel) {
+          this.memoryPanel.show();
+        }
+      });
+      console.log('[APP] bindEvents: ✓ Memory expand button listener added');
+    }
+
+    // Close cost breakdown when clicking outside
+    document.addEventListener('click', (e) => {
+      const panel = document.getElementById('cost-breakdown-panel');
+      if (panel && !panel.classList.contains('hidden') && costTicker && !costTicker.contains(e.target) && !panel.contains(e.target)) {
+        panel.classList.add('hidden');
+      }
+    });
+    console.log('[APP] bindEvents: ✓ Document click listener for cost panel added');
 
     console.log('[APP] bindEvents: All event bindings complete');
   }
@@ -372,24 +418,26 @@ class App {
    */
   _connectStream(sessionId) {
     // Close any existing stream
-    if (this._eventSource) {
-      this._eventSource.close();
+    if (this._sseClient) {
+      this._sseClient.close();
     }
 
     const url = `/api/chat/stream/${sessionId}`;
-    this._eventSource = new EventSource(url);
+    this._sseClient = new SSEClient(url, {
+      onStatusChange: (status) => this._updateSSEStatus(status)
+    });
 
-    this._eventSource.addEventListener('provider_trying', (e) => {
+    this._sseClient.on('provider_trying', (e) => {
       const data = JSON.parse(e.data);
       this.chat.updateLoading(`Trying ${data.provider}${data.model ? ' (' + data.model + ')' : ''}...`);
     });
 
-    this._eventSource.addEventListener('provider_failed', (e) => {
+    this._sseClient.on('provider_failed', (e) => {
       const data = JSON.parse(e.data);
       console.warn(`[APP] Provider failed: ${data.provider} - ${data.error}`);
     });
 
-    this._eventSource.addEventListener('complete', (e) => {
+    this._sseClient.on('complete', (e) => {
       const data = JSON.parse(e.data);
       this._cleanupStream();
       this.chat.hideLoading();
@@ -398,7 +446,7 @@ class App {
       this._reenableInput();
     });
 
-    this._eventSource.addEventListener('failed', (e) => {
+    this._sseClient.on('failed', (e) => {
       const data = JSON.parse(e.data);
       this._cleanupStream();
       this.chat.hideLoading();
@@ -411,7 +459,7 @@ class App {
       this._reenableInput();
     });
 
-    this._eventSource.addEventListener('cancelled', () => {
+    this._sseClient.on('cancelled', () => {
       this._cleanupStream();
       this.chat.hideLoading();
       this._showCancelButton(false);
@@ -420,7 +468,7 @@ class App {
     });
 
     // Pipeline step events
-    this._eventSource.addEventListener('pipeline_step_start', (e) => {
+    this._sseClient.on('pipeline_step_start', (e) => {
       const data = JSON.parse(e.data);
       const domainLabels = { forge3d: '3D Generation', design: 'Design Generation', code: 'Code Generation' };
       const label = domainLabels[data.domain] || data.domain;
@@ -428,12 +476,12 @@ class App {
       this._updatePipelineStep(data.step - 1, 'active');
     });
 
-    this._eventSource.addEventListener('pipeline_step_complete', (e) => {
+    this._sseClient.on('pipeline_step_complete', (e) => {
       const data = JSON.parse(e.data);
       this._updatePipelineStep(data.step - 1, data.success ? 'complete' : 'failed');
     });
 
-    this._eventSource.addEventListener('pipeline_complete', (e) => {
+    this._sseClient.on('pipeline_complete', (e) => {
       const data = JSON.parse(e.data);
       this._cleanupStream();
       this.chat.hideLoading();
@@ -458,7 +506,7 @@ class App {
       this._reenableInput();
     });
 
-    this._eventSource.addEventListener('pipeline_failed', (e) => {
+    this._sseClient.on('pipeline_failed', (e) => {
       const data = JSON.parse(e.data);
       this._cleanupStream();
       this.chat.hideLoading();
@@ -468,25 +516,40 @@ class App {
       this._updateCostTicker();
       this._reenableInput();
     });
-
-    this._eventSource.onerror = () => {
-      this._cleanupStream();
-      this.chat.hideLoading();
-      this._showCancelButton(false);
-      this._hidePipelineProgress();
-      this.chat.addSystemMessage('Stream connection lost. Check if the server is running.');
-      this._reenableInput();
-    };
   }
 
   /**
-   * Clean up EventSource connection.
+   * Clean up SSE connection.
    */
   _cleanupStream() {
-    if (this._eventSource) {
-      this._eventSource.close();
-      this._eventSource = null;
+    if (this._sseClient) {
+      this._sseClient.close();
+      this._sseClient = null;
     }
+  }
+
+  /**
+   * Update SSE connection status indicator.
+   * @param {string} status - 'connected', 'reconnecting', or 'disconnected'
+   */
+  _updateSSEStatus(status) {
+    const indicator = document.querySelector('#sse-status');
+    const dot = indicator?.querySelector('.sse-status-dot');
+    if (!dot) return;
+
+    // Remove all status classes
+    dot.classList.remove('connected', 'reconnecting', 'disconnected');
+    dot.classList.add(status);
+
+    // Update title tooltip
+    const titles = {
+      connected: 'Stream connected',
+      reconnecting: 'Reconnecting...',
+      disconnected: 'Stream disconnected'
+    };
+    indicator.title = titles[status] || 'Stream status';
+
+    console.log(`[APP] SSE status: ${status}`);
   }
 
   /**
@@ -591,22 +654,10 @@ class App {
       this.currentPlan = null;
 
       if (response.status === 'applied' || response.status === 'partial') {
-        const appliedCount = response.applied || 0;
-        const failedCount = response.failed || 0;
+        // Add timeline entry with rollback button
+        this.chat.addPlanAppliedEntry(response);
 
-        let message = `Plan applied. ${appliedCount} file(s) modified.`;
-        if (failedCount > 0) {
-          message += ` ${failedCount} operation(s) failed.`;
-        }
-        if (response.cost) {
-          message += ` Cost: $${response.cost.toFixed(4)}`;
-        }
-        if (response.provider) {
-          message += ` (${response.provider}/${response.model})`;
-        }
-
-        this.chat.addSystemMessage(message);
-
+        // Show error details if any
         if (response.errors && response.errors.length > 0) {
           response.errors.forEach(err => {
             this.chat.addSystemMessage(`Error: ${err}`);
@@ -659,15 +710,16 @@ class App {
 
   /**
    * Rollback the last change
+   * @returns {Promise<boolean>} - true if successful, false otherwise
    */
   async rollback() {
     if (!this.sessionId) {
       console.error('[APP] No active session');
-      return;
+      return false;
     }
 
     if (!confirm('Are you sure you want to rollback the last change?')) {
-      return;
+      return false;
     }
 
     this.chat.showLoading();
@@ -682,14 +734,17 @@ class App {
       if (response.status === 'rolled_back') {
         const restoredCount = response.restored || 0;
         this.chat.addSystemMessage(`Rollback successful. ${restoredCount} file(s) restored.`);
+        return true;
       } else {
         this.chat.addSystemMessage(`Rollback: ${response.message || 'Unknown error'}`);
+        return false;
       }
 
     } catch (error) {
       console.error('[APP] Rollback failed:', error);
       this.chat.hideLoading();
       this.chat.addSystemMessage(`Error: ${error.message}`);
+      return false;
     }
   }
 
@@ -914,6 +969,10 @@ class App {
       const data = await this.apiGet('/api/cost/summary');
       const valueEl = document.getElementById('cost-ticker-value');
       const limitEl = document.getElementById('cost-ticker-limit');
+      const tickerEl = document.getElementById('cost-ticker');
+
+      // Store cost data for breakdown panel
+      this.costData = data;
 
       if (valueEl) {
         valueEl.textContent = `$${(data.totalSpent || 0).toFixed(2)}`;
@@ -930,13 +989,29 @@ class App {
         limitEl.textContent = `$${(data.budgetLimit || 1).toFixed(2)}`;
       }
 
+      // Apply threshold-based CSS classes to ticker parent
+      if (tickerEl) {
+        tickerEl.classList.remove('budget-warning', 'budget-critical');
+        if (data.budgetUsedPercent >= 95) {
+          tickerEl.classList.add('budget-critical');
+        } else if (data.budgetUsedPercent >= 80) {
+          tickerEl.classList.add('budget-warning');
+        }
+      }
+
       // Also update sidebar budget bar from the same data
       this.updateBudgetDisplay({
         remaining: data.budgetRemaining,
         daily_limit_usd: data.budgetLimit
       });
+
+      // Update cost breakdown panel if visible
+      const panel = document.getElementById('cost-breakdown-panel');
+      if (panel && !panel.classList.contains('hidden')) {
+        this._renderCostBreakdown();
+      }
     } catch (error) {
-      console.warn('[APP] Cost ticker update failed:', error.message);
+      console.warn('[COST] Cost ticker update failed:', error.message);
     }
   }
 
@@ -984,6 +1059,150 @@ class App {
       this.chat.hideLoading();
       this.chat.addSystemMessage(`Upgrade failed: ${error.message}`);
     }
+  }
+
+  /**
+   * Toggle cost breakdown panel visibility.
+   */
+  _toggleCostBreakdown() {
+    const panel = document.getElementById('cost-breakdown-panel');
+    if (!panel) {
+      console.warn('[COST] Cost breakdown panel not found in DOM');
+      return;
+    }
+
+    const isHidden = panel.classList.contains('hidden');
+
+    if (isHidden) {
+      // Show panel and render data
+      panel.classList.remove('hidden');
+      this._renderCostBreakdown();
+    } else {
+      // Hide panel
+      panel.classList.add('hidden');
+    }
+  }
+
+  /**
+   * Render cost breakdown panel content.
+   * Data sourced from local server /api/cost/summary (trusted boundary).
+   */
+  _renderCostBreakdown() {
+    const panel = document.getElementById('cost-breakdown-panel');
+    if (!panel || !this.costData) return;
+
+    const data = this.costData;
+    const providers = data.providers || {};
+    const budgetPercent = Math.min(Number(data.budgetUsedPercent) || 0, 100);
+
+    // Build DOM elements instead of innerHTML to prevent XSS
+    panel.innerHTML = '';
+
+    // Header
+    const header = document.createElement('div');
+    header.className = 'cost-breakdown-header';
+    const h3 = document.createElement('h3');
+    h3.textContent = 'Daily Budget Breakdown';
+    header.appendChild(h3);
+    panel.appendChild(header);
+
+    // Budget progress section
+    const budgetSection = document.createElement('div');
+    budgetSection.className = 'cost-breakdown-section';
+
+    const spentRow = document.createElement('div');
+    spentRow.className = 'cost-breakdown-budget-info';
+    const spentLabel = document.createElement('span');
+    spentLabel.className = 'cost-breakdown-label';
+    spentLabel.textContent = 'Total Spent:';
+    const spentValue = document.createElement('span');
+    spentValue.className = 'cost-breakdown-value';
+    spentValue.textContent = `$${(data.totalSpent || 0).toFixed(4)}`;
+    spentRow.appendChild(spentLabel);
+    spentRow.appendChild(spentValue);
+    budgetSection.appendChild(spentRow);
+
+    const progressOuter = document.createElement('div');
+    progressOuter.className = 'cost-breakdown-progress';
+    const progressBar = document.createElement('div');
+    progressBar.className = 'cost-breakdown-progress-bar';
+    progressBar.style.width = `${budgetPercent}%`;
+    progressOuter.appendChild(progressBar);
+    budgetSection.appendChild(progressOuter);
+
+    const remainRow = document.createElement('div');
+    remainRow.className = 'cost-breakdown-budget-info';
+    const remainLabel = document.createElement('span');
+    remainLabel.className = 'cost-breakdown-label';
+    remainLabel.textContent = 'Remaining:';
+    const remainValue = document.createElement('span');
+    remainValue.className = 'cost-breakdown-value';
+    remainValue.textContent = `$${(data.budgetRemaining || 0).toFixed(4)}`;
+    remainRow.appendChild(remainLabel);
+    remainRow.appendChild(remainValue);
+    budgetSection.appendChild(remainRow);
+    panel.appendChild(budgetSection);
+
+    // Provider table section
+    const tableSection = document.createElement('div');
+    tableSection.className = 'cost-breakdown-section';
+    const table = document.createElement('table');
+    table.className = 'cost-breakdown-table';
+
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    ['Provider', 'Requests', 'Cost', 'Status'].forEach(text => {
+      const th = document.createElement('th');
+      th.textContent = text;
+      headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    const providerEntries = Object.entries(providers);
+
+    if (providerEntries.length === 0) {
+      const emptyRow = document.createElement('tr');
+      const emptyCell = document.createElement('td');
+      emptyCell.colSpan = 4;
+      emptyCell.className = 'cost-breakdown-empty';
+      emptyCell.textContent = 'No providers used yet';
+      emptyRow.appendChild(emptyCell);
+      tbody.appendChild(emptyRow);
+    } else {
+      providerEntries.forEach(([name, info]) => {
+        const cost = info.cost || 0;
+        const requests = info.requests || 0;
+        const failures = info.failures || 0;
+
+        const row = document.createElement('tr');
+
+        const nameCell = document.createElement('td');
+        nameCell.className = 'provider-name';
+        nameCell.textContent = name;
+        row.appendChild(nameCell);
+
+        const reqCell = document.createElement('td');
+        reqCell.textContent = requests;
+        row.appendChild(reqCell);
+
+        const costCell = document.createElement('td');
+        costCell.textContent = `$${cost.toFixed(4)}`;
+        row.appendChild(costCell);
+
+        const statusCell = document.createElement('td');
+        statusCell.className = failures > 0 ? 'status-warning' : 'status-ok';
+        statusCell.textContent = failures > 0 ? `${failures} failed` : 'OK';
+        row.appendChild(statusCell);
+
+        tbody.appendChild(row);
+      });
+    }
+
+    table.appendChild(tbody);
+    tableSection.appendChild(table);
+    panel.appendChild(tableSection);
   }
 
   /**
@@ -1076,15 +1295,30 @@ document.addEventListener('DOMContentLoaded', () => {
     console.error('[APP] Error message:', error.message);
     console.error('[APP] Error stack:', error.stack);
 
-    // Show error on page
-    document.body.innerHTML = `
-      <div style="padding: 40px; font-family: monospace; background: #1a1a2e; color: #e0e7ff; min-height: 100vh;">
-        <h1 style="color: #ef4444;">❌ BrightForge Failed to Load</h1>
-        <h2>Error: ${error.message}</h2>
-        <pre style="background: #0a0e27; padding: 20px; border-radius: 8px; overflow: auto;">${error.stack}</pre>
-        <p>Check the browser console for detailed logs.</p>
-      </div>
-    `;
+    // Show error on page (using DOM APIs to prevent XSS from error messages)
+    document.body.innerHTML = '';
+    const errorDiv = document.createElement('div');
+    errorDiv.style.cssText = 'padding: 40px; font-family: monospace; background: #1a1a2e; color: #e0e7ff; min-height: 100vh;';
+
+    const h1 = document.createElement('h1');
+    h1.style.color = '#ef4444';
+    h1.textContent = 'BrightForge Failed to Load';
+    errorDiv.appendChild(h1);
+
+    const h2 = document.createElement('h2');
+    h2.textContent = 'Error: ' + error.message;
+    errorDiv.appendChild(h2);
+
+    const pre = document.createElement('pre');
+    pre.style.cssText = 'background: #0a0e27; padding: 20px; border-radius: 8px; overflow: auto;';
+    pre.textContent = error.stack;
+    errorDiv.appendChild(pre);
+
+    const p = document.createElement('p');
+    p.textContent = 'Check the browser console for detailed logs.';
+    errorDiv.appendChild(p);
+
+    document.body.appendChild(errorDiv);
   }
 });
 

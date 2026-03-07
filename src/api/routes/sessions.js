@@ -39,8 +39,7 @@ export function sessionRoutes() {
     } catch (error) {
       console.error(`[ROUTE] /api/sessions error: ${error.message}`);
       res.status(500).json({
-        error: 'Internal server error',
-        message: error.message
+        error: 'Internal server error'
       });
     }
   });
@@ -72,8 +71,7 @@ export function sessionRoutes() {
     } catch (error) {
       console.error(`[ROUTE] /api/sessions/:id error: ${error.message}`);
       res.status(500).json({
-        error: 'Internal server error',
-        message: error.message
+        error: 'Internal server error'
       });
     }
   });

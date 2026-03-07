@@ -1,0 +1,217 @@
+/* Pipeline Panel Styles */
+
+.pipeline-section {
+  margin-top: var(--spacing-md, 12px);
+}
+
+.pipeline-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary, #94a3b8);
+  margin-bottom: var(--spacing-sm, 8px);
+}
+
+.pipeline-template-select {
+  width: 100%;
+  margin-bottom: var(--spacing-sm, 8px);
+}
+
+.pipeline-run-btn {
+  width: 100%;
+  padding: 8px 16px;
+  background: var(--brand-primary, #6366f1);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md, 8px);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.pipeline-run-btn:hover {
+  background: var(--brand-primary-hover, #4f46e5);
+  transform: translateY(-1px);
+}
+
+.pipeline-run-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Pipeline progress tracker */
+.pipeline-progress {
+  margin-top: var(--spacing-md, 12px);
+  border: 1px solid var(--border-color, #334155);
+  border-radius: var(--radius-md, 8px);
+  background: var(--card-bg, #1e293b);
+  overflow: hidden;
+}
+
+.pipeline-progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--surface-bg, #0f172a);
+  border-bottom: 1px solid var(--border-color, #334155);
+}
+
+.pipeline-progress-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary, #e2e8f0);
+}
+
+.pipeline-progress-status {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.pipeline-progress-status.running {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+}
+
+.pipeline-progress-status.completed {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+}
+
+.pipeline-progress-status.failed {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+.pipeline-progress-status.cancelled {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
+}
+
+/* Stage list */
+.pipeline-stages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pipeline-stage {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border-color-subtle, #1e293b);
+  font-size: 0.78rem;
+  color: var(--text-secondary, #94a3b8);
+  transition: background 0.15s;
+}
+
+.pipeline-stage:last-child {
+  border-bottom: none;
+}
+
+.pipeline-stage.active {
+  background: rgba(59, 130, 246, 0.08);
+  color: var(--text-primary, #e2e8f0);
+}
+
+.pipeline-stage.completed {
+  color: #4ade80;
+}
+
+.pipeline-stage.failed {
+  color: #f87171;
+}
+
+/* Stage indicator dot */
+.stage-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--border-color, #334155);
+  transition: background 0.2s, box-shadow 0.2s;
+}
+
+.pipeline-stage.pending .stage-indicator {
+  background: var(--border-color, #334155);
+}
+
+.pipeline-stage.active .stage-indicator {
+  background: #3b82f6;
+  box-shadow: 0 0 6px rgba(59, 130, 246, 0.5);
+  animation: stagePulse 1.5s ease-in-out infinite;
+}
+
+.pipeline-stage.completed .stage-indicator {
+  background: #22c55e;
+}
+
+.pipeline-stage.failed .stage-indicator {
+  background: #ef4444;
+}
+
+@keyframes stagePulse {
+  0%, 100% { box-shadow: 0 0 4px rgba(59, 130, 246, 0.4); }
+  50% { box-shadow: 0 0 10px rgba(59, 130, 246, 0.7); }
+}
+
+.stage-name {
+  flex: 1;
+}
+
+.stage-time {
+  font-size: 0.7rem;
+  color: var(--text-muted, #64748b);
+}
+
+/* Pipeline error display */
+.pipeline-error {
+  padding: 8px 12px;
+  margin: 0;
+  font-size: 0.75rem;
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.08);
+  border-top: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+/* Cancel button */
+.pipeline-cancel-btn {
+  width: 100%;
+  padding: 6px;
+  margin-top: var(--spacing-xs, 4px);
+  background: transparent;
+  color: var(--text-secondary, #94a3b8);
+  border: 1px solid var(--border-color, #334155);
+  border-radius: var(--radius-sm, 4px);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.pipeline-cancel-btn:hover {
+  color: #f87171;
+  border-color: #f87171;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .pipeline-progress-header {
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-start;
+  }
+}

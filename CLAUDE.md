@@ -195,7 +195,7 @@ Five modules in `src/forge3d/`:
 
 | Module | Purpose |
 |---|---|
-| `model-bridge.js` | Spawns/manages Python inference server subprocess, HTTP client, post-processing proxy |
+| `model-bridge.js` | Spawns/manages Python inference server subprocess, HTTP client, post-processing proxy, health watchdog with auto-restart, stderr file logging, port conflict detection |
 | `database.js` | SQLite persistence (projects, assets, generation_history) via `better-sqlite3` |
 | `generation-queue.js` | FIFO GPU queue, max 1 concurrent, pause/resume/cancel |
 | `forge-session.js` | Generation lifecycle (idle → generating → complete/failed) |
@@ -253,6 +253,32 @@ Per-project persistent memory at `{projectRoot}/.brightforge/memory.json`:
 - `DiffApplier` auto-checkpoints if project is a git repo, falls back to .backup files
 - Timeline: `GET /api/chat/timeline` returns chronological BrightForge checkpoints
 - Revert: `POST /api/chat/revert/:commitHash` uses `git revert --no-edit`
+
+### Orchestration Runtime (Phase 9)
+
+Multi-agent task orchestration with Claude-Ollama handoff support. Six modules in `src/orchestration/`:
+
+| Module | Log Tag | Purpose |
+|---|---|---|
+| `storage.js` | `[ORCH-DB]` | SQLite persistence (task_states, orchestration_events, audit_results, agent_registry) |
+| `event-bus.js` | `[EVENT-BUS]` | SHA256-hashed event envelopes, 13 event types, ring buffers, TelemetryBus forwarding |
+| `task-state.js` | `[TASK-STATE]` | FSM lifecycle (active/paused/completed/failed), phase progression, architectural decisions |
+| `supervisor.js` | `[SUPERVISOR]` | Structural/coding standard/continuity audits, weighted scoring (0.4/0.3/0.3) |
+| `handoff.js` | `[HANDOFF]` | Claude-Ollama pause/resume with pre-handoff audit, HandoffError class |
+| `index.js` | `[ORCHESTRATOR]` | Facade with init/shutdown sequence, agent registration |
+
+Config: `config/orchestration.yaml`. DB: `data/orchestration.db`. Status: **runtime complete, not yet wired to API routes or dashboard**.
+
+### Bridge Hardening (Sprint 2)
+
+`model-bridge.js` improvements for reliability:
+- Health watchdog: auto-restart after N consecutive health check failures (configurable)
+- Stderr file logging to `sessions/bridge-errors.log` with 1MB rotation
+- Port conflict detection: `_isPortOccupied()` checks before spawning
+- Process liveness verification during `_waitForStartup()`
+- Telemetry events: `bridge_started`, `bridge_stopped`, `bridge_restart`, `bridge_health_failure`
+- Cumulative `totalRestarts` counter across lifecycle
+- Error reporting to ErrorHandler on crashes
 
 ### Electron Desktop
 

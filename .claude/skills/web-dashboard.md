@@ -46,10 +46,39 @@ Chat uses fire-and-forget with SSE progress (NOT polling):
 3. Events: `provider_trying`, `complete`, `failed`, `cancelled`, `pipeline_step_*`
 4. `POST /api/chat/cancel/:sessionId` aborts via AbortController
 
-## Cost Ticker
+### SSEClient (Sprint 1)
+
+`public/js/sse-client.js` wraps `EventSource` with resilient reconnection:
+- Exponential backoff: 1s base, 30s max, 10 retries
+- `on(event, handler)` — registers event listeners, auto-attaches on reconnect
+- `close()` — permanently closes connection and stops retries
+- `onStatusChange` callback: `'connected'` / `'reconnecting'` / `'disconnected'`
+- Status dot in topbar: `#sse-status` (green/yellow/red with pulse animation)
+- 15s heartbeat keepalive on server-side SSE routes (chat + forge3d)
+- **Must expose to `window` scope**: `window.SSEClient = SSEClient;` (not ES module)
+
+### MemoryPanel (Sprint 2)
+
+`public/js/memory-panel.js` — Project memory management modal:
+- Tech stack tags (detected + confirmed, deduped)
+- Convention categories (code/design/forge3d) — collapsible, CRUD
+- Corrections display (last 5, reversed)
+- "Clear All Memory" with confirmation
+- Sidebar badge (`#memory-count`) shows convention count
+- API: `GET /api/memory`, `POST /api/memory/convention`, `DELETE /api/memory/convention/:category/:index`, `POST /api/memory/clear`
+- **Must expose to `window` scope**: `window.MemoryPanel = MemoryPanel;`
+
+## Cost Ticker (Sprint 1)
 
 Header cost ticker polls `/api/cost/summary` every 60s. Click opens breakdown panel.
-Color thresholds: green (normal), `budget-warning` (80%+), `budget-critical` (95%+).
+Color thresholds: green (normal), `budget-warning` (80%+, amber), `budget-critical` (95%+, red pulse).
+
+### Rollback Timeline (Sprint 1)
+
+Plan-applied entries in the Chat tab show:
+- Timestamp, file count, provider + cost
+- "Rollback" button per entry (calls `DiffApplier.rollback()`)
+- Timeline entries added via `chat.addPlanAppliedEntry(data)` after successful plan approval
 
 ## Adding a New Tab
 
