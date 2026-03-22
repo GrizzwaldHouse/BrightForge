@@ -1,0 +1,67 @@
+# Playtest & Balancing Engine Defaults (Phase 17)
+# AI playtest agents simulate gameplay on prototypes and produce balance reports.
+
+simulation:
+  max_ticks: 1000             # Maximum simulation ticks per run
+  tick_timeout_ms: 5000       # Safety timeout per tick
+  max_agents: 10              # Maximum agents per simulation
+  default_agent_count: 3      # One of each type by default
+
+agents:
+  explorer:
+    description: "Visits all regions, interacts with everything"
+    move_cost: 1
+    interact_cost: 2
+    quest_pickup_cost: 1
+    exploration_bias: 1.0
+    quest_bias: 0.2
+    skip_optional: false
+  quest_focused:
+    description: "Follows quest chains linearly"
+    move_cost: 1
+    interact_cost: 2
+    quest_pickup_cost: 1
+    exploration_bias: 0.1
+    quest_bias: 1.0
+    skip_optional: false
+  speedrunner:
+    description: "Attempts fastest quest completion"
+    move_cost: 1
+    interact_cost: 1
+    quest_pickup_cost: 1
+    exploration_bias: 0.0
+    quest_bias: 1.0
+    skip_optional: true
+
+thresholds:
+  quest_completion_rate:
+    excellent: 95
+    good: 80
+    poor: 50
+  average_quest_time:
+    excellent: 50
+    good: 100
+    poor: 200
+  deadlock_tolerance: 0
+  npc_interaction_rate:
+    excellent: 90
+    good: 70
+    poor: 40
+  navigation_failure_rate:
+    excellent: 5
+    good: 15
+    poor: 30
+
+scoring:
+  weights:
+    quest_completion: 0.30
+    quest_time: 0.15
+    npc_interaction: 0.20
+    navigation: 0.15
+    deadlocks: 0.20
+  grade_thresholds:
+    A: 90
+    B: 75
+    C: 60
+    D: 40
+    F: 0

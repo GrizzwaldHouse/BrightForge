@@ -235,4 +235,7 @@ class ShapEAdapter(ModelAdapter):
         info = super().get_info()
         info['textured'] = False
         info['description'] = 'Lightweight image-to-3D (untextured geometry)'
+        info['capabilities'] = ['text_to_mesh', 'image_to_mesh']
+        info['input_types'] = ['image', 'text']
+        info['output_formats'] = ['glb', 'fbx']
         return info

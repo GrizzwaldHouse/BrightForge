@@ -799,6 +799,175 @@ class ModelBridge extends EventEmitter {
     return info;
   }
 
+  /**
+   * Validate UV coordinates in a mesh.
+   * @param {Buffer} meshBuffer - GLB file bytes
+   * @returns {Promise<Object>} Validation result
+   */
+  async validateUVs(meshBuffer) {
+    this._ensureRunning();
+    console.log(`[BRIDGE] Requesting UV validation (${meshBuffer.length} bytes)...`);
+
+    const formData = new FormData();
+    formData.append('file', new Blob([meshBuffer]), 'mesh.glb');
+
+    const response = await this._fetchRaw(`${this.baseUrl}/validate/uvs`, {
+      method: 'POST',
+      body: formData,
+      signal: AbortSignal.timeout(forge3dConfig.generation.timeout_ms)
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ detail: response.statusText }));
+      throw new Error(`UV validation failed: ${err.detail || err.error || response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log(`[BRIDGE] UV validation complete: has_uvs=${result.has_uvs}`);
+    return result;
+  }
+
+  /**
+   * Auto-unwrap UV coordinates for a mesh.
+   * @param {Buffer} meshBuffer - GLB file bytes
+   * @returns {Promise<Buffer>} GLB with generated UVs
+   */
+  async autoUnwrapUVs(meshBuffer) {
+    this._ensureRunning();
+    console.log(`[BRIDGE] Requesting auto UV unwrap (${meshBuffer.length} bytes)...`);
+
+    const formData = new FormData();
+    formData.append('file', new Blob([meshBuffer]), 'mesh.glb');
+
+    const response = await this._fetchRaw(`${this.baseUrl}/unwrap/auto`, {
+      method: 'POST',
+      body: formData,
+      signal: AbortSignal.timeout(forge3dConfig.generation.timeout_ms)
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ detail: response.statusText }));
+      throw new Error(`Auto UV unwrap failed: ${err.detail || err.error || response.statusText}`);
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    console.log(`[BRIDGE] Auto UV unwrap complete: ${buffer.length} bytes`);
+    return buffer;
+  }
+
+  /**
+   * Generate PBR textures for a mesh.
+   * @param {string} meshPath - Path to GLB file (server-side)
+   * @param {string} prompt - Text description
+   * @param {Object} [styleHints] - Style parameters (roughness, metallic, etc.)
+   * @param {number} [resolution] - Texture resolution (default 1024)
+   * @returns {Promise<Object>} Texture paths
+   */
+  async generateTextures(meshPath, prompt, styleHints = {}, resolution = 1024) {
+    this._ensureRunning();
+    console.log(`[BRIDGE] Requesting texture generation for ${meshPath}...`);
+
+    const formData = new FormData();
+    formData.append('prompt', prompt);
+    formData.append('style_hints', JSON.stringify(styleHints));
+    formData.append('resolution', String(resolution));
+
+    // For now, send mesh buffer since server expects upload
+    // In production, support both buffer and path-based generation
+    const { readFileSync } = await import('fs');
+    const meshBuffer = readFileSync(meshPath);
+    formData.append('file', new Blob([meshBuffer]), 'mesh.glb');
+
+    const response = await this._fetchRaw(`${this.baseUrl}/generate/textures`, {
+      method: 'POST',
+      body: formData,
+      signal: AbortSignal.timeout(forge3dConfig.generation.timeout_ms)
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ detail: response.statusText }));
+      throw new Error(`Texture generation failed: ${err.detail || err.error || response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log(`[BRIDGE] Texture generation complete: ${Object.keys(result.textures).length} textures`);
+    return result;
+  }
+
+  /**
+   * Build material descriptor from texture set.
+   * @param {Object} textures - Texture paths map
+   * @param {string} [preset] - Material preset name
+   * @returns {Promise<Object>} Material descriptor
+   */
+  async buildMaterial(textures, preset = 'default_pbr') {
+    this._ensureRunning();
+    console.log(`[BRIDGE] Requesting material build with preset: ${preset}`);
+
+    const formData = new FormData();
+    formData.append('textures', JSON.stringify(textures));
+    formData.append('preset', preset);
+
+    const response = await this._fetchRaw(`${this.baseUrl}/build/material`, {
+      method: 'POST',
+      body: formData,
+      signal: AbortSignal.timeout(30000) // 30s timeout
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ detail: response.statusText }));
+      throw new Error(`Material build failed: ${err.detail || err.error || response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log(`[BRIDGE] Material built with ${result.material.metadata.texture_count} textures`);
+    return result.material;
+  }
+
+  /**
+   * Assemble multiple GLB files into a single multi-node scene GLB.
+   * @param {Object} manifest - { sceneName, nodes: [{ name, glb_path, transform: 4x4 }] }
+   * @returns {Promise<{buffer: Buffer, metadata: Object}>}
+   */
+  async assembleScene(manifest) {
+    this._ensureRunning();
+    const endTimer = telemetryBus.startTimer('bridge_assemble_scene');
+
+    console.log(`[BRIDGE] Requesting scene assembly (${manifest.nodes?.length || 0} nodes)...`);
+
+    try {
+      const formData = new FormData();
+      formData.append('manifest', JSON.stringify(manifest));
+
+      const response = await this._fetchRaw(`${this.baseUrl}/assemble/scene`, {
+        method: 'POST',
+        body: formData,
+        signal: AbortSignal.timeout(forge3dConfig.generation.timeout_ms)
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ detail: response.statusText }));
+        throw new Error(`Scene assembly failed: ${err.detail || err.error || response.statusText}`);
+      }
+
+      const buffer = Buffer.from(await response.arrayBuffer());
+      const metadata = {
+        assemblyTime: parseFloat(response.headers.get('x-assembly-time')) || 0,
+        nodeCount: parseInt(response.headers.get('x-node-count')) || 0,
+        fileSize: buffer.length
+      };
+
+      console.log(`[BRIDGE] Scene assembled: ${buffer.length} bytes, ${metadata.nodeCount} nodes`);
+      endTimer({ success: true, nodeCount: metadata.nodeCount });
+
+      return { buffer, metadata };
+    } catch (err) {
+      endTimer({ success: false, error: err.message });
+      errorHandler.report('bridge_error', err, { operation: 'assembleScene' });
+      throw err;
+    }
+  }
+
   // --- Internal Helpers ---
 
   /**

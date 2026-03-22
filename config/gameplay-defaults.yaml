@@ -1,0 +1,62 @@
+# Gameplay Prototype Defaults
+# Configuration for the AI Gameplay & Prototype Generator (Phase 16)
+
+gameplay:
+  max_npcs: 20
+  max_quests: 10
+  max_interactions: 50
+  max_chain_depth: 5
+  default_genre: adventure
+
+npc:
+  behavior_types:
+    - merchant
+    - guard
+    - quest_giver
+    - wanderer
+  max_per_region: 5
+  require_unique_names: true
+
+interactions:
+  types:
+    - pickup_item
+    - trigger_event
+    - dialogue
+    - activate_object
+  max_per_node: 3
+
+quests:
+  max_objectives_per_quest: 5
+  require_completion_path: true
+  reward_types:
+    - item
+    - experience
+    - currency
+    - unlock
+
+engine_targets:
+  unity:
+    language: csharp
+    script_extension: .cs
+  unreal:
+    language: blueprint_json
+    script_extension: .json
+
+validation:
+  check_reachability: true
+  check_quest_completability: true
+  check_npc_placement: true
+  max_prompt_length: 1000
+
+llm:
+  task_name: gameplay_analysis
+  max_tokens: 3000
+  temperature: 0.4
+  max_retries: 1
+
+export:
+  include_world: true
+  include_scripts: true
+  include_npc_data: true
+  include_quest_data: true
+  include_interaction_data: true

@@ -320,6 +320,63 @@ class UniversalMeshClient {
   // -- Info for frontend ----------------------------------------------------
 
   /**
+   * Get engine info with capability metadata from Python bridge.
+   * Used by GET /api/forge3d/engines.
+   * @returns {Promise<Array>} Engine info with capabilities
+   */
+  async getEngineInfo() {
+    const engines = [];
+
+    // Get Python adapter info if bridge is running
+    if (modelBridge.state === 'running') {
+      try {
+        const bridgeInfo = await modelBridge.getModels();
+        if (bridgeInfo.models) {
+          for (const model of bridgeInfo.models) {
+            engines.push({
+              name: model.name,
+              type: 'local',
+              model_type: model.model_type,
+              textured: model.textured || false,
+              capabilities: model.capabilities || [],
+              input_types: model.input_types || [],
+              output_formats: model.output_formats || [],
+              vram_requirement_gb: model.vram_requirement_gb || 0,
+              loaded: model.loaded || false,
+              enabled: true,
+              available: true
+            });
+          }
+        }
+      } catch (err) {
+        console.warn(`[MESH-CLIENT] Failed to get Python bridge models: ${err.message}`);
+      }
+    }
+
+    // Add cloud providers from config
+    for (const [name, provider] of Object.entries(this.providers)) {
+      if (provider.type === 'cloud') {
+        engines.push({
+          name,
+          type: 'cloud',
+          model_type: 'mesh',
+          textured: provider.textured || false,
+          capabilities: provider.capabilities || ['image_to_mesh'],
+          input_types: provider.input_types || ['image'],
+          output_formats: provider.output_formats || ['glb'],
+          vram_requirement_gb: 0,
+          loaded: false,
+          enabled: provider.enabled || false,
+          available: this.isProviderAvailable(name),
+          cost_per_generation: provider.cost_per_generation || 0
+        });
+      }
+    }
+
+    return engines;
+  }
+
+  /**
    * Get provider info for the frontend (cost estimates, tiers, availability).
    * Used by GET /api/forge3d/providers.
    */

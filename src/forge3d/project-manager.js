@@ -177,6 +177,7 @@ class ProjectManager {
       console.log(`[PROJECT] Thumbnail saved: ${data.thumbnailBuffer.length} bytes`);
     }
 
+    // MINOR: Pass material_data and has_materials to database
     const asset = forge3dDb.createAsset(projectId, {
       name: `${safeName}${data.extension}`,
       type: data.type,
@@ -185,7 +186,9 @@ class ProjectManager {
       fbxPath,
       fbxSize,
       thumbnailPath,
-      metadata: data.metadata || {}
+      metadata: data.metadata || {},
+      material_data: data.material_data || {},
+      has_materials: data.has_materials || 0
     });
 
     console.log(`[PROJECT] Asset saved: "${asset.name}" (${asset.id}) to project "${project.name}"`);

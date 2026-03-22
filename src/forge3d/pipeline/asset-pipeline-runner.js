@@ -145,7 +145,12 @@ class AssetPipelineRunner extends EventEmitter {
         prompt: params.prompt || null,
         imageBuffer: params.imageBuffer || null,
         projectId: params.projectId || null,
-        model: params.model || null
+        model: params.model || null,
+        ...Object.fromEntries(
+          Object.entries(params).filter(([k]) =>
+            !['prompt', 'imageBuffer', 'projectId', 'model'].includes(k)
+          )
+        )
       },
       currentStageIndex: -1,
       startedAt: null,

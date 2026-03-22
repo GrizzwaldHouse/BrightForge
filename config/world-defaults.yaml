@@ -1,0 +1,70 @@
+# World Generation Defaults
+# Configuration for the AI World Generator (Phase 15)
+
+world:
+  max_regions: 16
+  default_world_type: fantasy
+  sizes:
+    small:
+      grid: [2, 2]
+      max_regions: 4
+    medium:
+      grid: [3, 3]
+      max_regions: 9
+    large:
+      grid: [4, 4]
+      max_regions: 16
+  per_scene_timeout_ms: 600000
+  total_timeout_ms: 3600000
+  max_concurrent_scenes: 2
+
+biomes:
+  types:
+    - forest
+    - desert
+    - mountain
+    - ocean
+    - plains
+    - tundra
+    - swamp
+    - volcanic
+    - urban
+    - ruins
+  adjacency_rules:
+    ocean: [ocean, plains, swamp, forest]
+    desert: [desert, plains, volcanic, mountain]
+    mountain: [mountain, forest, tundra, desert]
+    forest: [forest, plains, swamp, mountain, ocean]
+    plains: [plains, forest, desert, urban, ocean]
+    tundra: [tundra, mountain, ocean]
+    swamp: [swamp, forest, ocean, plains]
+    volcanic: [volcanic, desert, mountain]
+    urban: [urban, plains, forest]
+    ruins: [ruins, forest, desert, mountain, plains]
+
+validation:
+  position_bounds: [-1000, 1000]
+  scale_bounds: [0.01, 100]
+  rotation_bounds: [-360, 360]
+  max_prompt_length: 1000
+  max_landmarks_per_region: 5
+
+llm:
+  task_name: world_analysis
+  max_tokens: 3000
+  temperature: 0.3
+  max_retries: 1
+
+streaming:
+  default_chunk_size: 2
+  load_radius: 2
+  unload_radius: 4
+  lod_levels: 3
+
+export:
+  formats:
+    - gltf
+    - unity
+    - unreal
+  include_streaming_metadata: true
+  include_world_graph: true

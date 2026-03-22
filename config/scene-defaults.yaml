@@ -1,0 +1,20 @@
+# Scene Generation Defaults
+# Configuration for the AI Scene Generator (Phase 14)
+
+scene:
+  max_assets: 10
+  default_scene_type: outdoor
+  per_asset_timeout_ms: 300000
+  total_timeout_ms: 1800000
+
+validation:
+  position_bounds: [-100, 100]
+  scale_bounds: [0.01, 100]
+  rotation_bounds: [-360, 360]
+  max_prompt_length: 500
+
+llm:
+  task_name: scene_analysis
+  max_tokens: 2000
+  temperature: 0.3
+  max_retries: 1

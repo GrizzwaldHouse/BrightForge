@@ -137,3 +137,280 @@ pipelines:
             - glb
           save_to_project: true
         gate: null
+
+  generate_textured_game_asset:
+    description: "Full textured game asset: generate, optimize, LOD, validate UVs, generate textures, build material, package"
+    stages:
+      - name: generate_mesh
+        handler: generate-mesh
+        config:
+          type: full
+          default_model: auto
+        gate: null
+
+      - name: optimize_mesh
+        handler: optimize-mesh
+        config:
+          target_faces: 10000
+          preset: desktop
+        gate: null
+
+      - name: generate_lods
+        handler: generate-lods
+        config:
+          levels:
+            - label: high
+              ratio: 1.0
+            - label: mid
+              ratio: 0.5
+            - label: low
+              ratio: 0.25
+        gate: null
+
+      - name: validate_uvs
+        handler: validate-uvs
+        config:
+          auto_unwrap: true
+          required: false
+        gate: null
+
+      - name: generate_textures
+        handler: generate-textures
+        config:
+          resolution: 1024
+          style_hints:
+            roughness: 0.5
+            metallic: 0.0
+        gate: null
+
+      - name: assemble_material
+        handler: assemble-material
+        config:
+          preset: default_pbr
+        gate: null
+
+      - name: quality_check
+        handler: quality-check
+        config:
+          max_faces: 50000
+          min_faces: 100
+          require_manifold: false
+        gate: supervisor
+
+      - name: package_asset
+        handler: package-game-asset
+        config:
+          formats:
+            - glb
+            - fbx
+          save_to_project: true
+        gate: null
+
+  generate_scene:
+    description: "Scene generation: analyze prompt, generate assets, assemble multi-node GLB, export"
+    stages:
+      - name: analyze_scene
+        handler: analyze-scene
+        config:
+          max_assets: 10
+          default_scene_type: outdoor
+        gate: null
+
+      - name: generate_scene_assets
+        handler: generate-scene-assets
+        config:
+          generation_type: full
+          default_model: auto
+          timeout_ms: 1800000
+          max_retries_per_asset: 1
+        gate: null
+
+      - name: assemble_scene
+        handler: assemble-scene
+        config:
+          output_format: glb
+        gate: null
+
+      - name: export_scene
+        handler: export-scene
+        config:
+          formats:
+            - glb
+          save_to_project: true
+          save_individual_assets: true
+          save_descriptor: true
+        gate: null
+
+  generate_world:
+    description: "World generation: analyze prompt, map regions, generate scenes, optimize assets, build graph, streaming, export"
+    stages:
+      - name: parse_world_prompt
+        handler: parse-world-prompt
+        config:
+          max_regions: 16
+          default_world_type: fantasy
+        gate: null
+
+      - name: generate_world_map
+        handler: generate-world-map
+        config:
+          assign_biomes: true
+          validate_adjacency: true
+        gate: null
+
+      - name: generate_world_scenes
+        handler: generate-world-scenes
+        config:
+          scene_pipeline: generate_scene
+          max_concurrent: 2
+          timeout_ms: 3600000
+          prioritize_landmarks: true
+        gate: null
+
+      - name: optimize_world_assets
+        handler: optimize-world-assets
+        config:
+          deduplicate_threshold: 0.85
+          reuse_textures: true
+        gate: null
+
+      - name: build_world_graph
+        handler: build-world-graph
+        config:
+          calculate_distances: true
+          validate_connectivity: true
+        gate: null
+
+      - name: streaming_layout
+        handler: streaming-layout-stage
+        config:
+          chunk_size: 2
+          lod_levels: 3
+        gate: null
+
+      - name: export_world
+        handler: export-world
+        config:
+          formats:
+            - gltf
+          save_to_project: true
+          save_world_graph: true
+          save_streaming_metadata: true
+        gate: null
+
+  generate_prototype:
+    description: "Gameplay prototype: parse prompt, generate NPCs, interactions, quests, game logic, validate, export"
+    stages:
+      - name: parse_gameplay_prompt
+        handler: parse-gameplay-prompt
+        config:
+          max_npcs: 20
+          max_quests: 10
+        gate: null
+
+      - name: generate_npcs
+        handler: generate-npcs
+        config:
+          behavior_types:
+            - merchant
+            - guard
+            - quest_giver
+            - wanderer
+          max_per_region: 5
+        gate: null
+
+      - name: generate_interactions
+        handler: generate-interactions
+        config:
+          types:
+            - pickup_item
+            - trigger_event
+            - dialogue
+            - activate_object
+        gate: null
+
+      - name: generate_quests
+        handler: generate-quests
+        config:
+          max_chain_depth: 5
+          require_completion_path: true
+        gate: null
+
+      - name: build_game_logic
+        handler: build-game-logic
+        config:
+          target_engines:
+            - unity
+            - unreal
+        gate: null
+
+      - name: validate_gameplay
+        handler: validate-gameplay
+        config:
+          check_reachability: true
+          check_quest_completability: true
+        gate: supervisor
+
+      - name: export_prototype
+        handler: export-prototype
+        config:
+          include_world: true
+          include_scripts: true
+          formats:
+            - gltf
+        gate: null
+
+  run_playtest:
+    description: "AI Playtest: load prototype, spawn agents, simulate, analyze, report"
+    stages:
+      - name: load_prototype
+        handler: load-prototype
+        config:
+          load_from_db: true
+        gate: null
+
+      - name: spawn_playtest_agents
+        handler: spawn-playtest-agents
+        config:
+          agent_types:
+            - explorer
+            - quest_focused
+            - speedrunner
+          agents_per_type: 1
+        gate: null
+
+      - name: simulate_quest_completion
+        handler: simulate-quest-completion
+        config:
+          max_ticks: 1000
+          record_events: true
+        gate: null
+
+      - name: analyze_pathing
+        handler: analyze-pathing
+        config:
+          detect_bottlenecks: true
+          build_heatmap: true
+        gate: null
+
+      - name: detect_deadlocks
+        handler: detect-deadlocks
+        config:
+          check_cycles: true
+          check_unreachable: true
+          check_impossible: true
+        gate: null
+
+      - name: generate_balance_report
+        handler: generate-balance-report
+        config:
+          save_to_project: true
+          save_to_db: true
+        gate: null
+
+      - name: suggest_balance_adjustments
+        handler: suggest-balance-adjustments
+        config:
+          save_to_project: true
+          severity_threshold: minor
+        gate: null
