@@ -26,9 +26,13 @@ import { errorRoutes } from './routes/errors.js';
 import { metricsRoutes } from './routes/metrics.js';
 import designRoutes from './routes/design.js';
 import forge3dRoutes from './routes/forge3d.js';
+import sceneRoutes from './routes/scene.js';
+import worldRoutes from './routes/world.js';
+import prototypeRoutes from './routes/prototype.js';
 import { memoryRoutes } from './routes/memory.js';
 import { costRoutes } from './routes/cost.js';
 import pipelineRoutes from './routes/pipelines.js';
+import modelIntelligenceRoutes from './routes/model-intelligence.js';
 import { authMiddleware } from './middleware/auth.js';
 import { generalLimiter } from './middleware/rate-limit.js';
 import errorHandler from '../core/error-handler.js';
@@ -100,9 +104,13 @@ export function createServer(options = {}) {
   app.use('/api/metrics', metricsRoutes());
   app.use('/api/design', designRoutes);
   app.use('/api/forge3d', forge3dRoutes);
+  app.use('/api/scene', sceneRoutes);
+  app.use('/api/world', worldRoutes);
+  app.use('/api/prototype', prototypeRoutes);
   app.use('/api/memory', memoryRoutes());
   app.use('/api/cost', costRoutes());
   app.use('/api/pipelines', pipelineRoutes);
+  app.use('/api/models', modelIntelligenceRoutes);
   app.use('/api', configRoutes());
 
   // Static frontend

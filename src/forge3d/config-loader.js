@@ -145,6 +145,16 @@ class Forge3DConfig {
     this.batch = this._section('batch', {
       max_prompts: 5
     });
+
+    // Load asset pipelines from separate YAML file
+    try {
+      const pipelinesPath = join(__dirname, '../../config/asset-pipelines.yaml');
+      const pipelinesRaw = readFileSync(pipelinesPath, 'utf8');
+      this.assetPipelines = parseYaml(pipelinesRaw);
+    } catch (err) {
+      console.warn(`[CONFIG] Could not load asset-pipelines.yaml: ${err.message}`);
+      this.assetPipelines = { pipelines: {} };
+    }
   }
 
   /**

@@ -218,6 +218,16 @@ task_routing:
     fallback: "together"
     max_tokens: 300
 
+  scene_analysis:
+    description: "Decompose scene prompts into structured asset lists with positions"
+    prefer:
+      - groq
+      - cerebras
+      - together
+      - mistral
+    fallback: "gemini"
+    max_tokens: 2000
+
 # Budget limits (daily)
 budget:
   daily_limit_usd: 1.00

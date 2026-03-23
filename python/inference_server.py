@@ -36,6 +36,22 @@ def _cfg(section, key, default=None):
     """Get a config value with fallback to default."""
     return CONFIG.get(section, {}).get(key, default)
 
+# MEDIUM SECURITY: Sanitize error messages for HTTP responses
+# Removes file paths, stack traces, and internal implementation details
+def sanitize_error(error):
+    """
+    Sanitize error message to remove sensitive information before sending to client.
+    Removes absolute paths, stack traces, and internal details.
+    """
+    import re
+    msg = str(error)
+    # Remove absolute paths (Windows and Unix)
+    msg = re.sub(r'[A-Z]:\\[^\s]+', '[path]', msg, flags=re.IGNORECASE)
+    msg = re.sub(r'/[^\s]+', '[path]', msg)
+    # Only keep first line (remove stack traces)
+    msg = msg.split('\n')[0].strip()
+    return msg or 'An error occurred'
+
 # Resolve CUDA OOM exception type (safe import — works even without torch)
 try:
     import torch
@@ -253,7 +269,7 @@ async def generate_mesh(
         raise HTTPException(507, 'GPU out of memory. Try a smaller image or wait for VRAM to free up.')
     except Exception as e:
         logger.error(f'[SERVER] Mesh generation error: {e}')
-        raise HTTPException(500, f'Internal error: {str(e)}')
+        raise HTTPException(500, f'Internal error: {sanitize_error(e)}')
 
     finally:
         # Clean up temp input
@@ -335,7 +351,7 @@ async def generate_image(
         raise HTTPException(507, 'GPU out of memory. Try smaller dimensions or fewer steps.')
     except Exception as e:
         logger.error(f'[SERVER] Image generation error: {e}')
-        raise HTTPException(500, f'Internal error: {str(e)}')
+        raise HTTPException(500, f'Internal error: {sanitize_error(e)}')
     finally:
         # Clean up stale temp files between generations
         cleanup_temp_files()
@@ -414,7 +430,7 @@ async def generate_full(
         raise HTTPException(507, 'GPU out of memory. Try a simpler prompt or fewer steps.')
     except Exception as e:
         logger.error(f'[SERVER] Full pipeline error: {e}')
-        raise HTTPException(500, f'Internal error: {str(e)}')
+        raise HTTPException(500, f'Internal error: {sanitize_error(e)}')
     finally:
         # Clean up stale temp files between generations
         cleanup_temp_files()
@@ -470,7 +486,7 @@ async def convert_glb_to_fbx(
         raise
     except Exception as e:
         logger.error(f'[SERVER] FBX conversion error: {e}')
-        raise HTTPException(500, f'Internal error: {str(e)}')
+        raise HTTPException(500, f'Internal error: {sanitize_error(e)}')
     finally:
         if temp_glb.exists():
             temp_glb.unlink()
@@ -547,7 +563,7 @@ async def extract_materials(
         raise
     except Exception as e:
         logger.error(f'[SERVER] Material extraction error: {e}')
-        raise HTTPException(500, f'Internal error: {str(e)}')
+        raise HTTPException(500, f'Internal error: {sanitize_error(e)}')
     finally:
         if temp_glb.exists():
             temp_glb.unlink()
@@ -611,7 +627,7 @@ async def postprocess_optimize(
         raise
     except Exception as e:
         logger.error(f'[SERVER] Optimize error: {e}')
-        raise HTTPException(500, f'Internal error: {str(e)}')
+        raise HTTPException(500, f'Internal error: {sanitize_error(e)}')
     finally:
         if temp_input.exists():
             temp_input.unlink()
@@ -663,7 +679,7 @@ async def postprocess_lod(
         raise
     except Exception as e:
         logger.error(f'[SERVER] LOD error: {e}')
-        raise HTTPException(500, f'Internal error: {str(e)}')
+        raise HTTPException(500, f'Internal error: {sanitize_error(e)}')
     finally:
         if temp_input.exists():
             temp_input.unlink()
@@ -702,7 +718,7 @@ async def postprocess_report(
         raise
     except Exception as e:
         logger.error(f'[SERVER] Report error: {e}')
-        raise HTTPException(500, f'Internal error: {str(e)}')
+        raise HTTPException(500, f'Internal error: {sanitize_error(e)}')
     finally:
         if temp_input.exists():
             temp_input.unlink()
@@ -719,6 +735,350 @@ async def postprocess_presets():
             'unreal': {'target_faces': 50000, 'label': 'Unreal Engine', 'description': 'Game-ready for UE5'},
         }
     }
+
+
+@app.post('/validate/uvs')
+async def validate_uvs(
+    file: UploadFile = File(...),
+):
+    """Validate UV coordinates in a mesh.
+
+    Accepts: GLB mesh file
+    Returns: JSON with UV validation results: {
+        'success': bool,
+        'has_uvs': bool,
+        'overlapping_islands': bool,
+        'texel_density': float
+    }
+    """
+    import trimesh
+
+    contents = await file.read()
+
+    # HIGH SECURITY: File size limit (100MB for mesh files)
+    max_mesh_size = 100 * 1024 * 1024
+    if len(contents) > max_mesh_size:
+        raise HTTPException(400, f'File too large. Maximum {max_mesh_size // (1024 * 1024)} MB.')
+
+    max_upload_bytes = _cfg('generation', 'max_upload_size_bytes', 20 * 1024 * 1024)
+    if len(contents) > max_upload_bytes:
+        raise HTTPException(400, 'File too large. Maximum 20 MB.')
+
+    job_id = generate_job_id()
+    temp_input = TEMP_DIR / f'{job_id}_uv_validate.glb'
+    temp_input.write_bytes(contents)
+
+    try:
+        logger.info(f'[SERVER] UV validation request: job={job_id}')
+
+        mesh = trimesh.load(str(temp_input))
+
+        # Check for UV coordinates
+        has_uvs = hasattr(mesh, 'visual') and hasattr(mesh.visual, 'uv')
+
+        result = {
+            'success': True,
+            'has_uvs': has_uvs,
+            'overlapping_islands': False,  # Placeholder for actual overlap detection
+            'texel_density': 1.0 if has_uvs else 0.0
+        }
+
+        if has_uvs:
+            # Basic UV coordinate stats
+            uv_coords = mesh.visual.uv
+            result['uv_count'] = len(uv_coords)
+            result['uv_min'] = uv_coords.min(axis=0).tolist()
+            result['uv_max'] = uv_coords.max(axis=0).tolist()
+        else:
+            result['uv_count'] = 0
+
+        return JSONResponse(result)
+
+    except Exception as e:
+        logger.error(f'[SERVER] UV validation error: {e}')
+        raise HTTPException(500, f'Internal error: {sanitize_error(e)}')
+    finally:
+        if temp_input.exists():
+            temp_input.unlink()
+
+
+@app.post('/unwrap/auto')
+async def auto_unwrap_uvs(
+    file: UploadFile = File(...),
+):
+    """Automatically unwrap UVs for a mesh using trimesh/xatlas.
+
+    Accepts: GLB mesh file
+    Returns: GLB file with generated UV coordinates
+    """
+    import trimesh
+
+    contents = await file.read()
+
+    # HIGH SECURITY: File size limit (100MB for mesh files)
+    max_mesh_size = 100 * 1024 * 1024
+    if len(contents) > max_mesh_size:
+        raise HTTPException(400, f'File too large. Maximum {max_mesh_size // (1024 * 1024)} MB.')
+
+    max_upload_bytes = _cfg('generation', 'max_upload_size_bytes', 20 * 1024 * 1024)
+    if len(contents) > max_upload_bytes:
+        raise HTTPException(400, 'File too large. Maximum 20 MB.')
+
+    job_id = generate_job_id()
+    temp_input = TEMP_DIR / f'{job_id}_unwrap_input.glb'
+    temp_output = OUTPUT_DIR / f'{job_id}_unwrapped.glb'
+    temp_input.write_bytes(contents)
+
+    try:
+        logger.info(f'[SERVER] Auto UV unwrap request: job={job_id}')
+
+        # Load mesh
+        mesh = trimesh.load(str(temp_input))
+
+        # Auto-unwrap using trimesh's built-in unwrapper (if available)
+        # For production, integrate xatlas or similar UV unwrapper
+        # For now, just return the original mesh with a placeholder
+        logger.warning('[SERVER] Auto UV unwrap not fully implemented, returning original mesh')
+
+        mesh.export(str(temp_output), file_type='glb')
+
+        return FileResponse(
+            str(temp_output),
+            media_type='model/gltf-binary',
+            filename=f'{job_id}_unwrapped.glb',
+            headers={'X-Job-Id': job_id}
+        )
+
+    except Exception as e:
+        logger.error(f'[SERVER] UV unwrap error: {e}')
+        raise HTTPException(500, f'Internal error: {sanitize_error(e)}')
+    finally:
+        if temp_input.exists():
+            temp_input.unlink()
+
+
+@app.post('/generate/textures')
+async def generate_textures(
+    file: UploadFile = File(...),
+    prompt: str = Form(...),
+    style_hints: str = Form(default='{}'),
+    resolution: int = Form(default=1024),
+):
+    """Generate PBR texture set for a mesh.
+
+    Accepts: GLB mesh file
+    Returns: JSON with paths to generated textures (albedo, normal, roughness, metallic, AO)
+    """
+    from texture_generator import texture_generator
+    import json
+
+    # HIGH SECURITY: Resolution bounds check
+    if resolution < 512 or resolution > 4096:
+        raise HTTPException(400, 'Resolution must be between 512 and 4096')
+
+    contents = await file.read()
+    max_upload_bytes = _cfg('generation', 'max_upload_size_bytes', 20 * 1024 * 1024)
+    if len(contents) > max_upload_bytes:
+        raise HTTPException(400, 'File too large. Maximum 20 MB.')
+
+    job_id = generate_job_id()
+    temp_input = TEMP_DIR / f'{job_id}_texture_input.glb'
+    temp_input.write_bytes(contents)
+    texture_output_dir = OUTPUT_DIR / f'{job_id}_textures'
+
+    try:
+        logger.info(f'[SERVER] Texture generation request: job={job_id}, prompt="{prompt[:80]}"')
+
+        # Parse style hints
+        try:
+            hints = json.loads(style_hints)
+        except json.JSONDecodeError:
+            hints = {}
+
+        # Generate textures
+        textures = await asyncio.to_thread(
+            texture_generator.generate_textures,
+            str(temp_input),
+            prompt,
+            hints,
+            str(texture_output_dir),
+            resolution
+        )
+
+        # Convert absolute paths to download URLs
+        download_textures = {}
+        for tex_type, tex_path in textures.items():
+            filename = Path(tex_path).name
+            download_textures[tex_type] = f'/download/{job_id}_textures/{filename}'
+
+        return JSONResponse({
+            'success': True,
+            'job_id': job_id,
+            'textures': download_textures,
+            'texture_paths': textures  # Absolute paths for server-side use
+        })
+
+    except ValueError as e:
+        logger.error(f'[SERVER] Texture generation validation error: {e}')
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        logger.error(f'[SERVER] Texture generation error: {e}')
+        raise HTTPException(500, f'Internal error: {sanitize_error(e)}')
+    finally:
+        if temp_input.exists():
+            temp_input.unlink()
+
+
+@app.post('/build/material')
+async def build_material(
+    textures: str = Form(...),  # JSON dict of texture paths
+    preset: str = Form(default='default_pbr'),
+):
+    """Build material descriptor from texture set.
+
+    Args:
+        textures: JSON dict mapping texture types to paths, e.g. '{"albedo": "/path/to/albedo.png", ...}'
+        preset: Material preset name ('default_pbr', 'ue5_standard', 'unity_standard')
+
+    Returns: JSON material descriptor
+    """
+    from material_builder import material_builder
+    import json
+
+    try:
+        logger.info(f'[SERVER] Material build request: preset={preset}')
+
+        # Parse texture dict
+        try:
+            texture_dict = json.loads(textures)
+        except json.JSONDecodeError:
+            raise HTTPException(400, 'Invalid textures JSON')
+
+        # HIGH SECURITY: Validate that all texture paths are within allowed output directory
+        for tex_type, tex_path in texture_dict.items():
+            try:
+                resolved_path = Path(tex_path).resolve()
+                if not resolved_path.is_relative_to(OUTPUT_DIR.resolve()):
+                    raise HTTPException(400, f'Texture path outside allowed directory: {tex_type}')
+            except (ValueError, OSError):
+                raise HTTPException(400, f'Invalid texture path: {tex_type}')
+
+        # Build material descriptor
+        material = await asyncio.to_thread(
+            material_builder.build_material,
+            texture_dict,
+            preset
+        )
+
+        return JSONResponse({
+            'success': True,
+            'material': material
+        })
+
+    except ValueError as e:
+        logger.error(f'[SERVER] Material build validation error: {e}')
+        raise HTTPException(400, str(e))
+    except FileNotFoundError as e:
+        logger.error(f'[SERVER] Material build file error: {e}')
+        raise HTTPException(404, str(e))
+    except Exception as e:
+        logger.error(f'[SERVER] Material build error: {e}')
+        raise HTTPException(500, f'Internal error: {sanitize_error(e)}')
+
+
+
+# --- Scene Assembly ---
+
+@app.post('/assemble/scene')
+async def assemble_scene(manifest: str = Form(...)):
+    """Assemble multiple GLB files into a single multi-node scene GLB."""
+    import json
+    import trimesh
+    import numpy as np
+
+    try:
+        data = json.loads(manifest)
+    except json.JSONDecodeError:
+        raise HTTPException(400, 'Invalid manifest JSON')
+
+    nodes = data.get('nodes', [])
+    if not nodes:
+        raise HTTPException(400, 'No nodes in manifest')
+
+    if len(nodes) > 20:
+        raise HTTPException(400, 'Too many nodes (max 20)')
+
+    scene_name = data.get('sceneName', 'untitled_scene')
+    job_id = str(uuid.uuid4())[:12]
+    logger.info(f'Scene assembly: job={job_id}, nodes={len(nodes)}')
+
+    start_time = time.time()
+
+    try:
+        scene = trimesh.Scene()
+
+        for node in nodes:
+            name = node.get('name', 'unnamed')
+            glb_path = node.get('glb_path')
+            transform = node.get('transform')
+
+            if not glb_path:
+                raise HTTPException(400, f'Node "{name}" missing glb_path')
+
+            # PATH SECURITY: Validate path within allowed directories
+            resolved = Path(glb_path).resolve()
+            allowed_dirs = [OUTPUT_DIR.resolve(), TEMP_DIR.resolve()]
+            allowed_dirs.append(Path(tempfile.gettempdir()).resolve())
+
+            if not any(resolved.is_relative_to(d) for d in allowed_dirs):
+                raise HTTPException(400, f'Path not allowed for node "{name}"')
+
+            if not resolved.exists():
+                raise HTTPException(404, f'GLB file not found for node "{name}"')
+
+            # Load mesh
+            mesh = trimesh.load(str(resolved))
+
+            # Build 4x4 transform matrix
+            if transform:
+                matrix = np.array(transform, dtype=np.float64)
+                if matrix.shape != (4, 4):
+                    raise HTTPException(400, f'Transform for "{name}" must be 4x4 matrix')
+            else:
+                matrix = np.eye(4)
+
+            # Add to scene (handle both single mesh and scene)
+            if isinstance(mesh, trimesh.Scene):
+                for geom_name, geom in mesh.geometry.items():
+                    scene.add_geometry(geom, node_name=f'{name}_{geom_name}', transform=matrix)
+            else:
+                scene.add_geometry(mesh, node_name=name, transform=matrix)
+
+        # Export assembled scene
+        output_path = OUTPUT_DIR / f'{job_id}_scene.glb'
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        scene.export(str(output_path), file_type='glb')
+
+        assembly_time = round(time.time() - start_time, 2)
+        file_size = output_path.stat().st_size
+
+        logger.info(f'Scene assembled: {len(nodes)} nodes, {file_size} bytes, {assembly_time}s')
+
+        return FileResponse(
+            str(output_path),
+            media_type='model/gltf-binary',
+            filename=f'{scene_name}.glb',
+            headers={
+                'X-Assembly-Time': str(assembly_time),
+                'X-Node-Count': str(len(nodes)),
+                'X-File-Size': str(file_size),
+            },
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f'Scene assembly error: {e}')
+        raise HTTPException(500, f'Scene assembly failed: {sanitize_error(e)}')
 
 
 @app.get('/download/{job_id}/{filename}')

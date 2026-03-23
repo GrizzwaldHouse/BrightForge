@@ -76,6 +76,20 @@ fbx_export:
   scale_factor: 100.0  # meters -> centimeters for Unreal
   coordinate_system: "unreal"  # unreal (Z-up, cm) | default
 
+texture_generation:
+  default_resolution: 1024
+  supported_resolutions: [512, 1024, 2048]
+  default_style:
+    roughness: 0.5
+    metallic: 0.0
+  inference_steps: 50
+  guidance_scale: 7.5
+
+uv_validation:
+  overlap_threshold: 0.05
+  min_texel_density: 0.5
+  auto_unwrap_enabled: true
+
 material_presets:
   ue5-standard:
     shading_model: "DefaultLit"

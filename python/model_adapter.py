@@ -81,6 +81,10 @@ class ModelAdapter(ABC):
             'vram_requirement_gb': self.vram_requirement_gb,
             'loaded': self.is_loaded(),
             'repo_id': self._config.get('repo_id', 'unknown'),
+            'textured': False,
+            'capabilities': [],
+            'input_types': [],
+            'output_formats': []
         }
 
 
@@ -98,6 +102,15 @@ class HunyuanAdapter(ModelAdapter):
     @property
     def vram_requirement_gb(self):
         return self._config.get('required_vram_gb', 12.0)
+
+    def get_info(self):
+        """Return metadata with Hunyuan3D capabilities."""
+        info = super().get_info()
+        info['textured'] = True
+        info['capabilities'] = ['text_to_mesh', 'image_to_mesh', 'textured_mesh']
+        info['input_types'] = ['image', 'text']
+        info['output_formats'] = ['glb', 'fbx']
+        return info
 
     def load(self, device, dtype):
         repo_id = self._config.get('repo_id', 'tencent/Hunyuan3D-2')
@@ -313,6 +326,15 @@ class SDXLAdapter(ModelAdapter):
     @property
     def vram_requirement_gb(self):
         return self._config.get('required_vram_gb', 8.0)
+
+    def get_info(self):
+        """Return metadata with SDXL capabilities."""
+        info = super().get_info()
+        info['textured'] = False
+        info['capabilities'] = ['text_to_image']
+        info['input_types'] = ['text']
+        info['output_formats'] = ['png']
+        return info
 
     def load(self, device, dtype):
         from diffusers import StableDiffusionXLPipeline, DPMSolverMultistepScheduler

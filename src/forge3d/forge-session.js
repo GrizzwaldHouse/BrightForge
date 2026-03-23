@@ -95,6 +95,12 @@ class ForgeSession extends EventEmitter {
   create(params) {
     const id = randomUUID().slice(0, forge3dConfig.session.id_length);
 
+    // Normalize 'auto' model to null/undefined so Python uses configured default
+    let modelName = params.model || null;
+    if (modelName === 'auto') {
+      modelName = null;
+    }
+
     const session = {
       id,
       type: params.type,
@@ -102,7 +108,7 @@ class ForgeSession extends EventEmitter {
       imageBuffer: params.imageBuffer || null,
       filename: params.filename || null,
       options: params.options || {},
-      model: params.model || null,
+      model: modelName,
       state: SESSION_STATES.IDLE,
       createdAt: Date.now(),
       startedAt: null,
@@ -188,6 +194,19 @@ class ForgeSession extends EventEmitter {
         });
       }
 
+      // Emit engine selection telemetry
+      if (session.actualModel) {
+        telemetryBus.emit('forge3d', {
+          type: 'engine_selected',
+          sessionId,
+          engineName: session.actualModel,
+          generationType: session.type,
+          generationTime: result.generationTime || result.totalTime || 0,
+          success: true,
+          textured: result.provider === 'hunyuan3d' || false
+        });
+      }
+
       // Persist completion to DB
       this._persistState(sessionId, SESSION_STATES.COMPLETE);
 
@@ -239,15 +258,19 @@ class ForgeSession extends EventEmitter {
       { model: session.model, task: session.options?.task }
     );
 
+    // Save the actual provider/model used
+    session.actualModel = result.provider || session.model || 'unknown';
+
     session.progress = { stage: 'mesh', percent: forge3dConfig.session.progress.mesh_end_pct };
     return {
       type: 'mesh',
       meshBuffer: result.glbBuffer,
       fbxBuffer: result.fbxBuffer || null,
-      thumbnailBuffer: session.imageBuffer || null, // Use input image as thumbnail
+      thumbnailBuffer: session.imageBuffer || null,
       generationTime: result.metadata.generationTime || 0,
       fileSize: result.metadata.fileSize || result.glbBuffer.length,
-      fbxFileSize: result.metadata.fbxFileSize || 0
+      fbxFileSize: result.metadata.fbxFileSize || 0,
+      provider: result.provider
     };
   }
 
@@ -265,12 +288,16 @@ class ForgeSession extends EventEmitter {
       model: session.model
     });
 
+    // Save the actual model used (from bridge response headers)
+    session.actualModel = result.headers?.model || session.model || 'sdxl';
+
     session.progress = { stage: 'image', percent: forge3dConfig.session.progress.mesh_end_pct };
     return {
       type: 'image',
       imageBuffer: result.buffer,
       generationTime: parseFloat(result.headers.generationTime) || 0,
-      fileSize: parseInt(result.headers.fileSize) || result.buffer.length
+      fileSize: parseInt(result.headers.fileSize) || result.buffer.length,
+      provider: result.headers?.model
     };
   }
 
@@ -301,9 +328,10 @@ class ForgeSession extends EventEmitter {
       { model: session.model, task: session.options?.task }
     );
 
-    // Download the generated image for thumbnail
-    const thumbnailBuffer = imageResult.buffer;
+    // Save the actual model used (mesh provider wins for full pipeline)
+    session.actualModel = meshResult.provider || session.model || 'unknown';
 
+    const thumbnailBuffer = imageResult.buffer;
     session.progress = { stage: 'complete', percent: 100 };
 
     return {
@@ -314,10 +342,11 @@ class ForgeSession extends EventEmitter {
       thumbnailBuffer,
       totalTime: (parseFloat(imageResult.headers?.generationTime) || 0) + (meshResult.metadata?.generationTime || 0),
       stages: {
-        image: { generationTime: parseFloat(imageResult.headers?.generationTime) || 0 },
+        image: { generationTime: parseFloat(imageResult.headers?.generationTime) || 0, model: imageResult.headers?.model },
         mesh: { generationTime: meshResult.metadata?.generationTime || 0, provider: meshResult.provider }
       },
-      vramAfter: null
+      vramAfter: null,
+      provider: meshResult.provider
     };
   }
 

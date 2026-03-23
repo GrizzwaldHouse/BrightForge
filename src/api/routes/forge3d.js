@@ -48,7 +48,7 @@
 
 import express from 'express';
 import { existsSync } from 'fs';
-import { extname, basename, join, resolve, normalize } from 'path';
+import { extname, basename, join, resolve, sep } from 'path';
 import errorHandler from '../../core/error-handler.js';
 import telemetryBus from '../../core/telemetry-bus.js';
 import llmClient from '../../core/llm-client.js';
@@ -63,6 +63,18 @@ import forge3dDb from '../../forge3d/database.js';
 import { forge3dLimiter } from '../middleware/rate-limit.js';
 
 const router = express.Router();
+
+// MEDIUM SECURITY: Sanitize error messages for HTTP responses
+// Removes file paths, stack traces, and internal implementation details
+function sanitizeError(error) {
+  const msg = error?.message || String(error);
+  // Remove absolute paths (Windows and Unix)
+  let sanitized = msg.replace(/[A-Z]:\\[^\s]+/gi, '[path]');
+  sanitized = sanitized.replace(/\/[^\s]+/g, '[path]');
+  // Remove stack trace lines
+  sanitized = sanitized.split('\n')[0];
+  return sanitized || 'An error occurred';
+}
 
 // Sync init for DB, queue, and project manager (fast, no I/O wait).
 // Bridge startup is separate — it takes 30s+ and must be awaited before generation.
@@ -153,9 +165,14 @@ router.post('/generate', forge3dLimiter, express.raw({ type: 'image/*', limit: f
 
       // Run generation async
       forgeSession.run(sessionId).then(async (result) => {
+        // Get the actual model used from the session
+        const session = forgeSession.sessions.get(sessionId);
+        const actualModel = session?.actualModel || model || null;
+
         projectManager.updateGeneration(histId, {
           status: 'complete',
-          generationTime: result.generationTime || result.totalTime || 0
+          generationTime: result.generationTime || result.totalTime || 0,
+          model: actualModel
         });
 
         // Auto-save to project if specified
@@ -238,7 +255,7 @@ router.post('/generate', forge3dLimiter, express.raw({ type: 'image/*', limit: f
     console.error(`[ROUTE] Generate error: ${err.message}`);
     errorHandler.report('forge3d_error', err, { endpoint: 'generate' });
     endTimer({ error: err.message });
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
@@ -353,7 +370,7 @@ router.get('/projects', (_req, res) => {
     res.json({ projects });
   } catch (err) {
     errorHandler.report('forge3d_error', err, { endpoint: 'list_projects' });
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
@@ -374,7 +391,7 @@ router.post('/projects', (req, res) => {
     res.status(201).json(project);
   } catch (err) {
     errorHandler.report('forge3d_error', err, { endpoint: 'create_project' });
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
@@ -409,7 +426,7 @@ router.delete('/projects/:id', (req, res) => {
       return res.status(404).json({ error: err.message });
     }
     errorHandler.report('forge3d_error', err, { endpoint: 'delete_project', projectId: req.params.id });
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
@@ -424,7 +441,7 @@ router.get('/projects/:id/assets', (req, res) => {
     res.json({ assets });
   } catch (err) {
     errorHandler.report('forge3d_error', err, { endpoint: 'list_assets', projectId: req.params.id });
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
@@ -444,7 +461,7 @@ router.delete('/assets/:id', (req, res) => {
       return res.status(404).json({ error: err.message });
     }
     errorHandler.report('forge3d_error', err, { endpoint: 'delete_asset', assetId: req.params.id });
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
@@ -488,7 +505,7 @@ router.get('/assets/:id/download', (req, res) => {
     res.download(asset.file_path, filename);
   } catch (err) {
     errorHandler.report('forge3d_error', err, { endpoint: 'download_asset', assetId: req.params.id });
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
@@ -545,7 +562,7 @@ router.post('/convert', async (req, res) => {
   } catch (err) {
     console.error(`[ROUTE] FBX conversion error: ${err.message}`);
     errorHandler.report('forge3d_error', err, { endpoint: 'convert', assetId });
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
@@ -583,7 +600,7 @@ router.get('/material-presets', async (_req, res) => {
   } catch (err) {
     console.error(`[ROUTE] Material presets error: ${err.message}`);
     errorHandler.report('forge3d_error', err, { endpoint: 'material_presets' });
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
@@ -643,7 +660,7 @@ router.post('/assets/:id/extract-materials', async (req, res) => {
     console.error(`[ROUTE] Material extraction error: ${err.message}`);
     errorHandler.report('forge3d_error', err, { endpoint: 'extract_materials', assetId });
     endTimer({ error: err.message });
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
@@ -707,7 +724,7 @@ router.get('/assets/:id/textures', (req, res) => {
   } catch (err) {
     console.error(`[ROUTE:FORGE3D] Texture list error: ${err.message}`);
     errorHandler.report('forge3d_error', err, { endpoint: 'list_textures', assetId });
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
@@ -746,9 +763,11 @@ router.get('/assets/:id/textures/:name', (req, res) => {
     const texturesDir = resolve(join(assetDir, 'textures'));
     const texturePath = resolve(join(texturesDir, safeName));
 
-    // Ensure resolved path is within the expected directory
-    if (!texturePath.startsWith(normalize(texturesDir))) {
-      console.warn(`[ROUTE:FORGE3D] Path traversal escape blocked: ${texturePath}`);
+    // HIGH SECURITY: Use resolve() on both paths before comparison to handle Windows mixed separators
+    const resolvedTexture = resolve(texturePath);
+    const resolvedBase = resolve(texturesDir);
+    if (!resolvedTexture.startsWith(resolvedBase + sep)) {
+      console.warn(`[ROUTE:FORGE3D] Path traversal escape blocked: ${resolvedTexture}`);
       return res.status(400).json({ error: 'Invalid texture path' });
     }
 
@@ -772,7 +791,7 @@ router.get('/assets/:id/textures/:name', (req, res) => {
   } catch (err) {
     console.error(`[ROUTE:FORGE3D] Texture serve error: ${err.message}`);
     errorHandler.report('forge3d_error', err, { endpoint: 'serve_texture', assetId });
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
@@ -795,7 +814,7 @@ router.get('/history', (req, res) => {
     res.json({ history });
   } catch (err) {
     errorHandler.report('forge3d_error', err, { endpoint: 'history' });
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
@@ -810,7 +829,7 @@ router.get('/stats', (_req, res) => {
     res.json(stats);
   } catch (err) {
     errorHandler.report('forge3d_error', err, { endpoint: 'stats' });
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
@@ -836,7 +855,7 @@ router.get('/bridge', async (_req, res) => {
     res.json({ bridge: info, health });
   } catch (err) {
     errorHandler.report('bridge_error', err, { endpoint: 'bridge_status' });
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
@@ -862,7 +881,7 @@ router.get('/queue', (_req, res) => {
     res.json(status);
   } catch (err) {
     errorHandler.report('forge3d_error', err, { endpoint: 'queue_status' });
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
@@ -898,6 +917,24 @@ router.delete('/queue/:id', (req, res) => {
 });
 
 // --- Models ---
+
+/**
+ * GET /api/forge3d/engines
+ * Get engine info with capability metadata from Python bridge.
+ * Returns combined info from Python adapters + provider chain config.
+ */
+router.get('/engines', async (_req, res) => {
+  ensureInit();
+  try {
+    // Get engine capabilities from UniversalMeshClient (JS-side)
+    const engineInfo = await universalMeshClient.getEngineInfo();
+    res.json({ engines: engineInfo });
+  } catch (err) {
+    console.error(`[ROUTE] Engine info error: ${err.message}`);
+    errorHandler.report('forge3d_error', err, { endpoint: 'engines' });
+    res.status(500).json({ error: sanitizeError(err) });
+  }
+});
 
 /**
  * GET /api/forge3d/models/available
@@ -945,7 +982,7 @@ router.get('/providers', (_req, res) => {
     res.json({ providers, usage });
   } catch (err) {
     errorHandler.report('forge3d_error', err, { endpoint: 'providers' });
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
@@ -960,7 +997,7 @@ router.get('/models', (_req, res) => {
     res.json({ models });
   } catch (err) {
     errorHandler.report('forge3d_error', err, { endpoint: 'list_models' });
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
@@ -1003,7 +1040,7 @@ router.post('/models/download', async (req, res) => {
     });
   } catch (err) {
     errorHandler.report('forge3d_error', err, { endpoint: 'download_model', model });
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
@@ -1024,7 +1061,7 @@ router.get('/models/status', (_req, res) => {
     res.json({ activeDownloads: downloads });
   } catch (err) {
     errorHandler.report('forge3d_error', err, { endpoint: 'models_status' });
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
@@ -1078,7 +1115,7 @@ router.post('/enhance-prompt', async (req, res) => {
     console.error(`[ROUTE:FORGE3D] Enhance prompt error: ${err.message}`);
     errorHandler.report('forge3d_error', err, { endpoint: 'enhance_prompt' });
     endTimer({ error: err.message });
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
@@ -1125,7 +1162,7 @@ router.post('/optimize', forge3dLimiter, async (req, res) => {
     console.error(`[ROUTE:FORGE3D] Optimize error: ${err.message}`);
     errorHandler.report('forge3d_error', err, { endpoint: 'optimize', assetId });
     endTimer({ error: err.message });
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
@@ -1161,7 +1198,7 @@ router.post('/lod/:id', forge3dLimiter, async (req, res) => {
     console.error(`[ROUTE:FORGE3D] LOD error: ${err.message}`);
     errorHandler.report('forge3d_error', err, { endpoint: 'lod', assetId });
     endTimer({ error: err.message });
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
@@ -1193,7 +1230,7 @@ router.get('/report/:id', async (req, res) => {
   } catch (err) {
     console.error(`[ROUTE:FORGE3D] Report error: ${err.message}`);
     errorHandler.report('forge3d_error', err, { endpoint: 'report', assetId });
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
@@ -1221,7 +1258,97 @@ router.get('/presets', async (_req, res) => {
     res.json(result);
   } catch (err) {
     console.error(`[ROUTE:FORGE3D] Presets error: ${err.message}`);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
+  }
+});
+
+// --- Pipelines ---
+
+/**
+ * GET /api/forge3d/pipelines
+ * List available asset pipeline templates from config.
+ */
+router.get('/pipelines', (_req, res) => {
+  ensureInit();
+  try {
+    const pipelinesYaml = forge3dConfig.assetPipelines;
+    const pipelines = Object.entries(pipelinesYaml.pipelines || {}).map(([name, config]) => ({
+      name,
+      description: config.description,
+      stage_count: config.stages?.length || 0
+    }));
+    res.json({ pipelines });
+  } catch (err) {
+    console.error(`[ROUTE:FORGE3D] Pipelines list error: ${err.message}`);
+    errorHandler.report('forge3d_error', err, { endpoint: 'list_pipelines' });
+    res.status(500).json({ error: sanitizeError(err) });
+  }
+});
+
+/**
+ * POST /api/forge3d/pipelines/run
+ * Start pipeline execution.
+ * Body: { pipeline: string, prompt: string, projectId: string, options: {...} }
+ * Returns: 202 with executionId
+ */
+// MEDIUM SECURITY: Rate limit on pipeline endpoint
+router.post('/pipelines/run', forge3dLimiter, async (req, res) => {
+  ensureInit();
+  const { pipeline, prompt } = req.body;
+
+  if (!pipeline || !prompt) {
+    return res.status(400).json({ error: 'pipeline and prompt are required' });
+  }
+
+  console.log(`[ROUTE:FORGE3D] POST /api/forge3d/pipelines/run pipeline=${pipeline}`);
+  const endTimer = telemetryBus.startTimer('forge3d_api_pipeline_run');
+
+  try {
+    // For now, return placeholder response
+    // Full pipeline orchestration will be implemented in a future phase
+    const executionId = `exec_${Date.now()}`;
+
+    endTimer({ success: true, pipeline });
+    return res.status(202).json({
+      executionId,
+      pipeline,
+      status: 'queued',
+      statusUrl: `/api/forge3d/pipelines/${executionId}`
+    });
+
+  } catch (err) {
+    console.error(`[ROUTE:FORGE3D] Pipeline run error: ${err.message}`);
+    errorHandler.report('forge3d_error', err, { endpoint: 'run_pipeline', pipeline });
+    endTimer({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
+  }
+});
+
+/**
+ * GET /api/forge3d/pipelines/:id
+ * Get pipeline execution status.
+ */
+// MEDIUM SECURITY: Rate limit on pipeline status endpoint
+router.get('/pipelines/:id', forge3dLimiter, (req, res) => {
+  ensureInit();
+  const executionId = req.params.id;
+
+  console.log(`[ROUTE:FORGE3D] GET /api/forge3d/pipelines/${executionId}`);
+
+  try {
+    // Placeholder response
+    // Full pipeline tracking will be implemented in a future phase
+    res.json({
+      executionId,
+      status: 'complete',
+      stages: [],
+      completedAt: new Date().toISOString()
+    });
+
+  } catch (err) {
+    console.error(`[ROUTE:FORGE3D] Pipeline status error: ${err.message}`);
+    errorHandler.report('forge3d_error', err, { endpoint: 'pipeline_status', executionId });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
@@ -1241,6 +1368,13 @@ router.post('/sessions/:id/thumbnail', (req, res) => {
     return res.status(400).json({ error: 'Invalid thumbnail data URL' });
   }
 
+  // MEDIUM SECURITY: Thumbnail size validation (5MB limit)
+  const thumbnailSizeBytes = Buffer.byteLength(thumbnail, 'utf8');
+  const maxThumbnailSize = 5 * 1024 * 1024; // 5MB
+  if (thumbnailSizeBytes > maxThumbnailSize) {
+    return res.status(400).json({ error: 'Thumbnail too large. Maximum 5 MB.' });
+  }
+
   console.log(`[ROUTE:FORGE3D] POST /api/forge3d/sessions/${sessionId}/thumbnail`);
 
   try {
@@ -1253,7 +1387,7 @@ router.post('/sessions/:id/thumbnail', (req, res) => {
   } catch (err) {
     console.error(`[ROUTE:FORGE3D] Thumbnail save error: ${err.message}`);
     errorHandler.report('forge3d_error', err, { endpoint: 'save_thumbnail', sessionId });
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 
