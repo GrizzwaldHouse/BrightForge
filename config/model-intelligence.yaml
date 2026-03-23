@@ -1,0 +1,106 @@
+# Model Intelligence - Scanner Configuration
+# Phase 1: System Discovery
+#
+# Scans local drives for AI model files, detects runtimes,
+# and maps storage topology for the BrightForge model learning system.
+
+scanner:
+  # Timeout for a single scan operation (ms)
+  scan_timeout: 300000          # 5 minutes
+  # Maximum individual file size to inspect headers (bytes)
+  max_file_size: 107374182400   # 100 GB
+  # Files to process per batch when hashing
+  batch_size: 10
+  # Concurrent directory walkers
+  concurrency: 4
+  # Minimum file size to consider as a model (bytes)
+  min_model_size: 1048576       # 1 MB
+
+# Known model storage locations (env vars expanded at load time)
+known_locations:
+  ollama:
+    models_dir: "${USERPROFILE}\\.ollama\\models"
+    blob_dir: "${USERPROFILE}\\.ollama\\models\\blobs"
+    manifests_dir: "${USERPROFILE}\\.ollama\\models\\manifests"
+    api_url: "http://127.0.0.1:11434"
+  huggingface:
+    cache_dir: "${USERPROFILE}\\.cache\\huggingface\\hub"
+    token_path: "${USERPROFILE}\\.cache\\huggingface\\token"
+  lmstudio:
+    models_dir: "${USERPROFILE}\\.cache\\lm-studio\\models"
+
+# Runtime detection definitions
+runtimes:
+  ollama:
+    name: "Ollama"
+    check_commands:
+      - ["ollama", "--version"]
+    api_health: "http://127.0.0.1:11434/api/tags"
+    api_version: "http://127.0.0.1:11434/api/version"
+  python:
+    name: "Python"
+    check_commands:
+      - ["py", "--version"]
+      - ["python", "--version"]
+  lmstudio:
+    name: "LM Studio"
+    check_commands:
+      - ["lms", "version"]
+    install_paths:
+      - "${LOCALAPPDATA}\\LM Studio"
+      - "${LOCALAPPDATA}\\Programs\\LM Studio"
+
+# Model file extensions to detect
+extensions:
+  # GGUF (llama.cpp / Ollama)
+  - ".gguf"
+  # SafeTensors (HuggingFace standard)
+  - ".safetensors"
+  # PyTorch binary
+  - ".bin"
+  - ".pt"
+  - ".pth"
+  # ONNX runtime
+  - ".onnx"
+  # TensorFlow
+  - ".pb"
+  - ".h5"
+  # Pickle-based (legacy)
+  - ".pkl"
+  # CoreML
+  - ".mlmodel"
+  # GGML (legacy llama.cpp)
+  - ".ggml"
+
+# Storage volume scanning
+storage:
+  # Drive letters to probe
+  volumes:
+    - "C"
+    - "D"
+    - "E"
+  # Directories to skip during deep scan
+  exclude_dirs:
+    - "node_modules"
+    - ".git"
+    - "__pycache__"
+    - "Windows"
+    - "Program Files"
+    - "Program Files (x86)"
+    - "$Recycle.Bin"
+    - "System Volume Information"
+    - "Recovery"
+    - "PerfLogs"
+
+# Output paths (relative to project root)
+output:
+  dir: "data/model-intelligence"
+  model_inventory: "data/model-intelligence/model_inventory.json"
+  runtime_inventory: "data/model-intelligence/runtime_inventory.json"
+  storage_topology: "data/model-intelligence/storage_topology.json"
+
+# Database
+database:
+  path: "data/model-intelligence.db"
+  journal_mode: "WAL"
+  busy_timeout: 5000
