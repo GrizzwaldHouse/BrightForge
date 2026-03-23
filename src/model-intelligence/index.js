@@ -14,6 +14,7 @@ import modelDb from './database.js';
 import { EVENT_TYPES } from './event-types.js';
 import { ModelScanner } from './scanner.js';
 import inventoryWriter from './inventory-writer.js';
+import modelRouter from './model-router.js';
 import telemetryBus from '../core/telemetry-bus.js';
 import errorHandler from '../core/error-handler.js';
 
@@ -40,6 +41,9 @@ class ModelIntelligence {
     this._scanner = new ModelScanner();
     this._wireEvents();
 
+    // Populate router with current DB state
+    modelRouter.refresh();
+
     this._initialized = true;
     console.log('[MODEL-INTEL] Initialized');
   }
@@ -51,6 +55,11 @@ class ModelIntelligence {
         telemetryBus.emit(data.type, data);
       });
     }
+
+    // Refresh router when scan completes
+    this._scanner.on(EVENT_TYPES.SCAN_COMPLETED, () => {
+      modelRouter.refresh();
+    });
 
     // Wire scanner errors to errorHandler
     this._scanner.on('error', (err) => {
@@ -100,6 +109,10 @@ class ModelIntelligence {
   getScanHistory(limit = 20) {
     if (!this._db) return [];
     return this._db.getScanHistory(limit);
+  }
+
+  getRouter() {
+    return modelRouter;
   }
 
   shutdown() {

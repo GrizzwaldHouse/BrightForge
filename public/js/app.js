@@ -5,6 +5,7 @@
  */
 /* global SSEClient */
 /* global MemoryPanel */
+/* global ModelPanel */
 
 console.log('[APP] ===== app.js LOADING =====');
 
@@ -62,6 +63,7 @@ class App {
 
       this.fileBrowser = null; // Initialized after DOM ready
       this.memoryPanel = null; // Initialized after DOM ready
+      this.modelPanel = null; // Initialized on first tab view
 
       console.log('[APP] Constructor complete, calling init()');
       this.init();
@@ -123,6 +125,11 @@ class App {
       this.memoryPanel = new MemoryPanel(this);
       await this.memoryPanel.init();
       console.log('[APP] ✓ Memory panel initialized');
+
+      // Create model panel (lazy init on first tab view)
+      console.log('[APP] Step 6c: Creating model panel...');
+      this.modelPanel = new ModelPanel();
+      console.log('[APP] ✓ Model panel created');
 
       // Start provider status polling (every 30 seconds)
       console.log('[APP] Step 7: Starting provider status polling...');
@@ -287,6 +294,9 @@ class App {
         }
         if (targetTab === 'forge3d' && !this.forge3dPanel.initialized) {
           this.forge3dPanel.init();
+        }
+        if (targetTab === 'models' && this.modelPanel && !this.modelPanel.initialized) {
+          this.modelPanel.init();
         }
       });
     });

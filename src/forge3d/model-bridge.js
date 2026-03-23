@@ -118,6 +118,12 @@ class ModelBridge extends EventEmitter {
           startupTime,
           totalRestarts: this.totalRestarts
         });
+
+        // Fire-and-forget model validation (never blocks startup)
+        this._validateModels().catch(err => {
+          console.warn('[BRIDGE] Model validation failed (non-fatal):', err.message);
+        });
+
         return true;
       } catch (err) {
         console.warn(`[BRIDGE] Failed on port ${port}: ${err.message}`);
@@ -966,6 +972,23 @@ class ModelBridge extends EventEmitter {
       errorHandler.report('bridge_error', err, { operation: 'assembleScene' });
       throw err;
     }
+  }
+
+  /**
+   * Validate available models after bridge startup (fire-and-forget).
+   * Logs the adapter list and emits a telemetry event.
+   */
+  async _validateModels() {
+    const models = await this.getModels();
+    const modelList = models.models || [];
+    const names = modelList.map(m => m.name).join(', ');
+    console.log(`[BRIDGE] Models available: ${modelList.length} (${names || 'none'})`);
+    this.emit('models_validated', { models: modelList });
+    telemetryBus.emit('forge3d', {
+      type: 'models_validated',
+      count: modelList.length,
+      names: modelList.map(m => m.name)
+    });
   }
 
   // --- Internal Helpers ---

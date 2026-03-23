@@ -104,3 +104,13 @@ database:
   path: "data/model-intelligence.db"
   journal_mode: "WAL"
   busy_timeout: 5000
+
+# Smart routing configuration
+routing:
+  prefer_local: true
+  weights:
+    availability: 0.4
+    locality: 0.2
+    vram_fit: 0.2
+    cost: 0.2
+  auto_refresh: true
