@@ -190,6 +190,7 @@ const MIGRATIONS = [
         name TEXT NOT NULL,
         world_type TEXT DEFAULT 'fantasy',
         prompt TEXT,
+        pipeline_id TEXT,
         world_size TEXT DEFAULT 'medium'
           CHECK (world_size IN ('small','medium','large')),
         status TEXT NOT NULL DEFAULT 'pending'
@@ -358,6 +359,14 @@ const MIGRATIONS = [
       CREATE INDEX IF NOT EXISTS idx_playtest_runs_prototype ON playtest_runs(prototype_id);
       CREATE INDEX IF NOT EXISTS idx_playtest_runs_status ON playtest_runs(status);
       CREATE INDEX IF NOT EXISTS idx_playtest_reports_run ON playtest_reports(playtest_run_id);
+    `
+  },
+  {
+    version: 10,
+    description: 'Add priority column and index to generation_history',
+    sql: `
+      ALTER TABLE generation_history ADD COLUMN priority INTEGER DEFAULT 1;
+      CREATE INDEX IF NOT EXISTS idx_history_priority ON generation_history(priority, status, created_at);
     `
   }
 ];
@@ -957,6 +966,7 @@ class Forge3DDatabase {
     const values = [];
 
     if (updates.status !== undefined) { fields.push('status = ?'); values.push(updates.status); }
+    if (updates.pipelineId !== undefined) { fields.push('pipeline_id = ?'); values.push(updates.pipelineId); }
     if (updates.regionCount !== undefined) { fields.push('region_count = ?'); values.push(updates.regionCount); }
     if (updates.worldGraph !== undefined) {
       fields.push('world_graph = ?');

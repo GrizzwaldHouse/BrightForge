@@ -223,6 +223,9 @@ class AssetPipelineRunner extends EventEmitter {
       stageIndex: exec.currentStageIndex
     });
 
+    // Schedule cleanup of activePipelines entry (keep 5 min for status queries)
+    setTimeout(() => { this.activePipelines.delete(pipelineId); }, 300000);
+
     console.log(`[PIPELINE] Cancelled pipeline ${pipelineId}`);
     return true;
   }
@@ -331,6 +334,9 @@ class AssetPipelineRunner extends EventEmitter {
 
         endTimer({ pipelineId, status: 'failed', failedStage: stage.name });
         console.log(`[PIPELINE] Pipeline ${pipelineId} FAILED at stage ${stage.name}: ${exec.error}`);
+
+        // Schedule cleanup of activePipelines entry (keep 5 min for status queries)
+        setTimeout(() => { this.activePipelines.delete(pipelineId); }, 300000);
         return;
       }
     }
@@ -355,6 +361,9 @@ class AssetPipelineRunner extends EventEmitter {
           // Non-fatal
         }
       }
+
+      // Schedule cleanup of activePipelines entry (keep 5 min for status queries)
+      setTimeout(() => { this.activePipelines.delete(pipelineId); }, 300000);
 
       endTimer({ pipelineId, status: 'completed' });
       console.log(`[PIPELINE] Pipeline ${pipelineId} COMPLETED successfully`);

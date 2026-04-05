@@ -104,6 +104,32 @@ router.post('/generate', forge3dLimiter, (req, res) => {
       status: 'generating'
     });
 
+    // Sync DB status when pipeline completes or fails
+    const onPipelineComplete = (data) => {
+      if (data.pipelineId === pipelineId) {
+        try {
+          forge3dDb.updateWorld(world.id, { status: 'complete' });
+        } catch (dbErr) {
+          console.warn(`[WORLD] DB status sync failed: ${dbErr.message}`);
+        }
+        assetPipelineRunner.off('pipeline_complete', onPipelineComplete);
+        assetPipelineRunner.off('pipeline_failed', onPipelineFailed);
+      }
+    };
+    const onPipelineFailed = (data) => {
+      if (data.pipelineId === pipelineId) {
+        try {
+          forge3dDb.updateWorld(world.id, { status: 'failed' });
+        } catch (dbErr) {
+          console.warn(`[WORLD] DB status sync failed: ${dbErr.message}`);
+        }
+        assetPipelineRunner.off('pipeline_complete', onPipelineComplete);
+        assetPipelineRunner.off('pipeline_failed', onPipelineFailed);
+      }
+    };
+    assetPipelineRunner.on('pipeline_complete', onPipelineComplete);
+    assetPipelineRunner.on('pipeline_failed', onPipelineFailed);
+
     endTimer({ worldId: world.id, pipelineId });
 
     return res.status(202).json({
@@ -209,10 +235,35 @@ router.get('/:id/stream', (req, res) => {
 
   const pipelineId = world.pipeline_id;
 
+  // If pipeline already finished before SSE connected, send result immediately
+  const pipelineStatus = assetPipelineRunner.getStatus(pipelineId);
+  if (pipelineStatus && (pipelineStatus.status === 'completed' || pipelineStatus.status === 'failed')) {
+    res.write(`data: ${JSON.stringify({ pipelineId, worldId, status: pipelineStatus.status, done: true })}\n\n`);
+    res.end();
+    return;
+  }
+
+  // Fallback: check DB status if pipeline entry is already cleaned up
+  if (!pipelineStatus) {
+    const freshWorld = forge3dDb.getWorld(worldId);
+    if (freshWorld && (freshWorld.status === 'complete' || freshWorld.status === 'failed')) {
+      res.write(`data: ${JSON.stringify({ pipelineId, worldId, status: freshWorld.status, done: true })}\n\n`);
+      res.end();
+      return;
+    }
+  }
+
   // Heartbeat keepalive every 15s
   const heartbeat = setInterval(() => {
     res.write(':keepalive\n\n');
   }, 15000);
+
+  // Safety timeout — close SSE after 10 minutes to prevent stuck connections
+  const sseTimeout = setTimeout(() => {
+    cleanup();
+    res.write(`data: ${JSON.stringify({ worldId, timeout: true, done: true })}\n\n`);
+    res.end();
+  }, 600000);
 
   // Filter pipeline events to this world's pipeline
   const onEvent = (data) => {
@@ -223,7 +274,6 @@ router.get('/:id/stream', (req, res) => {
 
   const onComplete = (data) => {
     if (data.pipelineId === pipelineId) {
-      clearInterval(heartbeat);
       res.write(`data: ${JSON.stringify({ ...data, worldId, done: true })}\n\n`);
       cleanup();
       res.end();
@@ -232,6 +282,7 @@ router.get('/:id/stream', (req, res) => {
 
   const cleanup = () => {
     clearInterval(heartbeat);
+    clearTimeout(sseTimeout);
     assetPipelineRunner.off('stage_started', onEvent);
     assetPipelineRunner.off('stage_completed', onEvent);
     assetPipelineRunner.off('stage_failed', onEvent);
@@ -244,6 +295,16 @@ router.get('/:id/stream', (req, res) => {
   assetPipelineRunner.on('stage_failed', onEvent);
   assetPipelineRunner.on('pipeline_complete', onComplete);
   assetPipelineRunner.on('pipeline_failed', onComplete);
+
+  // Re-check pipeline status after attaching listeners to catch race condition
+  // where pipeline completed between initial check and listener registration
+  const recheck = assetPipelineRunner.getStatus(pipelineId);
+  if (recheck && (recheck.status === 'completed' || recheck.status === 'failed')) {
+    res.write(`data: ${JSON.stringify({ pipelineId, worldId, status: recheck.status, done: true })}\n\n`);
+    cleanup();
+    res.end();
+    return;
+  }
 
   req.on('close', cleanup);
 });

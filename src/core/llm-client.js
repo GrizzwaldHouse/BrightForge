@@ -14,6 +14,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import errorHandler from './error-handler.js';
 import telemetryBus from './telemetry-bus.js';
+import contextAdapter from './context-adapter.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -389,6 +390,9 @@ class UniversalLLMClient {
     const routingLog = [];
     const endTimer = telemetryBus.startTimer('llm_request', { task });
 
+    // Adapt context for target providers
+    const adaptedMessages = contextAdapter.adaptContext(messages, routing.prefer[0] || 'groq', options.modelHint);
+
     // Try preferred providers in order
     for (const providerSpec of routing.prefer) {
       const { provider, modelHint } = this.parseProviderModel(providerSpec);
@@ -421,7 +425,7 @@ class UniversalLLMClient {
           options.onProviderTrying(provider, model);
         }
 
-        const result = await this.callProvider(provider, messages, {
+        const result = await this.callProvider(provider, adaptedMessages, {
           ...options,
           modelHint,
           max_tokens: routing.max_tokens || options.max_tokens
@@ -460,7 +464,7 @@ class UniversalLLMClient {
             options.onProviderTrying(fallbackProvider, model);
           }
 
-          const result = await this.callProvider(fallbackProvider, messages, {
+          const result = await this.callProvider(fallbackProvider, adaptedMessages, {
             ...options,
             modelHint,
             max_tokens: routing.max_tokens || options.max_tokens

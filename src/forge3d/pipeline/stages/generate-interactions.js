@@ -52,12 +52,14 @@ export async function execute(context, _stageConfig) {
         for (const interaction of interactions) {
           forge3dDb.createInteraction({
             prototypeId: context.prototypeId,
-            interactionId: interaction.id,
-            npcId: interaction.npcId,
+            targetNode: interaction.npcId || interaction.targetNode,
             type: interaction.type,
-            trigger: interaction.trigger,
-            dialogueOptions: JSON.stringify(interaction.dialogueOptions || []),
-            outcomes: JSON.stringify(interaction.outcomes || {})
+            parameters: {
+              trigger: interaction.trigger,
+              dialogueOptions: interaction.dialogueOptions || [],
+              outcomes: interaction.outcomes || {}
+            },
+            regionId: interaction.regionId || null
           });
         }
       } catch (dbErr) {

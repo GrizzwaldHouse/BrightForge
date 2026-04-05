@@ -43,7 +43,7 @@ export async function execute(context, stageConfig) {
 
     // Optional adjacency validation
     if (stageConfig.validate_adjacency) {
-      biomeValidation = biomeGenerator.validateAdjacency(worldGraph);
+      biomeValidation = biomeGenerator.validateBiomeAdjacency(worldGraph);
       if (biomeValidation.violations.length > 0) {
         console.warn(`${LOG_TAG} Adjacency validation found ${biomeValidation.violations.length} violations (non-blocking)`);
         biomeValidation.violations.forEach((v) => {

@@ -163,9 +163,9 @@ router.get('/:id', (req, res) => {
       return res.status(404).json({ error: 'Prototype not found' });
     }
 
-    const npcs = forge3dDb.getPrototypeNPCs(prototypeId);
-    const quests = forge3dDb.getPrototypeQuests(prototypeId);
-    const interactions = forge3dDb.getPrototypeInteractions(prototypeId);
+    const npcs = forge3dDb.getNPCsByPrototype(prototypeId);
+    const quests = forge3dDb.getQuestsByPrototype(prototypeId);
+    const interactions = forge3dDb.getInteractionsByPrototype(prototypeId);
 
     // Include pipeline status if active
     let pipelineStatus = null;

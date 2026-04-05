@@ -67,14 +67,13 @@ export async function execute(context, _stageConfig) {
         for (const quest of quests) {
           forge3dDb.createQuest({
             prototypeId: context.prototypeId,
-            questId: quest.id,
-            name: quest.name,
-            type: quest.type,
-            npcGiverId: quest.npcGiverId,
-            description: quest.description,
-            objectives: JSON.stringify(quest.objectives || []),
-            rewards: JSON.stringify(quest.rewards || {}),
-            prerequisites: JSON.stringify(quest.prerequisites || [])
+            title: quest.name || quest.title,
+            objectives: quest.objectives || [],
+            triggers: quest.prerequisites || [],
+            rewards: quest.rewards ? (Array.isArray(quest.rewards) ? quest.rewards : [quest.rewards]) : [],
+            chainOrder: quest.chainOrder || 0,
+            prerequisiteQuestId: quest.prerequisiteQuestId || null,
+            npcGiverId: quest.npcGiverId || null
           });
         }
       } catch (dbErr) {

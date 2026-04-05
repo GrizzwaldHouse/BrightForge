@@ -1,0 +1,12 @@
+# BrightForge Security Configuration
+# File watcher settings for monitoring project file integrity.
+
+file_watcher:
+  enabled: true
+  watch_extensions: ['.js', '.py', '.ts', '.jsx', '.json', '.env', '.yaml', '.md']
+  ignore_dirs: ['node_modules', '.git', '__pycache__', 'dist', 'build', 'data', '.brightforge-backup']
+  credential_patterns: ['.env', 'credentials', 'secret', 'api_key', 'token', '.pem', '.key']
+  hash_algorithm: 'sha256'
+  silence_threshold_seconds: 120
+  audit_log: 'sessions/security-audit.jsonl'
+  max_audit_size_mb: 5
