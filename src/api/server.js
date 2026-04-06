@@ -36,6 +36,7 @@ import pipelineRoutes from './routes/pipelines.js';
 import debugRoutes from './routes/debug.js';
 import { securityRoutes } from './routes/security.js';
 import { agentHealthRoutes } from './routes/agent-health.js';
+import { skillRoutes } from './routes/skills.js';
 import { authMiddleware } from './middleware/auth.js';
 import { generalLimiter } from './middleware/rate-limit.js';
 import errorHandler from '../core/error-handler.js';
@@ -115,6 +116,7 @@ export function createServer(options = {}) {
   app.use('/api/cost', costRoutes());
   app.use('/api/pipelines', pipelineRoutes);
   app.use('/api/debug', debugRoutes);
+  app.use('/api/skills', skillRoutes());
   app.use('/api/security', securityRoutes());
   app.use('/api/health', agentHealthRoutes());
   app.use('/api', configRoutes());

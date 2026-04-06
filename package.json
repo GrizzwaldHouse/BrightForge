@@ -69,7 +69,8 @@
     "test-path-analyzer": "node src/forge3d/playtest/path-analyzer.js --test",
     "test-agent-simulator": "node src/forge3d/playtest/agent-simulator.js --test",
     "test-balance-analyzer": "node src/forge3d/playtest/balance-analyzer.js --test",
-    "test-playtest-routes": "node src/api/routes/playtest.js --test"
+    "test-playtest-routes": "node src/api/routes/playtest.js --test",
+    "test-skills": "node src/core/skill-orchestrator.js --test"
   },
   "keywords": [
     "coding-agent",

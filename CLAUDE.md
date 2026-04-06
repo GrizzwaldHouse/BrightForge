@@ -40,6 +40,7 @@ npm run test-multi-step   # src/core/multi-step-planner.js --test
 npm run test-api          # src/api/web-session.js --test
 npm run test-image        # src/core/image-client.js --test
 npm run test-design       # src/core/design-engine.js --test
+npm run test-skills       # src/core/skill-orchestrator.js --test
 
 # Forge3D module self-tests
 npm run test-bridge        # src/forge3d/model-bridge.js --test
@@ -177,6 +178,7 @@ Express server (`src/api/server.js`) created via `createServer()` factory. Route
 | `routes/forge3d.js` | `/api/forge3d` | 3D generation, projects, assets, queue, post-processing (26 endpoints) |
 | `routes/cost.js` | `/api/cost` | Cost summary and per-session cost breakdown |
 | `routes/memory.js` | `/api/memory` | Project memory CRUD (conventions, corrections, tech stack) |
+| `routes/skills.js` | `/api/skills` | Skill orchestrator: load, prune, scan, sync, registry, usage log |
 
 WebSession (`src/api/web-session.js`) extends `EventEmitter`. Separates plan generation from application:
 1. `POST /api/chat/turn` → returns `202 { status: 'generating' }` immediately
@@ -253,6 +255,21 @@ Per-project persistent memory at `{projectRoot}/.brightforge/memory.json`:
 - `DiffApplier` auto-checkpoints if project is a git repo, falls back to .backup files
 - Timeline: `GET /api/chat/timeline` returns chronological BrightForge checkpoints
 - Revert: `POST /api/chat/revert/:commitHash` uses `git revert --no-edit`
+
+### Self-Pruning Skill Orchestrator
+
+Dynamic skill lifecycle manager that minimizes token usage by lazily loading and auto-pruning skills.
+
+- `src/core/skill-orchestrator.js` — Core module: scan, load, prune, archive, sync, handoff
+- `src/api/routes/skills.js` — 11 REST endpoints at `/api/skills/*`
+- `.claude/skill_registry.json` — Persistent registry (skill name → path, usage, tags, status)
+- `.claude/skills_temp/` — Temp cache for pruned skills (prefer over remote re-fetch)
+- `.claude/skill_usage.md` — Markdown transition log
+- `.claude/HANDOFF.md` — Agent session handoff state
+
+**Lifecycle**: `active` → `cached` (pruned, local) → `archived` (deleted). Skills restored from cache before attempting remote fetch. Max 15 active skills enforced.
+
+**API**: `GET /api/skills`, `GET /api/skills/stats`, `POST /api/skills/load`, `POST /api/skills/prune`, `POST /api/skills/scan`, `POST /api/skills/sync`, `POST /api/skills/handoff`
 
 ### Orchestration Runtime (Phase 9)
 
