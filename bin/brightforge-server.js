@@ -30,6 +30,7 @@ config({ path: join(__dirname, '../.env.local') });
 import { createServer } from '../src/api/server.js';
 import { UniversalLLMClient } from '../src/core/llm-client.js';
 import errorHandler from '../src/core/error-handler.js';
+import wsEventBus from '../src/api/ws-event-bus.js';
 
 /**
  * Start the HTTP server.
@@ -93,6 +94,14 @@ async function main() {
     console.log('');
     console.log('  Press Ctrl+C to stop');
     console.log('');
+
+    // Attach WebSocket event bus to the HTTP server
+    try {
+      wsEventBus.attach(server);
+      console.log(`  [SERVER] WebSocket: ws://localhost:${port}/ws/events`);
+    } catch (err) {
+      console.warn(`  [SERVER] WebSocket bus attach failed: ${err.message}`);
+    }
   });
 
   server.on('error', (error) => {
@@ -112,6 +121,7 @@ async function main() {
   // Graceful shutdown
   const shutdown = () => {
     console.log('\n  [SERVER] Shutting down...');
+    wsEventBus.detach();
     server.close(() => {
       store.destroy();
       process.exit(0);

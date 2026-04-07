@@ -70,7 +70,18 @@
     "test-agent-simulator": "node src/forge3d/playtest/agent-simulator.js --test",
     "test-balance-analyzer": "node src/forge3d/playtest/balance-analyzer.js --test",
     "test-playtest-routes": "node src/api/routes/playtest.js --test",
-    "test-skills": "node src/core/skill-orchestrator.js --test"
+    "test-skills": "node src/core/skill-orchestrator.js --test",
+    "test-ws-bus": "node src/api/ws-event-bus.js --test",
+    "test-planner": "node src/agents/planner-agent.js --test",
+    "test-builder": "node src/agents/builder-agent.js --test",
+    "test-tester": "node src/agents/tester-agent.js --test",
+    "test-reviewer": "node src/agents/reviewer-agent.js --test",
+    "test-survey": "node src/agents/survey-agent.js --test",
+    "test-recorder": "node src/agents/recorder-agent.js --test",
+    "test-agents": "npm run test-planner && npm run test-builder && npm run test-tester && npm run test-reviewer && npm run test-survey && npm run test-recorder",
+    "test-integration": "node src/tests/integration-suite.js",
+    "test-stability": "node src/tests/stability-run.js",
+    "test-stability-quick": "node src/tests/stability-run.js --quick"
   },
   "keywords": [
     "coding-agent",
@@ -88,8 +99,10 @@
     "express": "^4.21.0",
     "express-rate-limit": "^8.3.0",
     "helmet": "^8.1.0",
+    "obs-websocket-js": "^5.0.8",
     "rotating-file-stream": "^3.2.9",
     "undici": "^7.22.0",
+    "ws": "^8.20.0",
     "yaml": "^2.3.4"
   },
   "devDependencies": {

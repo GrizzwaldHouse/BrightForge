@@ -145,6 +145,15 @@
           <button class="tab" data-tab="security">
             <i data-lucide="shield"></i> Security
           </button>
+          <button class="tab" data-tab="pipeline">
+            <i data-lucide="git-merge"></i> Pipeline
+          </button>
+          <button class="tab" data-tab="recorder">
+            <i data-lucide="video"></i> Recorder
+          </button>
+          <button class="tab" data-tab="stability">
+            <i data-lucide="shield-check"></i> Stability
+          </button>
           <button class="tab" data-tab="agents">
             <i data-lucide="users"></i> Agents
           </button>
@@ -514,6 +523,24 @@
           </div>
         </div>
 
+        <div class="tab-panel" data-panel="pipeline">
+          <div id="pipeline-panel" class="pipeline-layout">
+            <!-- Content rendered by agent-pipeline-panel.js -->
+          </div>
+        </div>
+
+        <div class="tab-panel" data-panel="recorder">
+          <div id="recorder-panel" class="recorder-layout">
+            <!-- Content rendered by recorder-panel.js -->
+          </div>
+        </div>
+
+        <div class="tab-panel" data-panel="stability">
+          <div id="stability-panel" class="stability-layout">
+            <!-- Content rendered by stability-panel.js -->
+          </div>
+        </div>
+
         <div class="tab-panel" data-panel="agents">
           <div id="agents-panel" class="agent-health-layout">
             <!-- Content rendered by agent-health-panel.js -->
@@ -555,6 +582,9 @@
   <script type="module" src="/js/debug-panel.js"></script>
   <script type="module" src="/js/security-panel.js"></script>
   <script type="module" src="/js/agent-health-panel.js"></script>
+  <script type="module" src="/js/agent-pipeline-panel.js"></script>
+  <script type="module" src="/js/recorder-panel.js"></script>
+  <script type="module" src="/js/stability-panel.js"></script>
   <script type="module" src="/js/system-health.js"></script>
   
   <!-- Init Icons -->

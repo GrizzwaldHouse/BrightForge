@@ -31,7 +31,7 @@ import telemetryBus from './telemetry-bus.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const VALID_CATEGORIES = ['provider_error', 'plan_error', 'apply_error', 'session_error', 'server_error', 'fatal', 'forge3d_error', 'bridge_error', 'gpu_error', 'orchestration_error', 'handoff_error', 'supervisor_error', 'pipeline_error', 'scene_error', 'world_error', 'gameplay_error', 'prototype_error', 'security_error', 'file_watcher_error'];
+const VALID_CATEGORIES = ['provider_error', 'plan_error', 'apply_error', 'session_error', 'server_error', 'fatal', 'forge3d_error', 'bridge_error', 'gpu_error', 'orchestration_error', 'handoff_error', 'supervisor_error', 'pipeline_error', 'scene_error', 'world_error', 'gameplay_error', 'prototype_error', 'security_error', 'file_watcher_error', 'agent_error', 'recorder_error', 'stability_error', 'ws_error'];
 const VALID_SEVERITIES = ['warning', 'error', 'fatal'];
 
 class ErrorHandler extends EventEmitter {

@@ -36,6 +36,12 @@ console.log('[APP] Importing SecurityPanel...');
 import { SecurityPanel } from './security-panel.js';
 console.log('[APP] Importing AgentHealthPanel...');
 import { AgentHealthPanel } from './agent-health-panel.js';
+console.log('[APP] Importing AgentPipelinePanel...');
+import { AgentPipelinePanel } from './agent-pipeline-panel.js';
+console.log('[APP] Importing RecorderPanel...');
+import { RecorderPanel } from './recorder-panel.js';
+console.log('[APP] Importing StabilityPanel...');
+import { StabilityPanel } from './stability-panel.js';
 console.log('[APP] ✓ All modules imported successfully');
 
 class App {
@@ -101,6 +107,18 @@ class App {
       console.log('[APP] Initializing AgentHealthPanel...');
       this.agentHealthPanel = new AgentHealthPanel(this);
       console.log('[APP] AgentHealthPanel initialized');
+
+      console.log('[APP] Initializing AgentPipelinePanel...');
+      this.pipelinePanel = new AgentPipelinePanel(this);
+      console.log('[APP] AgentPipelinePanel initialized');
+
+      console.log('[APP] Initializing RecorderPanel...');
+      this.recorderPanel = new RecorderPanel(this);
+      console.log('[APP] RecorderPanel initialized');
+
+      console.log('[APP] Initializing StabilityPanel...');
+      this.stabilityPanel = new StabilityPanel(this);
+      console.log('[APP] StabilityPanel initialized');
 
       this.fileBrowser = null; // Initialized after DOM ready
       this.memoryPanel = null; // Initialized after DOM ready
@@ -350,6 +368,15 @@ class App {
         }
         if (targetTab === 'agents' && !this.agentHealthPanel.initialized) {
           this.agentHealthPanel.init();
+        }
+        if (targetTab === 'pipeline' && !this.pipelinePanel.initialized) {
+          this.pipelinePanel.init();
+        }
+        if (targetTab === 'recorder' && !this.recorderPanel.initialized) {
+          this.recorderPanel.init();
+        }
+        if (targetTab === 'stability' && !this.stabilityPanel.initialized) {
+          this.stabilityPanel.init();
         }
       });
     });

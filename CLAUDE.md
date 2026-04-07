@@ -50,8 +50,22 @@ npm run test-project-manager # src/forge3d/project-manager.js --test
 npm run test-queue         # src/forge3d/generation-queue.js --test
 
 # Integration and Monitoring
-npm run test-integration   # node src/forge3d/test-suite.js
+npm run test-integration   # node src/tests/integration-suite.js
 npm run monitor           # node src/forge3d/monitor.js
+
+# Pipeline Agent self-tests
+npm run test-planner       # src/agents/planner-agent.js --test
+npm run test-builder       # src/agents/builder-agent.js --test
+npm run test-tester        # src/agents/tester-agent.js --test
+npm run test-reviewer      # src/agents/reviewer-agent.js --test
+npm run test-survey        # src/agents/survey-agent.js --test
+npm run test-recorder      # src/agents/recorder-agent.js --test
+npm run test-agents        # All 6 pipeline agent tests
+npm run test-ws-bus        # src/api/ws-event-bus.js --test
+
+# Stability Testing
+npm run test-stability       # 13-minute full-stack stability run
+npm run test-stability-quick # 60-second quick stability run (CI)
 
 # Lint
 npm run lint
@@ -153,7 +167,7 @@ System prompt is at `src/prompts/plan-system.txt`. Classification prompt at `cla
 Two singleton EventEmitter hubs provide cross-cutting observability:
 
 - **TelemetryBus** (`src/core/telemetry-bus.js`): Ring buffers (100 events) for LLM requests, operations, sessions, performance, and `forge3d` events. Tracks per-provider stats (requests, tokens, cost, failures, success rate). Latency percentiles (P50/P95/P99). `startTimer(category)` returns `endTimer()` function.
-- **ErrorHandler** (`src/core/error-handler.js`): Observer-pattern error broadcasting by category (`provider_error`, `plan_error`, `apply_error`, `session_error`, `server_error`, `fatal`, `forge3d_error`, `bridge_error`, `gpu_error`, `orchestration_error`, `handoff_error`, `supervisor_error`, `pipeline_error`). JSONL persistent log at `sessions/errors.jsonl`. Crash reports with memory/telemetry snapshots. Exponential backoff retry tracking.
+- **ErrorHandler** (`src/core/error-handler.js`): Observer-pattern error broadcasting by category (`provider_error`, `plan_error`, `apply_error`, `session_error`, `server_error`, `fatal`, `forge3d_error`, `bridge_error`, `gpu_error`, `orchestration_error`, `handoff_error`, `supervisor_error`, `pipeline_error`, `agent_error`, `recorder_error`, `stability_error`, `ws_error`). JSONL persistent log at `sessions/errors.jsonl`. Crash reports with memory/telemetry snapshots. Exponential backoff retry tracking.
 
 Both are imported and used throughout: `telemetryBus.emit(category, data)`, `errorHandler.report(category, error, context)`.
 
@@ -179,6 +193,9 @@ Express server (`src/api/server.js`) created via `createServer()` factory. Route
 | `routes/cost.js` | `/api/cost` | Cost summary and per-session cost breakdown |
 | `routes/memory.js` | `/api/memory` | Project memory CRUD (conventions, corrections, tech stack) |
 | `routes/skills.js` | `/api/skills` | Skill orchestrator: load, prune, scan, sync, registry, usage log |
+| `routes/agents.js` | `/api/agents` | Pipeline agents, recorder, stability run (10 endpoints) |
+
+WebSocket: `src/api/ws-event-bus.js` at `ws://localhost:3847/ws/events`
 
 WebSession (`src/api/web-session.js`) extends `EventEmitter`. Separates plan generation from application:
 1. `POST /api/chat/turn` → returns `202 { status: 'generating' }` immediately
@@ -278,13 +295,71 @@ Multi-agent task orchestration with Claude-Ollama handoff support. Six modules i
 | Module | Log Tag | Purpose |
 |---|---|---|
 | `storage.js` | `[ORCH-DB]` | SQLite persistence (task_states, orchestration_events, audit_results, agent_registry) |
-| `event-bus.js` | `[EVENT-BUS]` | SHA256-hashed event envelopes, 13 event types, ring buffers, TelemetryBus forwarding |
+| `event-bus.js` | `[EVENT-BUS]` | SHA256-hashed event envelopes, 30 event types, ring buffers, TelemetryBus forwarding |
 | `task-state.js` | `[TASK-STATE]` | FSM lifecycle (active/paused/completed/failed), phase progression, architectural decisions |
 | `supervisor.js` | `[SUPERVISOR]` | Structural/coding standard/continuity audits, weighted scoring (0.4/0.3/0.3) |
 | `handoff.js` | `[HANDOFF]` | Claude-Ollama pause/resume with pre-handoff audit, HandoffError class |
 | `index.js` | `[ORCHESTRATOR]` | Facade with init/shutdown sequence, agent registration |
 
-Config: `config/orchestration.yaml`. DB: `data/orchestration.db`. Status: **runtime complete, not yet wired to API routes or dashboard**.
+Config: `config/orchestration.yaml`. DB: `data/orchestration.db`. Status: **runtime complete, wired to API routes and dashboard via WebSocket event bus**.
+
+### Multi-Agent Pipeline (Phase 11)
+
+Six pipeline agents in `src/agents/` connected via WebSocket event bus:
+
+| Agent | Log Tag | Purpose |
+|---|---|---|
+| `planner-agent.js` | `[PLANNER]` | Decomposes task prompt into subtasks with dependencies |
+| `builder-agent.js` | `[BUILDER]` | Executes subtasks, orchestrates build pipeline |
+| `tester-agent.js` | `[TESTER]` | Runs self-tests and linting on build output |
+| `reviewer-agent.js` | `[REVIEWER]` | Code review + supervisor audit, produces score + verdict |
+| `survey-agent.js` | `[SURVEY]` | User feedback collection via WebSocket to UI |
+| `recorder-agent.js` | `[RECORDER]` | OBS WebSocket integration for screen recording |
+
+Pipeline flow: `Planner → Builder → Tester → Reviewer` (sequential). Builder can spawn Survey and Recorder as side agents.
+
+API: `src/api/routes/agents.js` mounted at `/api/agents`:
+- `GET /api/agents` — List all registered agents with status
+- `GET /api/agents/:name/status` — Single agent status
+- `POST /api/agents/pipeline/start` — Start pipeline
+- `POST /api/agents/pipeline/cancel` — Cancel running pipeline
+- `GET /api/agents/pipeline/status` — Pipeline progress
+- `POST /api/agents/recorder/start` — Start OBS recording
+- `POST /api/agents/recorder/stop` — Stop OBS recording
+- `GET /api/agents/recorder/status` — OBS connection status
+- `POST /api/agents/stability/start` — Start 13-minute stability run
+- `GET /api/agents/stability/status` — Stability run progress
+
+### WebSocket Event Bus
+
+`src/api/ws-event-bus.js` — Bridges OrchestrationEventBus to WebSocket clients.
+
+- Attaches to Express HTTP server via `new WebSocketServer({ server, path: '/ws/events' })`
+- Message protocol: `{ type, source, target, channel, payload, timestamp, id }`
+- Types: `register`, `event`, `heartbeat`, `command`
+- Channels: `agents`, `ui`, `system`, `recording`
+- Heartbeat: ping/pong every 30s, disconnect stale clients after 90s
+- Bidirectional: EventBus→WS broadcast, WS→EventBus forwarding
+- Singleton pattern, attached in `bin/brightforge-server.js`
+
+### OBS Recording Integration
+
+`src/agents/recorder-agent.js` uses `obs-websocket-js` (v5) to control OBS Studio:
+- Connect/disconnect with auto-reconnect (max 3 retries, exponential backoff)
+- Start/stop recording, scene switching
+- Graceful degradation: if OBS unavailable, operates in dry-run mode
+- Config: `config/orchestration.yaml` → `obs:` section (host, port, password)
+
+### Stability Testing
+
+`src/tests/stability-run.js` — 13-minute full-stack stability test:
+- 26 checkpoints every 30 seconds
+- Monitors: server uptime, heap/RSS memory growth, error rate, event bus latency
+- Verdict: PASS if >=90% checkpoints pass
+- Quick mode: `--quick` flag for 60-second CI run
+- Report output: `data/stability-report.json`
+
+Dashboard panels: `public/js/agent-pipeline-panel.js`, `public/js/recorder-panel.js`, `public/js/stability-panel.js`
 
 ### Bridge Hardening (Sprint 2)
 
@@ -321,9 +396,9 @@ if (process.argv.includes('--test')) {
 
 **YAML config loading** — Provider and agent configs loaded with `readFileSync` + `parse` from the `yaml` package.
 
-**Logging** — Console output with `[PREFIX]` tags: `[MASTER]`, `[PLAN]`, `[APPLY]`, `[LLM]`, `[WEB]`, `[STORE]`, `[SERVER]`, `[ROUTE]`, `[CHAT]`, `[HISTORY]`, `[MULTI-STEP]`, `[ERROR-HANDLER]`, `[TELEMETRY]`, `[IMAGE]`, `[DESIGN]`, `[FORGE3D]`, `[BRIDGE]`, `[QUEUE]`, `[PROJECT]`, `[PIPELINE]`, `[MEMORY]`, `[GIT]`, `[COST]`, `[APP]`.
+**Logging** — Console output with `[PREFIX]` tags: `[MASTER]`, `[PLAN]`, `[APPLY]`, `[LLM]`, `[WEB]`, `[STORE]`, `[SERVER]`, `[ROUTE]`, `[CHAT]`, `[HISTORY]`, `[MULTI-STEP]`, `[ERROR-HANDLER]`, `[TELEMETRY]`, `[IMAGE]`, `[DESIGN]`, `[FORGE3D]`, `[BRIDGE]`, `[QUEUE]`, `[PROJECT]`, `[PIPELINE]`, `[MEMORY]`, `[GIT]`, `[COST]`, `[APP]`, `[WS-BUS]`, `[PLANNER]`, `[BUILDER]`, `[TESTER]`, `[REVIEWER]`, `[SURVEY]`, `[RECORDER]`, `[STABILITY]`, `[INTEGRATION]`, `[SKILL-ORCH]`.
 
-**Dependencies** — `dotenv`, `yaml`, `express`, `better-sqlite3` (+ `eslint`, `electron`, `electron-builder` as dev). Uses native `fetch` (Node 18+).
+**Dependencies** — `dotenv`, `yaml`, `express`, `better-sqlite3`, `ws`, `obs-websocket-js`, `helmet`, `express-rate-limit` (+ `eslint`, `electron`, `electron-builder` as dev). Uses native `fetch` (Node 18+).
 
 **Backup suffix** — `.brightforge-backup`.
 

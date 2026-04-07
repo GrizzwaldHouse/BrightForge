@@ -4,6 +4,7 @@
  * HTTP API for the coding agent. Serves:
  * - /api/chat/* - Chat and plan management
  * - /api/sessions/* - Session history
+ * - /api/agents/* - Agent pipeline, recorder, stability
  * - /api/config - Provider config (sanitized)
  * - /api/health - Health check
  * - / - Static frontend from public/
@@ -37,6 +38,7 @@ import debugRoutes from './routes/debug.js';
 import { securityRoutes } from './routes/security.js';
 import { agentHealthRoutes } from './routes/agent-health.js';
 import { skillRoutes } from './routes/skills.js';
+import { agentRoutes } from './routes/agents.js';
 import { authMiddleware } from './middleware/auth.js';
 import { generalLimiter } from './middleware/rate-limit.js';
 import errorHandler from '../core/error-handler.js';
@@ -117,6 +119,7 @@ export function createServer(options = {}) {
   app.use('/api/pipelines', pipelineRoutes);
   app.use('/api/debug', debugRoutes);
   app.use('/api/skills', skillRoutes());
+  app.use('/api/agents', agentRoutes());
   app.use('/api/security', securityRoutes());
   app.use('/api/health', agentHealthRoutes());
   app.use('/api', configRoutes());
