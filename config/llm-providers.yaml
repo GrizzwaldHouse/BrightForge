@@ -228,6 +228,39 @@ task_routing:
     fallback: "gemini"
     max_tokens: 2000
 
+  idea_classification:
+    description: "Classify ideas into categories (AI, Tooling, Product, etc.)"
+    prefer:
+      - ollama
+      - groq
+    fallback: "claude:simple"
+    max_tokens: 200
+
+  idea_scoring:
+    description: "Score ideas on 5 dimensions (profitability, portfolio, etc.)"
+    prefer:
+      - ollama
+      - groq
+    fallback: "claude:simple"
+    max_tokens: 300
+
+  idea_research:
+    description: "Competitive analysis and gap identification for high-priority ideas"
+    prefer:
+      - ollama
+      - groq
+      - claude
+    fallback: "claude:balanced"
+    max_tokens: 1000
+
+  idea_embedding:
+    description: "Generate embeddings for idea semantic search"
+    prefer:
+      - ollama
+    fallback: null
+    max_tokens: 512
+    model_override: "nomic-embed-text"
+
 # Budget limits (daily)
 budget:
   daily_limit_usd: 1.00

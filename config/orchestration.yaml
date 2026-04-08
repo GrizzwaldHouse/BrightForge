@@ -42,6 +42,15 @@ event_bus:
     - stability_started
     - stability_checkpoint
     - stability_completed
+    - idea_detected
+    - idea_classified
+    - idea_duplicate
+    - idea_scored
+    - idea_ranked
+    - research_started
+    - research_completed
+    - idea_indexed
+    - idea_linked
   forward_to_telemetry: true
 
 task_state:
@@ -65,6 +74,11 @@ task_state:
     - Reviewer
     - Survey
     - Recorder
+    - IngestionAgent
+    - ClassificationAgent
+    - ScoringAgent
+    - ResearchAgent
+    - IndexingAgent
 
 supervisor:
   penalty_per_violation: 0.1
@@ -148,3 +162,36 @@ obs:
   password: ""
   reconnect_attempts: 3
   reconnect_delay_ms: 2000
+
+idea_intelligence:
+  scan_directory: "./ideas"
+  supported_extensions:
+    - ".md"
+    - ".txt"
+    - ".json"
+  scoring:
+    weights:
+      profitability: 0.30
+      portfolio_value: 0.25
+      execution_speed: 0.15
+      complexity_inverse: 0.15
+      novelty: 0.15
+    thresholds:
+      HIGH: 0.75
+      MID: 0.50
+      LOW: 0.25
+  classification:
+    categories:
+      - AI
+      - Tooling
+      - Product
+      - Experimental
+      - Game Dev
+      - Infrastructure
+    duplicate_threshold: 0.92
+    related_threshold: 0.70
+  embedding:
+    model: "nomic-embed-text"
+    dimensions: 768
+  research:
+    min_priority: "MID"

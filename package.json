@@ -81,7 +81,15 @@
     "test-agents": "npm run test-planner && npm run test-builder && npm run test-tester && npm run test-reviewer && npm run test-survey && npm run test-recorder",
     "test-integration": "node src/tests/integration-suite.js",
     "test-stability": "node src/tests/stability-run.js",
-    "test-stability-quick": "node src/tests/stability-run.js --quick"
+    "test-stability-quick": "node src/tests/stability-run.js --quick",
+    "test-idea-ingestion": "node src/idea/idea-ingestion.js --test",
+    "test-idea-classifier": "node src/idea/idea-classifier.js --test",
+    "test-idea-scoring": "node src/idea/idea-scoring.js --test",
+    "test-idea-research": "node src/idea/research-agent.js --test",
+    "test-idea-indexer": "node src/idea/idea-indexer.js --test",
+    "test-idea-facade": "node src/idea/index.js --test",
+    "test-idea-pipeline": "node src/idea/test-pipeline.js",
+    "test-idea": "npm run test-idea-ingestion && npm run test-idea-classifier && npm run test-idea-scoring && npm run test-idea-research && npm run test-idea-indexer && npm run test-idea-facade && npm run test-idea-pipeline"
   },
   "keywords": [
     "coding-agent",

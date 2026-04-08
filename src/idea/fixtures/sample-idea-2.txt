@@ -1,0 +1,7 @@
+Vulkan Shader Hot-Reload Tool
+
+Desktop app that watches GLSL/HLSL shader files and hot-reloads them
+in a running Vulkan application without restarting. Similar to how
+web dev has hot module replacement.
+
+#graphics #vulkan #tooling #developer-productivity

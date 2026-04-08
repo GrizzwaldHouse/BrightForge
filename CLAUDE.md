@@ -67,6 +67,16 @@ npm run test-ws-bus        # src/api/ws-event-bus.js --test
 npm run test-stability       # 13-minute full-stack stability run
 npm run test-stability-quick # 60-second quick stability run (CI)
 
+# Idea Intelligence System self-tests
+npm run test-idea-ingestion # src/idea/idea-ingestion.js --test
+npm run test-idea-classifier # src/idea/idea-classifier.js --test
+npm run test-idea-scoring   # src/idea/idea-scoring.js --test
+npm run test-idea-research  # src/idea/research-agent.js --test
+npm run test-idea-indexer   # src/idea/idea-indexer.js --test
+npm run test-idea-facade    # src/idea/index.js --test
+npm run test-idea-pipeline  # End-to-end SQLite + fixtures pipeline test
+npm run test-idea           # All 7 idea tests in sequence
+
 # Lint
 npm run lint
 npm run lint:fix
@@ -303,6 +313,35 @@ Multi-agent task orchestration with Claude-Ollama handoff support. Six modules i
 
 Config: `config/orchestration.yaml`. DB: `data/orchestration.db`. Status: **runtime complete, wired to API routes and dashboard via WebSocket event bus**.
 
+### Idea Intelligence System (Phase 12)
+
+Six modules in `src/idea/` ingest, classify, score, research, and index idea files. Built ON the orchestration layer (no new infrastructure) — reuses OrchestrationStorage (migration v2 adds `ideas` + `idea_relationships` tables) and OrchestrationEventBus. Ollama-first via `UniversalLLMClient`.
+
+| Module | Log Tag | Purpose |
+|---|---|---|
+| `idea-ingestion.js` | `[IDEA-INGEST]` | Recursive directory scanner (.md/.txt/.json), metadata extractors, SHA-256 dedup, emits `idea_detected` |
+| `idea-classifier.js` | `[IDEA-CLASS]` | LLM categorization (AI/Tooling/Product/Experimental/Game Dev/Infrastructure), cosine duplicate detection, emits `idea_classified` + `idea_duplicate` |
+| `idea-scoring.js` | `[IDEA-SCORE]` | 5-dimension weighted scoring (profitability 0.30, portfolio 0.25, exec speed 0.15, complexity-inverse 0.15, novelty 0.15), priority labels (HIGH/MID/LOW/SHINY_OBJECT), emits `idea_scored` + `idea_ranked` |
+| `research-agent.js` | `[IDEA-RESEARCH]` | Competitive analysis via LLM for HIGH/MID ideas, persists `related_projects` + `missing_features`, emits `research_started` + `research_completed` |
+| `idea-indexer.js` | `[IDEA-INDEX]` | nomic-embed-text 768-dim embeddings via Ollama `/api/embeddings`, semantic search, pairwise cross-linking, emits `idea_indexed` + `idea_linked` |
+| `index.js` | `[IDEA-INTEL]` | `IdeaIntelligence` facade — composes all 5 modules, exposes `processIdea`, `runPipeline`, `search`, `getStats` |
+
+**Pipeline flow**: `ingestion → classification → scoring → (research if HIGH/MID) → indexing → cross-link`
+
+**Storage**: Migration v2 adds two tables to `data/orchestration.db`:
+- `ideas` — id, title, summary, category (CHECK constraint), score_total, priority_label, 5 dimension scores, related_projects, missing_features, embedding (JSON), status, hash
+- `idea_relationships` — pairwise links with `relationship_type` (duplicate/related/extends/conflicts/supersedes) and similarity score
+
+**Event types** (added to `VALID_EVENT_TYPES` and `config/orchestration.yaml`): `idea_detected`, `idea_classified`, `idea_duplicate`, `idea_scored`, `idea_ranked`, `research_started`, `research_completed`, `idea_indexed`, `idea_linked`
+
+**LLM task routing** (in `config/llm-providers.yaml`): `idea_classification`, `idea_scoring`, `idea_research`, `idea_embedding` — all prefer Ollama, fall back to Groq/Claude.
+
+**Config**: `config/orchestration.yaml` → `idea_intelligence:` section (scan_directory, scoring weights, classification categories, embedding model, research min_priority).
+
+**Test fixtures**: `src/idea/fixtures/` — sample-idea-1.md (markdown + frontmatter), sample-idea-2.txt (plain text + hashtags), sample-idea-3.json (JSON).
+
+**Honeybadger bridge**: Decoupled HTTP bridge spec at `docs/honeybadger-bridge-spec.md` — BrightForge publishes `idea_scored`/`idea_indexed`/`research_completed` to Honeybadger Vault for storage and gets back `vault_indexed`/`vault_linked` confirmation. No shared code, localhost-only HTTP transport.
+
 ### Multi-Agent Pipeline (Phase 11)
 
 Six pipeline agents in `src/agents/` connected via WebSocket event bus:
@@ -396,7 +435,7 @@ if (process.argv.includes('--test')) {
 
 **YAML config loading** — Provider and agent configs loaded with `readFileSync` + `parse` from the `yaml` package.
 
-**Logging** — Console output with `[PREFIX]` tags: `[MASTER]`, `[PLAN]`, `[APPLY]`, `[LLM]`, `[WEB]`, `[STORE]`, `[SERVER]`, `[ROUTE]`, `[CHAT]`, `[HISTORY]`, `[MULTI-STEP]`, `[ERROR-HANDLER]`, `[TELEMETRY]`, `[IMAGE]`, `[DESIGN]`, `[FORGE3D]`, `[BRIDGE]`, `[QUEUE]`, `[PROJECT]`, `[PIPELINE]`, `[MEMORY]`, `[GIT]`, `[COST]`, `[APP]`, `[WS-BUS]`, `[PLANNER]`, `[BUILDER]`, `[TESTER]`, `[REVIEWER]`, `[SURVEY]`, `[RECORDER]`, `[STABILITY]`, `[INTEGRATION]`, `[SKILL-ORCH]`.
+**Logging** — Console output with `[PREFIX]` tags: `[MASTER]`, `[PLAN]`, `[APPLY]`, `[LLM]`, `[WEB]`, `[STORE]`, `[SERVER]`, `[ROUTE]`, `[CHAT]`, `[HISTORY]`, `[MULTI-STEP]`, `[ERROR-HANDLER]`, `[TELEMETRY]`, `[IMAGE]`, `[DESIGN]`, `[FORGE3D]`, `[BRIDGE]`, `[QUEUE]`, `[PROJECT]`, `[PIPELINE]`, `[MEMORY]`, `[GIT]`, `[COST]`, `[APP]`, `[WS-BUS]`, `[PLANNER]`, `[BUILDER]`, `[TESTER]`, `[REVIEWER]`, `[SURVEY]`, `[RECORDER]`, `[STABILITY]`, `[INTEGRATION]`, `[SKILL-ORCH]`, `[IDEA-INGEST]`, `[IDEA-CLASS]`, `[IDEA-SCORE]`, `[IDEA-RESEARCH]`, `[IDEA-INDEX]`, `[IDEA-INTEL]`.
 
 **Dependencies** — `dotenv`, `yaml`, `express`, `better-sqlite3`, `ws`, `obs-websocket-js`, `helmet`, `express-rate-limit` (+ `eslint`, `electron`, `electron-builder` as dev). Uses native `fetch` (Node 18+).
 

@@ -53,7 +53,16 @@ const VALID_EVENT_TYPES = [
   'recording_failed',
   'stability_started',
   'stability_checkpoint',
-  'stability_completed'
+  'stability_completed',
+  'idea_detected',
+  'idea_classified',
+  'idea_duplicate',
+  'idea_scored',
+  'idea_ranked',
+  'research_started',
+  'research_completed',
+  'idea_indexed',
+  'idea_linked'
 ];
 
 class OrchestrationEventBus extends EventEmitter {
