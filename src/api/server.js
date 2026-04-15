@@ -4,6 +4,7 @@
  * HTTP API for the coding agent. Serves:
  * - /api/chat/* - Chat and plan management
  * - /api/sessions/* - Session history
+ * - /api/agents/* - Agent pipeline, recorder, stability
  * - /api/config - Provider config (sanitized)
  * - /api/health - Health check
  * - / - Static frontend from public/
@@ -29,9 +30,15 @@ import forge3dRoutes from './routes/forge3d.js';
 import sceneRoutes from './routes/scene.js';
 import worldRoutes from './routes/world.js';
 import prototypeRoutes from './routes/prototype.js';
+import playtestRoutes from './routes/playtest.js';
 import { memoryRoutes } from './routes/memory.js';
 import { costRoutes } from './routes/cost.js';
 import pipelineRoutes from './routes/pipelines.js';
+import debugRoutes from './routes/debug.js';
+import { securityRoutes } from './routes/security.js';
+import { agentHealthRoutes } from './routes/agent-health.js';
+import { skillRoutes } from './routes/skills.js';
+import { agentRoutes } from './routes/agents.js';
 import modelIntelligenceRoutes from './routes/model-intelligence.js';
 import { authMiddleware } from './middleware/auth.js';
 import { generalLimiter } from './middleware/rate-limit.js';
@@ -107,9 +114,15 @@ export function createServer(options = {}) {
   app.use('/api/scene', sceneRoutes);
   app.use('/api/world', worldRoutes);
   app.use('/api/prototype', prototypeRoutes);
+  app.use('/api/playtest', playtestRoutes);
   app.use('/api/memory', memoryRoutes());
   app.use('/api/cost', costRoutes());
   app.use('/api/pipelines', pipelineRoutes);
+  app.use('/api/debug', debugRoutes);
+  app.use('/api/skills', skillRoutes());
+  app.use('/api/agents', agentRoutes());
+  app.use('/api/security', securityRoutes());
+  app.use('/api/health', agentHealthRoutes());
   app.use('/api/models', modelIntelligenceRoutes);
   app.use('/api', configRoutes());
 

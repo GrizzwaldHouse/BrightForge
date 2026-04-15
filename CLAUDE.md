@@ -40,6 +40,7 @@ npm run test-multi-step   # src/core/multi-step-planner.js --test
 npm run test-api          # src/api/web-session.js --test
 npm run test-image        # src/core/image-client.js --test
 npm run test-design       # src/core/design-engine.js --test
+npm run test-skills       # src/core/skill-orchestrator.js --test
 
 # Forge3D module self-tests
 npm run test-bridge        # src/forge3d/model-bridge.js --test
@@ -49,8 +50,32 @@ npm run test-project-manager # src/forge3d/project-manager.js --test
 npm run test-queue         # src/forge3d/generation-queue.js --test
 
 # Integration and Monitoring
-npm run test-integration   # node src/forge3d/test-suite.js
+npm run test-integration   # node src/tests/integration-suite.js
 npm run monitor           # node src/forge3d/monitor.js
+
+# Pipeline Agent self-tests
+npm run test-planner       # src/agents/planner-agent.js --test
+npm run test-builder       # src/agents/builder-agent.js --test
+npm run test-tester        # src/agents/tester-agent.js --test
+npm run test-reviewer      # src/agents/reviewer-agent.js --test
+npm run test-survey        # src/agents/survey-agent.js --test
+npm run test-recorder      # src/agents/recorder-agent.js --test
+npm run test-agents        # All 6 pipeline agent tests
+npm run test-ws-bus        # src/api/ws-event-bus.js --test
+
+# Stability Testing
+npm run test-stability       # 13-minute full-stack stability run
+npm run test-stability-quick # 60-second quick stability run (CI)
+
+# Idea Intelligence System self-tests
+npm run test-idea-ingestion # src/idea/idea-ingestion.js --test
+npm run test-idea-classifier # src/idea/idea-classifier.js --test
+npm run test-idea-scoring   # src/idea/idea-scoring.js --test
+npm run test-idea-research  # src/idea/research-agent.js --test
+npm run test-idea-indexer   # src/idea/idea-indexer.js --test
+npm run test-idea-facade    # src/idea/index.js --test
+npm run test-idea-pipeline  # End-to-end SQLite + fixtures pipeline test
+npm run test-idea           # All 7 idea tests in sequence
 
 # Lint
 npm run lint
@@ -152,7 +177,7 @@ System prompt is at `src/prompts/plan-system.txt`. Classification prompt at `cla
 Two singleton EventEmitter hubs provide cross-cutting observability:
 
 - **TelemetryBus** (`src/core/telemetry-bus.js`): Ring buffers (100 events) for LLM requests, operations, sessions, performance, and `forge3d` events. Tracks per-provider stats (requests, tokens, cost, failures, success rate). Latency percentiles (P50/P95/P99). `startTimer(category)` returns `endTimer()` function.
-- **ErrorHandler** (`src/core/error-handler.js`): Observer-pattern error broadcasting by category (`provider_error`, `plan_error`, `apply_error`, `session_error`, `server_error`, `fatal`, `forge3d_error`, `bridge_error`, `gpu_error`, `orchestration_error`, `handoff_error`, `supervisor_error`, `pipeline_error`). JSONL persistent log at `sessions/errors.jsonl`. Crash reports with memory/telemetry snapshots. Exponential backoff retry tracking.
+- **ErrorHandler** (`src/core/error-handler.js`): Observer-pattern error broadcasting by category (`provider_error`, `plan_error`, `apply_error`, `session_error`, `server_error`, `fatal`, `forge3d_error`, `bridge_error`, `gpu_error`, `orchestration_error`, `handoff_error`, `supervisor_error`, `pipeline_error`, `agent_error`, `recorder_error`, `stability_error`, `ws_error`). JSONL persistent log at `sessions/errors.jsonl`. Crash reports with memory/telemetry snapshots. Exponential backoff retry tracking.
 
 Both are imported and used throughout: `telemetryBus.emit(category, data)`, `errorHandler.report(category, error, context)`.
 
@@ -177,6 +202,10 @@ Express server (`src/api/server.js`) created via `createServer()` factory. Route
 | `routes/forge3d.js` | `/api/forge3d` | 3D generation, projects, assets, queue, post-processing (26 endpoints) |
 | `routes/cost.js` | `/api/cost` | Cost summary and per-session cost breakdown |
 | `routes/memory.js` | `/api/memory` | Project memory CRUD (conventions, corrections, tech stack) |
+| `routes/skills.js` | `/api/skills` | Skill orchestrator: load, prune, scan, sync, registry, usage log |
+| `routes/agents.js` | `/api/agents` | Pipeline agents, recorder, stability run (10 endpoints) |
+
+WebSocket: `src/api/ws-event-bus.js` at `ws://localhost:3847/ws/events`
 
 WebSession (`src/api/web-session.js`) extends `EventEmitter`. Separates plan generation from application:
 1. `POST /api/chat/turn` → returns `202 { status: 'generating' }` immediately
@@ -254,6 +283,21 @@ Per-project persistent memory at `{projectRoot}/.brightforge/memory.json`:
 - Timeline: `GET /api/chat/timeline` returns chronological BrightForge checkpoints
 - Revert: `POST /api/chat/revert/:commitHash` uses `git revert --no-edit`
 
+### Self-Pruning Skill Orchestrator
+
+Dynamic skill lifecycle manager that minimizes token usage by lazily loading and auto-pruning skills.
+
+- `src/core/skill-orchestrator.js` — Core module: scan, load, prune, archive, sync, handoff
+- `src/api/routes/skills.js` — 11 REST endpoints at `/api/skills/*`
+- `.claude/skill_registry.json` — Persistent registry (skill name → path, usage, tags, status)
+- `.claude/skills_temp/` — Temp cache for pruned skills (prefer over remote re-fetch)
+- `.claude/skill_usage.md` — Markdown transition log
+- `.claude/HANDOFF.md` — Agent session handoff state
+
+**Lifecycle**: `active` → `cached` (pruned, local) → `archived` (deleted). Skills restored from cache before attempting remote fetch. Max 15 active skills enforced.
+
+**API**: `GET /api/skills`, `GET /api/skills/stats`, `POST /api/skills/load`, `POST /api/skills/prune`, `POST /api/skills/scan`, `POST /api/skills/sync`, `POST /api/skills/handoff`
+
 ### Orchestration Runtime (Phase 9)
 
 Multi-agent task orchestration with Claude-Ollama handoff support. Six modules in `src/orchestration/`:
@@ -261,13 +305,100 @@ Multi-agent task orchestration with Claude-Ollama handoff support. Six modules i
 | Module | Log Tag | Purpose |
 |---|---|---|
 | `storage.js` | `[ORCH-DB]` | SQLite persistence (task_states, orchestration_events, audit_results, agent_registry) |
-| `event-bus.js` | `[EVENT-BUS]` | SHA256-hashed event envelopes, 13 event types, ring buffers, TelemetryBus forwarding |
+| `event-bus.js` | `[EVENT-BUS]` | SHA256-hashed event envelopes, 30 event types, ring buffers, TelemetryBus forwarding |
 | `task-state.js` | `[TASK-STATE]` | FSM lifecycle (active/paused/completed/failed), phase progression, architectural decisions |
 | `supervisor.js` | `[SUPERVISOR]` | Structural/coding standard/continuity audits, weighted scoring (0.4/0.3/0.3) |
 | `handoff.js` | `[HANDOFF]` | Claude-Ollama pause/resume with pre-handoff audit, HandoffError class |
 | `index.js` | `[ORCHESTRATOR]` | Facade with init/shutdown sequence, agent registration |
 
-Config: `config/orchestration.yaml`. DB: `data/orchestration.db`. Status: **runtime complete, not yet wired to API routes or dashboard**.
+Config: `config/orchestration.yaml`. DB: `data/orchestration.db`. Status: **runtime complete, wired to API routes and dashboard via WebSocket event bus**.
+
+### Idea Intelligence System (Phase 12)
+
+Six modules in `src/idea/` ingest, classify, score, research, and index idea files. Built ON the orchestration layer (no new infrastructure) — reuses OrchestrationStorage (migration v2 adds `ideas` + `idea_relationships` tables) and OrchestrationEventBus. Ollama-first via `UniversalLLMClient`.
+
+| Module | Log Tag | Purpose |
+|---|---|---|
+| `idea-ingestion.js` | `[IDEA-INGEST]` | Recursive directory scanner (.md/.txt/.json), metadata extractors, SHA-256 dedup, emits `idea_detected` |
+| `idea-classifier.js` | `[IDEA-CLASS]` | LLM categorization (AI/Tooling/Product/Experimental/Game Dev/Infrastructure), cosine duplicate detection, emits `idea_classified` + `idea_duplicate` |
+| `idea-scoring.js` | `[IDEA-SCORE]` | 5-dimension weighted scoring (profitability 0.30, portfolio 0.25, exec speed 0.15, complexity-inverse 0.15, novelty 0.15), priority labels (HIGH/MID/LOW/SHINY_OBJECT), emits `idea_scored` + `idea_ranked` |
+| `research-agent.js` | `[IDEA-RESEARCH]` | Competitive analysis via LLM for HIGH/MID ideas, persists `related_projects` + `missing_features`, emits `research_started` + `research_completed` |
+| `idea-indexer.js` | `[IDEA-INDEX]` | nomic-embed-text 768-dim embeddings via Ollama `/api/embeddings`, semantic search, pairwise cross-linking, emits `idea_indexed` + `idea_linked` |
+| `index.js` | `[IDEA-INTEL]` | `IdeaIntelligence` facade — composes all 5 modules, exposes `processIdea`, `runPipeline`, `search`, `getStats` |
+
+**Pipeline flow**: `ingestion → classification → scoring → (research if HIGH/MID) → indexing → cross-link`
+
+**Storage**: Migration v2 adds two tables to `data/orchestration.db`:
+- `ideas` — id, title, summary, category (CHECK constraint), score_total, priority_label, 5 dimension scores, related_projects, missing_features, embedding (JSON), status, hash
+- `idea_relationships` — pairwise links with `relationship_type` (duplicate/related/extends/conflicts/supersedes) and similarity score
+
+**Event types** (added to `VALID_EVENT_TYPES` and `config/orchestration.yaml`): `idea_detected`, `idea_classified`, `idea_duplicate`, `idea_scored`, `idea_ranked`, `research_started`, `research_completed`, `idea_indexed`, `idea_linked`
+
+**LLM task routing** (in `config/llm-providers.yaml`): `idea_classification`, `idea_scoring`, `idea_research`, `idea_embedding` — all prefer Ollama, fall back to Groq/Claude.
+
+**Config**: `config/orchestration.yaml` → `idea_intelligence:` section (scan_directory, scoring weights, classification categories, embedding model, research min_priority).
+
+**Test fixtures**: `src/idea/fixtures/` — sample-idea-1.md (markdown + frontmatter), sample-idea-2.txt (plain text + hashtags), sample-idea-3.json (JSON).
+
+**Honeybadger bridge**: Decoupled HTTP bridge spec at `docs/honeybadger-bridge-spec.md` — BrightForge publishes `idea_scored`/`idea_indexed`/`research_completed` to Honeybadger Vault for storage and gets back `vault_indexed`/`vault_linked` confirmation. No shared code, localhost-only HTTP transport.
+
+### Multi-Agent Pipeline (Phase 11)
+
+Six pipeline agents in `src/agents/` connected via WebSocket event bus:
+
+| Agent | Log Tag | Purpose |
+|---|---|---|
+| `planner-agent.js` | `[PLANNER]` | Decomposes task prompt into subtasks with dependencies |
+| `builder-agent.js` | `[BUILDER]` | Executes subtasks, orchestrates build pipeline |
+| `tester-agent.js` | `[TESTER]` | Runs self-tests and linting on build output |
+| `reviewer-agent.js` | `[REVIEWER]` | Code review + supervisor audit, produces score + verdict |
+| `survey-agent.js` | `[SURVEY]` | User feedback collection via WebSocket to UI |
+| `recorder-agent.js` | `[RECORDER]` | OBS WebSocket integration for screen recording |
+
+Pipeline flow: `Planner → Builder → Tester → Reviewer` (sequential). Builder can spawn Survey and Recorder as side agents.
+
+API: `src/api/routes/agents.js` mounted at `/api/agents`:
+- `GET /api/agents` — List all registered agents with status
+- `GET /api/agents/:name/status` — Single agent status
+- `POST /api/agents/pipeline/start` — Start pipeline
+- `POST /api/agents/pipeline/cancel` — Cancel running pipeline
+- `GET /api/agents/pipeline/status` — Pipeline progress
+- `POST /api/agents/recorder/start` — Start OBS recording
+- `POST /api/agents/recorder/stop` — Stop OBS recording
+- `GET /api/agents/recorder/status` — OBS connection status
+- `POST /api/agents/stability/start` — Start 13-minute stability run
+- `GET /api/agents/stability/status` — Stability run progress
+
+### WebSocket Event Bus
+
+`src/api/ws-event-bus.js` — Bridges OrchestrationEventBus to WebSocket clients.
+
+- Attaches to Express HTTP server via `new WebSocketServer({ server, path: '/ws/events' })`
+- Message protocol: `{ type, source, target, channel, payload, timestamp, id }`
+- Types: `register`, `event`, `heartbeat`, `command`
+- Channels: `agents`, `ui`, `system`, `recording`
+- Heartbeat: ping/pong every 30s, disconnect stale clients after 90s
+- Bidirectional: EventBus→WS broadcast, WS→EventBus forwarding
+- Singleton pattern, attached in `bin/brightforge-server.js`
+
+### OBS Recording Integration
+
+`src/agents/recorder-agent.js` uses `obs-websocket-js` (v5) to control OBS Studio:
+- Connect/disconnect with auto-reconnect (max 3 retries, exponential backoff)
+- Start/stop recording, scene switching
+- Graceful degradation: if OBS unavailable, operates in dry-run mode
+- Config: `config/orchestration.yaml` → `obs:` section (host, port, password)
+
+### Stability Testing
+
+`src/tests/stability-run.js` — 13-minute full-stack stability test:
+- 26 checkpoints every 30 seconds
+- Monitors: server uptime, heap/RSS memory growth, error rate, event bus latency
+- Verdict: PASS if >=90% checkpoints pass
+- Quick mode: `--quick` flag for 60-second CI run
+- Report output: `data/stability-report.json`
+
+Dashboard panels: `public/js/agent-pipeline-panel.js`, `public/js/recorder-panel.js`, `public/js/stability-panel.js`
 
 ### Bridge Hardening (Sprint 2)
 
@@ -304,9 +435,9 @@ if (process.argv.includes('--test')) {
 
 **YAML config loading** — Provider and agent configs loaded with `readFileSync` + `parse` from the `yaml` package.
 
-**Logging** — Console output with `[PREFIX]` tags: `[MASTER]`, `[PLAN]`, `[APPLY]`, `[LLM]`, `[WEB]`, `[STORE]`, `[SERVER]`, `[ROUTE]`, `[CHAT]`, `[HISTORY]`, `[MULTI-STEP]`, `[ERROR-HANDLER]`, `[TELEMETRY]`, `[IMAGE]`, `[DESIGN]`, `[FORGE3D]`, `[BRIDGE]`, `[QUEUE]`, `[PROJECT]`, `[PIPELINE]`, `[MEMORY]`, `[GIT]`, `[COST]`, `[APP]`.
+**Logging** — Console output with `[PREFIX]` tags: `[MASTER]`, `[PLAN]`, `[APPLY]`, `[LLM]`, `[WEB]`, `[STORE]`, `[SERVER]`, `[ROUTE]`, `[CHAT]`, `[HISTORY]`, `[MULTI-STEP]`, `[ERROR-HANDLER]`, `[TELEMETRY]`, `[IMAGE]`, `[DESIGN]`, `[FORGE3D]`, `[BRIDGE]`, `[QUEUE]`, `[PROJECT]`, `[PIPELINE]`, `[MEMORY]`, `[GIT]`, `[COST]`, `[APP]`, `[WS-BUS]`, `[PLANNER]`, `[BUILDER]`, `[TESTER]`, `[REVIEWER]`, `[SURVEY]`, `[RECORDER]`, `[STABILITY]`, `[INTEGRATION]`, `[SKILL-ORCH]`, `[IDEA-INGEST]`, `[IDEA-CLASS]`, `[IDEA-SCORE]`, `[IDEA-RESEARCH]`, `[IDEA-INDEX]`, `[IDEA-INTEL]`.
 
-**Dependencies** — `dotenv`, `yaml`, `express`, `better-sqlite3` (+ `eslint`, `electron`, `electron-builder` as dev). Uses native `fetch` (Node 18+).
+**Dependencies** — `dotenv`, `yaml`, `express`, `better-sqlite3`, `ws`, `obs-websocket-js`, `helmet`, `express-rate-limit` (+ `eslint`, `electron`, `electron-builder` as dev). Uses native `fetch` (Node 18+).
 
 **Backup suffix** — `.brightforge-backup`.
 

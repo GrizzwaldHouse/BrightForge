@@ -1,0 +1,150 @@
+{
+  "version": "1.0.0",
+  "layoutName": "Standard",
+  "description": "Default workspace layout with fixed sidebars and bottom asset browser",
+  "timestamp": "2026-04-14T00:00:00Z",
+  "panels": {
+    "menuBar": {
+      "visible": true,
+      "height": 40,
+      "position": "top"
+    },
+    "toolPanel": {
+      "visible": true,
+      "collapsed": false,
+      "width": 200,
+      "minWidth": 150,
+      "maxWidth": 400,
+      "position": "left",
+      "sections": {
+        "sculptTools": {
+          "collapsed": false,
+          "selectedTool": "clay"
+        },
+        "transformTools": {
+          "collapsed": false,
+          "selectedTool": "translate"
+        },
+        "selectionModes": {
+          "collapsed": false,
+          "selectedMode": "object"
+        }
+      }
+    },
+    "propertyInspector": {
+      "visible": true,
+      "collapsed": false,
+      "width": 300,
+      "minWidth": 200,
+      "maxWidth": 500,
+      "position": "right",
+      "sections": {
+        "objectProperties": {
+          "collapsed": false
+        },
+        "transformProperties": {
+          "collapsed": false,
+          "precision": 0.001
+        },
+        "materialEditor": {
+          "collapsed": false
+        }
+      }
+    },
+    "viewport": {
+      "visible": true,
+      "position": "center",
+      "camera": {
+        "mode": "orbit",
+        "fov": 60.0,
+        "nearClip": 0.1,
+        "farClip": 1000.0,
+        "position": [0.0, 5.0, 10.0],
+        "target": [0.0, 0.0, 0.0],
+        "up": [0.0, 1.0, 0.0]
+      },
+      "gizmo": {
+        "visible": true,
+        "mode": "translate",
+        "snapEnabled": false,
+        "snapIncrement": 0.5
+      },
+      "rendering": {
+        "wireframe": false,
+        "showGrid": true,
+        "gridSize": 10.0,
+        "gridSubdivisions": 10,
+        "showAxis": true,
+        "backgroundColor": [0.12, 0.12, 0.18, 1.0]
+      }
+    },
+    "assetBrowser": {
+      "visible": true,
+      "collapsed": false,
+      "height": 250,
+      "minHeight": 100,
+      "maxHeight": 600,
+      "position": "bottom",
+      "viewMode": "grid",
+      "thumbnailSize": 128,
+      "sortBy": "name",
+      "sortOrder": "ascending",
+      "filters": {
+        "types": [],
+        "tags": [],
+        "searchQuery": ""
+      },
+      "dragDropZone": {
+        "height": 150,
+        "acceptedFormats": [".obj", ".fbx", ".gltf", ".glb", ".png", ".jpg", ".jpeg", ".tga", ".bmp"]
+      }
+    },
+    "statusBar": {
+      "visible": true,
+      "height": 24,
+      "position": "bottom",
+      "sections": {
+        "quoteMessage": {
+          "width": "70%",
+          "truncate": true
+        },
+        "fpsCounter": {
+          "visible": true,
+          "updateInterval": 500
+        },
+        "triangleCount": {
+          "visible": true
+        },
+        "memoryUsage": {
+          "visible": true,
+          "updateInterval": 1000
+        }
+      }
+    }
+  },
+  "shortcuts": {
+    "save": "Ctrl+S",
+    "undo": "Ctrl+Z",
+    "redo": "Ctrl+Shift+Z",
+    "focusSearch": "Ctrl+F",
+    "frameSelected": "F",
+    "vertexMode": "1",
+    "edgeMode": "2",
+    "faceMode": "3",
+    "objectMode": "4",
+    "translateGizmo": "W",
+    "rotateGizmo": "E",
+    "scaleGizmo": "R",
+    "toggleWireframe": "Tab",
+    "deleteSelected": "Delete"
+  },
+  "recentProjects": [],
+  "preferences": {
+    "autoSaveInterval": 300000,
+    "maxUndoHistory": 50,
+    "enableTooltips": true,
+    "showWelcomeScreen": true,
+    "language": "en",
+    "theme": "dark"
+  }
+}

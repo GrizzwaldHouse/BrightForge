@@ -23,6 +23,26 @@ console.log('[APP] Importing DesignViewer...');
 import { DesignViewer } from './design-viewer.js';
 console.log('[APP] Importing Forge3DPanel...');
 import { Forge3DPanel } from './forge3d-panel.js';
+console.log('[APP] Importing ScenePanel...');
+import { ScenePanel } from './scene-panel.js';
+console.log('[APP] Importing WorldPanel...');
+import { WorldPanel } from './world-panel.js';
+console.log('[APP] Importing GameplayPanel...');
+import { GameplayPanel } from './gameplay-panel.js';
+console.log('[APP] Importing PlaytestPanel...');
+import { PlaytestPanel } from './playtest-panel.js';
+console.log('[APP] Importing DebugPanel...');
+import { DebugPanel } from './debug-panel.js';
+console.log('[APP] Importing SecurityPanel...');
+import { SecurityPanel } from './security-panel.js';
+console.log('[APP] Importing AgentHealthPanel...');
+import { AgentHealthPanel } from './agent-health-panel.js';
+console.log('[APP] Importing AgentPipelinePanel...');
+import { AgentPipelinePanel } from './agent-pipeline-panel.js';
+console.log('[APP] Importing RecorderPanel...');
+import { RecorderPanel } from './recorder-panel.js';
+console.log('[APP] Importing StabilityPanel...');
+import { StabilityPanel } from './stability-panel.js';
 console.log('[APP] ✓ All modules imported successfully');
 
 class App {
@@ -60,6 +80,46 @@ class App {
       console.log('[APP] Initializing Forge3DPanel...');
       this.forge3dPanel = new Forge3DPanel();
       console.log('[APP] Forge3DPanel initialized');
+
+      console.log('[APP] Initializing ScenePanel...');
+      this.scenePanel = new ScenePanel();
+      console.log('[APP] ScenePanel initialized');
+
+      console.log('[APP] Initializing WorldPanel...');
+      this.worldPanel = new WorldPanel();
+      console.log('[APP] WorldPanel initialized');
+
+      console.log('[APP] Initializing GameplayPanel...');
+      this.gameplayPanel = new GameplayPanel();
+      console.log('[APP] GameplayPanel initialized');
+
+      console.log('[APP] Initializing PlaytestPanel...');
+      this.playtestPanel = new PlaytestPanel();
+      console.log('[APP] PlaytestPanel initialized');
+
+      console.log('[APP] Initializing DebugPanel...');
+      this.debugPanel = new DebugPanel();
+      console.log('[APP] DebugPanel initialized');
+
+      console.log('[APP] Initializing SecurityPanel...');
+      this.securityPanel = new SecurityPanel(this);
+      console.log('[APP] SecurityPanel initialized');
+
+      console.log('[APP] Initializing AgentHealthPanel...');
+      this.agentHealthPanel = new AgentHealthPanel(this);
+      console.log('[APP] AgentHealthPanel initialized');
+
+      console.log('[APP] Initializing AgentPipelinePanel...');
+      this.pipelinePanel = new AgentPipelinePanel(this);
+      console.log('[APP] AgentPipelinePanel initialized');
+
+      console.log('[APP] Initializing RecorderPanel...');
+      this.recorderPanel = new RecorderPanel(this);
+      console.log('[APP] RecorderPanel initialized');
+
+      console.log('[APP] Initializing StabilityPanel...');
+      this.stabilityPanel = new StabilityPanel(this);
+      console.log('[APP] StabilityPanel initialized');
 
       this.fileBrowser = null; // Initialized after DOM ready
       this.memoryPanel = null; // Initialized after DOM ready
@@ -294,6 +354,36 @@ class App {
         }
         if (targetTab === 'forge3d' && !this.forge3dPanel.initialized) {
           this.forge3dPanel.init();
+        }
+        if (targetTab === 'scene' && !this.scenePanel.initialized) {
+          this.scenePanel.init();
+        }
+        if (targetTab === 'world' && !this.worldPanel.initialized) {
+          this.worldPanel.init();
+        }
+        if (targetTab === 'gameplay' && !this.gameplayPanel.initialized) {
+          this.gameplayPanel.init();
+        }
+        if (targetTab === 'playtest' && !this.playtestPanel.initialized) {
+          this.playtestPanel.init();
+        }
+        if (targetTab === 'debug' && !this.debugPanel.initialized) {
+          this.debugPanel.init();
+        }
+        if (targetTab === 'security' && !this.securityPanel.initialized) {
+          this.securityPanel.init();
+        }
+        if (targetTab === 'agents' && !this.agentHealthPanel.initialized) {
+          this.agentHealthPanel.init();
+        }
+        if (targetTab === 'pipeline' && !this.pipelinePanel.initialized) {
+          this.pipelinePanel.init();
+        }
+        if (targetTab === 'recorder' && !this.recorderPanel.initialized) {
+          this.recorderPanel.init();
+        }
+        if (targetTab === 'stability' && !this.stabilityPanel.initialized) {
+          this.stabilityPanel.init();
         }
         if (targetTab === 'models' && this.modelPanel && !this.modelPanel.initialized) {
           this.modelPanel.init();
