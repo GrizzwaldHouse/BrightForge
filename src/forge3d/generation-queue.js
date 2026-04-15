@@ -114,7 +114,8 @@ class GenerationQueue extends EventEmitter {
     // Rate limiting: reject if queue is full
     const currentSize = this._getQueuePosition() + (this.processing ? 1 : 0);
     if (currentSize >= forge3dConfig.queue.max_size) {
-      throw new Error(`Queue full (${currentSize}/${forge3dConfig.queue.max_size}). Try again later.`);
+      console.warn(`[QUEUE] Rejected job — queue at capacity (${currentSize}/${forge3dConfig.queue.max_size})`);
+      throw new Error(`Queue is full (max ${forge3dConfig.queue.max_size} jobs). Try again when current jobs complete.`);
     }
 
     const priorityMap = { urgent: 0, normal: 1, background: 2 };

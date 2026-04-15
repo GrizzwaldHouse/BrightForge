@@ -21,7 +21,7 @@
 import Database from 'better-sqlite3';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { mkdirSync, existsSync } from 'fs';
+import { mkdirSync, existsSync, copyFileSync, readdirSync, unlinkSync, statSync } from 'fs';
 import { randomUUID } from 'crypto';
 import forge3dConfig from './config-loader.js';
 
@@ -408,6 +408,62 @@ class Forge3DDatabase {
     }
 
     console.log('[DB] Database ready');
+
+    // Daily backup on open (non-fatal)
+    this.backupDatabase();
+  }
+
+  /**
+   * Copy the database file to data/backups/forge3d-YYYY-MM-DD.db.
+   * Creates the backups directory if needed. Keeps only the last 7 daily backups.
+   */
+  backupDatabase() {
+    try {
+      const backupDir = join(dirname(this.dbPath), 'backups');
+      if (!existsSync(backupDir)) {
+        mkdirSync(backupDir, { recursive: true });
+      }
+
+      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const destPath = join(backupDir, `forge3d-${today}.db`);
+
+      copyFileSync(this.dbPath, destPath);
+      console.log(`[FORGE3D-DB] Daily backup written: ${destPath}`);
+
+      // Prune old backups — keep only the 7 most recent
+      const MAX_BACKUPS = 7;
+      const files = readdirSync(backupDir)
+        .filter(f => f.startsWith('forge3d-') && f.endsWith('.db'))
+        .map(f => ({ name: f, mtime: statSync(join(backupDir, f)).mtimeMs }))
+        .sort((a, b) => b.mtime - a.mtime); // newest first
+
+      const toDelete = files.slice(MAX_BACKUPS);
+      for (const file of toDelete) {
+        unlinkSync(join(backupDir, file.name));
+        console.log(`[FORGE3D-DB] Old backup pruned: ${file.name}`);
+      }
+    } catch (err) {
+      console.warn(`[FORGE3D-DB] Backup failed (non-fatal): ${err.message}`);
+    }
+  }
+
+  /**
+   * Delete generation_history rows older than daysToKeep days.
+   * @param {number} daysToKeep - Number of days to retain (default 30)
+   * @returns {number} Count of deleted rows
+   */
+  pruneHistory(daysToKeep = 30) {
+    if (!this.db) return 0;
+    const result = this.db.prepare(
+      'DELETE FROM generation_history WHERE created_at < datetime(\'now\', \'-\' || ? || \' days\')'
+    ).run(daysToKeep);
+    const deleted = result.changes;
+    if (deleted > 0) {
+      console.log(`[FORGE3D-DB] Pruned ${deleted} history entries older than ${daysToKeep} days`);
+    } else {
+      console.log(`[FORGE3D-DB] No history entries to prune (retention: ${daysToKeep} days)`);
+    }
+    return deleted;
   }
 
   /**
