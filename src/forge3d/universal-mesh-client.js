@@ -17,6 +17,7 @@ import { dirname, join } from 'path';
 import telemetryBus from '../core/telemetry-bus.js';
 import errorHandler from '../core/error-handler.js';
 import modelBridge from './model-bridge.js';
+import modelRouter from '../model-intelligence/model-router.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -75,13 +76,36 @@ class UniversalMeshClient {
 
     const task = options.task || 'default';
     const routing = this.taskRouting[task] || this.taskRouting.default || { prefer: ['hunyuan3d', 'shap-e'] };
+    let preferList = [...routing.prefer];
 
     const errors = [];
     const routingLog = [];
     const endTimer = telemetryBus.startTimer('mesh_generation', { task });
 
+    // Consult model router for smart ordering (non-fatal if unavailable)
+    try {
+      const recommendation = modelRouter.getBestProvider(task);
+      if (recommendation && recommendation.name) {
+        // Move recommended provider to front of the list if it's in the chain
+        const idx = preferList.indexOf(recommendation.name);
+        if (idx > 0) {
+          preferList.splice(idx, 1);
+          preferList.unshift(recommendation.name);
+        }
+        routingLog.push({
+          provider: recommendation.name,
+          status: 'router_recommended',
+          score: recommendation.score,
+          reason: recommendation.reason
+        });
+        console.log(`[MESH-CLIENT] Router recommends: ${recommendation.name} (score: ${recommendation.score.toFixed(2)})`);
+      }
+    } catch (routerErr) {
+      console.warn(`[MESH-CLIENT] Router consultation failed (proceeding with default): ${routerErr.message}`);
+    }
+
     // Try preferred providers in order
-    for (const providerName of routing.prefer) {
+    for (const providerName of preferList) {
       // Check cancellation
       if (options.signal?.aborted) {
         const cancelError = new Error('Mesh generation cancelled');

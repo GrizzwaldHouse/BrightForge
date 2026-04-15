@@ -26,7 +26,8 @@ class TelemetryBus extends EventEmitter {
       operations: [],
       sessions: [],
       performance: [],
-      forge3d: []
+      forge3d: [],
+      modelIntelligence: []
     };
 
     this.ringBufferSize = 100;
@@ -137,7 +138,8 @@ class TelemetryBus extends EventEmitter {
         llmRequests: this.ringBuffers.llmRequests.slice(-10).reverse(),
         operations: this.ringBuffers.operations.slice(-10).reverse(),
         sessions: this.ringBuffers.sessions.slice(-10).reverse(),
-        forge3d: this.ringBuffers.forge3d.slice(-10).reverse()
+        forge3d: this.ringBuffers.forge3d.slice(-10).reverse(),
+        modelIntelligence: this.ringBuffers.modelIntelligence.slice(-10).reverse()
       }
     };
   }
@@ -207,6 +209,8 @@ class TelemetryBus extends EventEmitter {
       targetBuffer = this.ringBuffers.performance;
     } else if (event.category.startsWith('forge3d_')) {
       targetBuffer = this.ringBuffers.forge3d;
+    } else if (event.category.startsWith('model_intel_')) {
+      targetBuffer = this.ringBuffers.modelIntelligence;
     } else {
       // Unknown category - add to performance buffer as catch-all
       targetBuffer = this.ringBuffers.performance;
@@ -286,7 +290,8 @@ class TelemetryBus extends EventEmitter {
       operations: [],
       sessions: [],
       performance: [],
-      forge3d: []
+      forge3d: [],
+      modelIntelligence: []
     };
 
     this.counters = {
