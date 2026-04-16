@@ -89,7 +89,15 @@
     "test-idea-indexer": "node src/idea/idea-indexer.js --test",
     "test-idea-facade": "node src/idea/index.js --test",
     "test-idea-pipeline": "node src/idea/test-pipeline.js",
-    "test-idea": "npm run test-idea-ingestion && npm run test-idea-classifier && npm run test-idea-scoring && npm run test-idea-research && npm run test-idea-indexer && npm run test-idea-facade && npm run test-idea-pipeline"
+    "test-idea": "npm run test-idea-ingestion && npm run test-idea-classifier && npm run test-idea-scoring && npm run test-idea-research && npm run test-idea-indexer && npm run test-idea-facade && npm run test-idea-pipeline",
+    "test-model-config": "node src/model-intelligence/config-loader.js --test",
+    "test-model-db": "node src/model-intelligence/database.js --test",
+    "test-model-events": "node src/model-intelligence/event-types.js --test",
+    "test-model-scanner": "node src/model-intelligence/scanner.js --test",
+    "test-model-writer": "node src/model-intelligence/inventory-writer.js --test",
+    "test-model-intel": "node src/model-intelligence/index.js --test",
+    "test-model-router": "node src/model-intelligence/model-router.js --test",
+    "test-model-scanner-py": "py -3 python/model_scanner.py --test"
   },
   "keywords": [
     "coding-agent",

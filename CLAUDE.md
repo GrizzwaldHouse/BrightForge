@@ -77,6 +77,16 @@ npm run test-idea-facade    # src/idea/index.js --test
 npm run test-idea-pipeline  # End-to-end SQLite + fixtures pipeline test
 npm run test-idea           # All 7 idea tests in sequence
 
+# Model Intelligence System self-tests
+npm run test-model-config   # src/model-intelligence/config-loader.js --test
+npm run test-model-db       # src/model-intelligence/database.js --test
+npm run test-model-events   # src/model-intelligence/event-types.js --test
+npm run test-model-scanner  # src/model-intelligence/scanner.js --test
+npm run test-model-writer   # src/model-intelligence/inventory-writer.js --test
+npm run test-model-router   # src/model-intelligence/model-router.js --test
+npm run test-model-intel    # src/model-intelligence/index.js --test
+npm run test-model-scanner-py # python/model_scanner.py --test
+
 # Lint
 npm run lint
 npm run lint:fix
@@ -342,6 +352,48 @@ Six modules in `src/idea/` ingest, classify, score, research, and index idea fil
 
 **Honeybadger bridge**: Decoupled HTTP bridge spec at `docs/honeybadger-bridge-spec.md` — BrightForge publishes `idea_scored`/`idea_indexed`/`research_completed` to Honeybadger Vault for storage and gets back `vault_indexed`/`vault_linked` confirmation. No shared code, localhost-only HTTP transport.
 
+### Model Intelligence System (Phase 13)
+
+Seven modules in `src/model-intelligence/` scan the local machine for AI model files, detect installed runtimes, map storage volumes, and expose smart routing based on scanned inventory. Standalone subsystem with its own SQLite database and config file — no dependency on the orchestration layer.
+
+| Module | Log Tag | Purpose |
+|---|---|---|
+| `config-loader.js` | `[CONFIG-LOADER]` | Lazy YAML loader for `config/model-intelligence.yaml`, expands `${ENV_VAR}` placeholders, exposes typed getters |
+| `database.js` | `[MODEL-DB]` | SQLite persistence (`model_files`, `runtimes`, `storage_volumes`, `scan_history`) via `better-sqlite3`, WAL mode, migration v1 |
+| `event-types.js` | — | Event type constants (`model_intel_*`) and payload factory helpers; no runtime state |
+| `scanner.js` | `[MODEL-SCAN]` | Extends `EventEmitter`. Instant scan (Ollama API + HuggingFace cache + LM Studio) and deep scan (recursive walk). Detects runtimes via shell commands, maps Windows drive volumes via PowerShell |
+| `inventory-writer.js` | `[INVENTORY]` | Writes `model_inventory.json`, `runtime_inventory.json`, `storage_topology.json` to `data/model-intelligence/` after each scan |
+| `model-router.js` | `[MODEL-ROUTER]` | Scores and ranks discovered models/runtimes by availability, locality, VRAM fit, and cost. `getBestProvider(task, constraints)` returns ranked recommendation with reasoning |
+| `index.js` | `[MODEL-INTEL]` | `ModelIntelligence` facade — lazy `init()`, wires scanner events to TelemetryBus and ErrorHandler, exposes `runScan`, `getStatus`, `getInventory`, `getScanHistory`, `getRouter` |
+
+**Scan pipeline**: `init() → detectRuntimes → scanOllama(API + blobs) → scanHuggingFaceCache → scanLMStudio → detectStorageVolumes → inventoryWriter.writeAll()`
+
+**Scan types**:
+- **Instant scan** — Checks Ollama API (`/api/tags`), blob directory, HuggingFace hub cache, LM Studio models dir. Fast; no recursive walk.
+- **Deep scan** — Full recursive directory walk on caller-supplied paths. Classifies files by extension and header magic (GGUF magic `GGUF`). Skips files below `min_model_size` (default 1 MB).
+
+**Format detection**: GGUF, SafeTensors, PyTorch (`.bin`/`.pt`/`.pth`), ONNX, TensorFlow (`.pb`/`.h5`), CoreML (`.mlmodel`), GGML. Quantization extracted from filenames (Q4_K_M, BF16, FP16, INT8, etc.).
+
+**Storage**: Dedicated SQLite at `data/model-intelligence.db`. Output JSON files at `data/model-intelligence/`.
+
+**API** (mounted at `/api/models`):
+- `GET /api/models/status` — System status (initialized, last scan, file/runtime/volume counts)
+- `POST /api/models/scan` — Start instant or deep scan (202 + async, SSE for progress)
+- `GET /api/models/scan/history` — Paginated scan history
+- `GET /api/models/scan/:id` — Single scan record
+- `GET /api/models/inventory` — Combined model/runtime/storage summary
+- `GET /api/models/inventory/files` — Model files list (filterable by source/extension/format)
+- `GET /api/models/inventory/runtimes` — Detected runtimes
+- `GET /api/models/inventory/storage` — Storage volumes with free/used stats
+- `GET /api/models/stream` — SSE stream for real-time scan events (heartbeat every 30s)
+- `POST /api/models/export` — Download full inventory as JSON attachment
+
+**Event types**: `model_intel_scan_started`, `model_intel_scan_progress`, `model_intel_file_detected`, `model_intel_file_classified`, `model_intel_runtime_detected`, `model_intel_storage_detected`, `model_intel_scan_completed`, `model_intel_scan_failed`
+
+**Config**: `config/model-intelligence.yaml` — known locations (Ollama, HuggingFace, LM Studio), runtime check commands, supported extensions, storage volumes, database path, output paths.
+
+**Python companion**: `python/model_scanner.py` — standalone Python scanner (tested via `npm run test-model-scanner-py`).
+
 ### Multi-Agent Pipeline (Phase 11)
 
 Six pipeline agents in `src/agents/` connected via WebSocket event bus:
@@ -435,7 +487,7 @@ if (process.argv.includes('--test')) {
 
 **YAML config loading** — Provider and agent configs loaded with `readFileSync` + `parse` from the `yaml` package.
 
-**Logging** — Console output with `[PREFIX]` tags: `[MASTER]`, `[PLAN]`, `[APPLY]`, `[LLM]`, `[WEB]`, `[STORE]`, `[SERVER]`, `[ROUTE]`, `[CHAT]`, `[HISTORY]`, `[MULTI-STEP]`, `[ERROR-HANDLER]`, `[TELEMETRY]`, `[IMAGE]`, `[DESIGN]`, `[FORGE3D]`, `[BRIDGE]`, `[QUEUE]`, `[PROJECT]`, `[PIPELINE]`, `[MEMORY]`, `[GIT]`, `[COST]`, `[APP]`, `[WS-BUS]`, `[PLANNER]`, `[BUILDER]`, `[TESTER]`, `[REVIEWER]`, `[SURVEY]`, `[RECORDER]`, `[STABILITY]`, `[INTEGRATION]`, `[SKILL-ORCH]`, `[IDEA-INGEST]`, `[IDEA-CLASS]`, `[IDEA-SCORE]`, `[IDEA-RESEARCH]`, `[IDEA-INDEX]`, `[IDEA-INTEL]`.
+**Logging** — Console output with `[PREFIX]` tags: `[MASTER]`, `[PLAN]`, `[APPLY]`, `[LLM]`, `[WEB]`, `[STORE]`, `[SERVER]`, `[ROUTE]`, `[CHAT]`, `[HISTORY]`, `[MULTI-STEP]`, `[ERROR-HANDLER]`, `[TELEMETRY]`, `[IMAGE]`, `[DESIGN]`, `[FORGE3D]`, `[BRIDGE]`, `[QUEUE]`, `[PROJECT]`, `[PIPELINE]`, `[MEMORY]`, `[GIT]`, `[COST]`, `[APP]`, `[WS-BUS]`, `[PLANNER]`, `[BUILDER]`, `[TESTER]`, `[REVIEWER]`, `[SURVEY]`, `[RECORDER]`, `[STABILITY]`, `[INTEGRATION]`, `[SKILL-ORCH]`, `[IDEA-INGEST]`, `[IDEA-CLASS]`, `[IDEA-SCORE]`, `[IDEA-RESEARCH]`, `[IDEA-INDEX]`, `[IDEA-INTEL]`, `[MODEL-INTEL]`, `[MODEL-SCAN]`, `[MODEL-DB]`, `[MODEL-ROUTER]`, `[INVENTORY]`, `[CONFIG-LOADER]`.
 
 **Dependencies** — `dotenv`, `yaml`, `express`, `better-sqlite3`, `ws`, `obs-websocket-js`, `helmet`, `express-rate-limit` (+ `eslint`, `electron`, `electron-builder` as dev). Uses native `fetch` (Node 18+).
 
@@ -454,6 +506,7 @@ Requires `.env.local` with API keys: `GROQ_API_KEY`, `CEREBRAS_API_KEY`, `TOGETH
 - `config/llm-providers.yaml` — All 9 LLM providers, task routing rules, budget limits ($1/day)
 - `config/agent-config.yaml` — Task classification keywords, file context limits, plan engine settings, web server config, error handling config
 - `config/image-providers.yaml` — Image providers: Pollinations, Together, Nano Banana (Gemini), Stability
+- `config/model-intelligence.yaml` — Known model locations (Ollama, HuggingFace, LM Studio), runtime check commands, supported extensions, storage volumes, database path, output paths
 - `config/styles/*.md` — Design style templates (blue-glass, dark-industrial, default)
 
 ## Skills & Knowledge Base

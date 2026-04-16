@@ -40,7 +40,7 @@ project:
 
 queue:
   process_interval_ms: 100
-  max_size: 20
+  max_size: 50
   max_retries: 2
   temp_dir: "data/temp"
   temp_max_age_ms: 3600000  # 1 hour

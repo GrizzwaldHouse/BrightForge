@@ -53,6 +53,7 @@ class ModelBridge extends EventEmitter {
     this.pythonCmd = null; // Discovered Python command (python, python3, python3.13, etc.)
     this.pythonPrefixArgs = []; // Prefix args for py launcher (e.g., ['-3.13'])
     this.stderrStream = null;
+    this.cpuMode = false; // Set to true when no CUDA GPU is detected
   }
 
   /**
@@ -118,6 +119,15 @@ class ModelBridge extends EventEmitter {
           startupTime,
           totalRestarts: this.totalRestarts
         });
+
+        // Detect GPU availability after successful startup
+        await this._detectGpu();
+
+        // Fire-and-forget model validation (never blocks startup)
+        this._validateModels().catch(err => {
+          console.warn('[BRIDGE] Model validation failed (non-fatal):', err.message);
+        });
+
         return true;
       } catch (err) {
         console.warn(`[BRIDGE] Failed on port ${port}: ${err.message}`);
@@ -191,6 +201,11 @@ class ModelBridge extends EventEmitter {
       '--port', String(this.port),
       '--host', this.host
     ];
+
+    // Append --cpu flag when running in CPU fallback mode
+    if (this.cpuMode) {
+      baseArgs.push('--cpu');
+    }
 
     // Prepend py launcher prefix args if discovered (e.g., ['-3.13'])
     const args = [...this.pythonPrefixArgs, ...baseArgs];
@@ -968,6 +983,24 @@ class ModelBridge extends EventEmitter {
     }
   }
 
+  /**
+   * Validate available models after bridge startup (fire-and-forget).
+   * Logs the adapter list and emits a telemetry event.
+   */
+  async _validateModels() {
+    const models = await this.getModels();
+    const modelList = models.models || [];
+    const names = modelList.map(m => m.name).join(', ');
+    console.log(`[BRIDGE] Models available: ${modelList.length} (${names || 'none'})`);
+    this.emit('models_validated', { models: modelList });
+    telemetryBus.emit('forge3d', {
+      type: 'models_validated',
+      count: modelList.length,
+      names: modelList.map(m => m.name)
+    });
+  }
+
+
   // --- Internal Helpers ---
 
   /**
@@ -1107,6 +1140,36 @@ class ModelBridge extends EventEmitter {
       });
       proc.on('error', reject);
     });
+  }
+
+  /**
+   * Detect GPU availability by querying /status from the running Python server.
+   * Sets this.cpuMode = true when CUDA is not available.
+   */
+  async _detectGpu() {
+    try {
+      const status = await this._fetchWithTimeout(`${this.baseUrl}/status`, forge3dConfig.healthCheck.timeout_ms);
+      const cudaAvailable = status && status.cuda_available === true;
+      if (!cudaAvailable) {
+        this.cpuMode = true;
+        console.warn('[BRIDGE] WARNING: No CUDA GPU detected — running in CPU mode (generation will be slow)');
+        telemetryBus.emit('forge3d', { type: 'cpu_mode_active', reason: 'no_cuda' });
+      } else {
+        this.cpuMode = false;
+        console.log('[BRIDGE] CUDA GPU detected — hardware acceleration active');
+        telemetryBus.emit('forge3d', { type: 'gpu_mode_active' });
+      }
+    } catch (err) {
+      console.warn(`[BRIDGE] GPU detection failed (non-fatal): ${err.message}`);
+    }
+  }
+
+  /**
+   * Returns true when the bridge is operating in CPU-only fallback mode.
+   * @returns {boolean}
+   */
+  isCpuMode() {
+    return this.cpuMode;
   }
 
   _ensureRunning() {

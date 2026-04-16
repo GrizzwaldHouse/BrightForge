@@ -20,6 +20,7 @@
   <link rel="stylesheet" href="/css/debug-panel.css">
   <link rel="stylesheet" href="/css/security-panel.css">
   <link rel="stylesheet" href="/css/agent-health-panel.css">
+  <link rel="stylesheet" href="/css/model-panel.css">
 </head>
 <body>
   <div id="app">
@@ -162,6 +163,9 @@
           </button>
           <button class="tab" data-tab="sessions">
             <i data-lucide="list"></i> All Sessions
+          </button>
+          <button class="tab" data-tab="models">
+            <i data-lucide="database"></i> Models
           </button>
         </div>
 
@@ -553,6 +557,10 @@
             <p>Session history and management coming soon...</p>
           </div>
         </div>
+
+        <div class="tab-panel" data-panel="models">
+          <div id="model-panel"></div>
+        </div>
       </main>
     </div>
 
@@ -571,6 +579,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
 
   <script src="/js/sse-client.js"></script>
+  <script src="/js/model-panel.js"></script>
   <script src="/js/memory-panel.js"></script>
   <script src="/js/forge3d-pipeline-panel.js"></script>
   <script type="module" src="/js/app.js"></script>

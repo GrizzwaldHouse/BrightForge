@@ -1,0 +1,396 @@
+/** Model Panel - Model Intelligence dashboard styles
+ * @author Marcus Daley (GrizzwaldHouse)
+ * @date March 2026
+ */
+
+.model-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-md, 16px);
+  border-bottom: 1px solid var(--border, #27272A);
+}
+
+.model-panel-header h2 {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 600;
+  font-size: 1.25rem;
+  color: var(--text-primary, #FAFAFA);
+  margin: 0;
+}
+
+.model-panel-header .model-panel-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.model-panel-header .btn-scan {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--border, #27272A);
+  background: var(--bg-card, #141820);
+  color: var(--text-primary, #FAFAFA);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.model-panel-header .btn-scan:hover {
+  background: var(--bg-card-hover, #1E232E);
+  border-color: var(--brand-primary, #3B82F6);
+}
+
+.model-panel-header .btn-scan.primary {
+  background: var(--brand-primary, #3B82F6);
+  border-color: var(--brand-primary, #3B82F6);
+  color: #fff;
+}
+
+.model-panel-header .btn-scan.primary:hover {
+  background: var(--brand-hover, #2563EB);
+}
+
+.model-panel-header .btn-scan:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Stats Row — 4 columns */
+.model-stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--spacing-md, 16px);
+  padding: var(--spacing-md, 16px);
+}
+
+.model-stat-card {
+  background: var(--bg-card, #141820);
+  border: 1px solid var(--border, #27272A);
+  border-radius: var(--radius-md, 8px);
+  padding: 12px 16px;
+  text-align: center;
+}
+
+.model-stat-card .stat-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary, #FAFAFA);
+  display: block;
+}
+
+.model-stat-card .stat-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #A1A1AA);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 4px;
+  display: block;
+}
+
+/* Model Table */
+.model-table-container {
+  padding: 0 var(--spacing-md, 16px) var(--spacing-md, 16px);
+  overflow-x: auto;
+}
+
+.model-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.model-table th {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary, #A1A1AA);
+  border-bottom: 1px solid var(--border, #27272A);
+  background: var(--bg-card, #141820);
+  position: sticky;
+  top: 0;
+}
+
+.model-table td {
+  padding: 8px 12px;
+  color: var(--text-primary, #FAFAFA);
+  border-bottom: 1px solid var(--border, #27272A);
+}
+
+.model-table tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.model-table tbody tr:hover {
+  background: var(--bg-card-hover, #1E232E);
+}
+
+.model-table .mono {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+}
+
+.model-table .empty-row td {
+  text-align: center;
+  color: var(--text-dim, #52525B);
+  padding: 24px;
+}
+
+/* Runtime Cards */
+.model-runtimes-section {
+  padding: 0 var(--spacing-md, 16px) var(--spacing-md, 16px);
+}
+
+.model-runtimes-section h3 {
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary, #A1A1AA);
+  margin-bottom: 8px;
+}
+
+.runtime-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.runtime-card {
+  background: var(--bg-card, #141820);
+  border: 1px solid var(--border, #27272A);
+  border-radius: var(--radius-md, 8px);
+  padding: 12px;
+}
+
+.runtime-card .runtime-name {
+  font-weight: 600;
+  color: var(--text-primary, #FAFAFA);
+  margin-bottom: 4px;
+}
+
+.runtime-card .runtime-version {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--text-secondary, #A1A1AA);
+}
+
+.runtime-card .runtime-status {
+  margin-top: 6px;
+  font-size: 0.75rem;
+}
+
+/* Storage Cards */
+.model-storage-section {
+  padding: 0 var(--spacing-md, 16px) var(--spacing-md, 16px);
+}
+
+.model-storage-section h3 {
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary, #A1A1AA);
+  margin-bottom: 8px;
+}
+
+.storage-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.storage-card {
+  background: var(--bg-card, #141820);
+  border: 1px solid var(--border, #27272A);
+  border-radius: var(--radius-md, 8px);
+  padding: 12px;
+}
+
+.storage-card .storage-label {
+  font-weight: 600;
+  color: var(--text-primary, #FAFAFA);
+  margin-bottom: 8px;
+}
+
+.storage-card .storage-bar-wrapper {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.storage-card .storage-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.storage-bar-fill.usage-low {
+  background: var(--success, #22C55E);
+}
+
+.storage-bar-fill.usage-medium {
+  background: var(--warning, #F59E0B);
+}
+
+.storage-bar-fill.usage-high {
+  background: var(--error, #EF4444);
+}
+
+.storage-card .storage-text {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #A1A1AA);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Scan Progress */
+.model-scan-progress {
+  padding: 0 var(--spacing-md, 16px);
+  display: none;
+}
+
+.model-scan-progress.active {
+  display: block;
+}
+
+.model-scan-progress .scan-bar-wrapper {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.model-scan-progress .scan-bar-fill {
+  height: 100%;
+  background: var(--brand-primary, #3B82F6);
+  border-radius: 2px;
+  width: 0%;
+  transition: width 0.3s ease;
+}
+
+.model-scan-progress .scan-status-text {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #A1A1AA);
+}
+
+/* Scan Log */
+.scan-log-section {
+  padding: 0 var(--spacing-md, 16px) var(--spacing-md, 16px);
+}
+
+.scan-log-section h3 {
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary, #A1A1AA);
+  margin-bottom: 8px;
+}
+
+.scan-log-entries {
+  background: var(--bg-card, #141820);
+  border: 1px solid var(--border, #27272A);
+  border-radius: var(--radius-md, 8px);
+  padding: 12px;
+  max-height: 300px;
+  overflow-y: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--text-secondary, #A1A1AA);
+  line-height: 1.6;
+}
+
+.scan-log-entries .log-entry {
+  padding: 2px 0;
+}
+
+.scan-log-entries .log-entry.log-success {
+  color: var(--success, #22C55E);
+}
+
+.scan-log-entries .log-entry.log-warning {
+  color: var(--warning, #F59E0B);
+}
+
+.scan-log-entries .log-entry.log-error {
+  color: var(--error, #EF4444);
+}
+
+.scan-log-entries .log-empty {
+  color: var(--text-dim, #52525B);
+  text-align: center;
+  padding: 16px;
+}
+
+/* Badges */
+.model-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 500;
+}
+
+.model-badge.badge-success {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--success, #22C55E);
+}
+
+.model-badge.badge-warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--warning, #F59E0B);
+}
+
+.model-badge.badge-error {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--error, #EF4444);
+}
+
+.model-badge.badge-info {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--brand-primary, #3B82F6);
+}
+
+.model-badge.badge-neutral {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary, #A1A1AA);
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .model-stats-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .runtime-cards,
+  .storage-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .model-stats-row {
+    grid-template-columns: 1fr;
+  }
+
+  .model-panel-header {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  .model-table {
+    font-size: 0.75rem;
+  }
+
+  .model-table th,
+  .model-table td {
+    padding: 6px 8px;
+  }
+}
