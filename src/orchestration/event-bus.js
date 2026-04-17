@@ -57,6 +57,8 @@ const VALID_EVENT_TYPES = [
   'test_failed',
   'review_started',
   'review_completed',
+  'survey_started',
+  'survey_completed',
   'recording_started',
   'recording_stopped',
   'recording_failed',

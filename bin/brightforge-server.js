@@ -94,6 +94,14 @@ async function main() {
     console.log('');
     console.log('  Press Ctrl+C to stop');
     console.log('');
+
+    // Attach WebSocket event bus to the HTTP server
+    try {
+      wsEventBus.attach(server);
+      console.log(`  [SERVER] WebSocket: ws://localhost:${port}/ws/events`);
+    } catch (err) {
+      console.warn(`  [SERVER] WebSocket bus attach failed: ${err.message}`);
+    }
   });
 
   // Attach WebSocket event bus to the HTTP server

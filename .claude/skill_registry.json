@@ -1,0 +1,163 @@
+{
+  "algorithmic-art": {
+    "path": "D:\\BrightForge\\.claude\\skills\\algorithmic-art.md",
+    "last_used": "2026-04-06T07:13:55.115Z",
+    "created": "2026-04-06T07:13:54.010Z",
+    "usage_count": 2,
+    "task_tags": [
+      "art"
+    ],
+    "status": "active",
+    "hash": "809c18f82ba81902",
+    "source": "local"
+  },
+  "brightforge-module": {
+    "path": "D:\\BrightForge\\.claude\\skills\\brightforge-module.md",
+    "last_used": "2026-04-06T07:13:54.241Z",
+    "created": "2026-04-06T07:13:54.241Z",
+    "usage_count": 0,
+    "task_tags": [
+      "forge3d",
+      "code"
+    ],
+    "status": "active",
+    "hash": "641d8de4c51ad4a4",
+    "source": "local"
+  },
+  "forge3d-workflow": {
+    "path": "D:\\BrightForge\\.claude\\skills\\forge3d-workflow.md",
+    "last_used": "2026-04-06T07:13:54.241Z",
+    "created": "2026-04-06T07:13:54.241Z",
+    "usage_count": 0,
+    "task_tags": [
+      "forge3d",
+      "automation"
+    ],
+    "status": "active",
+    "hash": "0643711ec89ad662",
+    "source": "local"
+  },
+  "mcp-builder": {
+    "path": "D:\\BrightForge\\.claude\\skills\\mcp-builder.md",
+    "last_used": "2026-04-06T07:13:54.241Z",
+    "created": "2026-04-06T07:13:54.241Z",
+    "usage_count": 0,
+    "task_tags": [
+      "design"
+    ],
+    "status": "active",
+    "hash": "66411b3c844026b9",
+    "source": "local"
+  },
+  "nano-banana-integration": {
+    "path": "D:\\BrightForge\\.claude\\skills\\nano-banana-integration.md",
+    "last_used": "2026-04-06T07:13:54.248Z",
+    "created": "2026-04-06T07:13:54.248Z",
+    "usage_count": 0,
+    "task_tags": [
+      "general"
+    ],
+    "status": "active",
+    "hash": "7b8840c2720b4f92",
+    "source": "local"
+  },
+  "provider-chain": {
+    "path": "D:\\BrightForge\\.claude\\skills\\provider-chain.md",
+    "last_used": "2026-04-06T07:13:54.263Z",
+    "created": "2026-04-06T07:13:54.263Z",
+    "usage_count": 0,
+    "task_tags": [
+      "code"
+    ],
+    "status": "active",
+    "hash": "63db69cbd482cb00",
+    "source": "local"
+  },
+  "testing-guide": {
+    "path": "D:\\BrightForge\\.claude\\skills\\testing-guide.md",
+    "last_used": "2026-04-06T07:13:54.278Z",
+    "created": "2026-04-06T07:13:54.278Z",
+    "usage_count": 0,
+    "task_tags": [
+      "design",
+      "code"
+    ],
+    "status": "active",
+    "hash": "88cad66832fbfd9c",
+    "source": "local"
+  },
+  "ui-design-system": {
+    "path": "D:\\BrightForge\\.claude\\skills\\ui-design-system.md",
+    "last_used": "2026-04-06T07:13:54.278Z",
+    "created": "2026-04-06T07:13:54.278Z",
+    "usage_count": 0,
+    "task_tags": [
+      "design"
+    ],
+    "status": "active",
+    "hash": "5b5256538b4b3d82",
+    "source": "local"
+  },
+  "web-artifacts-builder": {
+    "path": "D:\\BrightForge\\.claude\\skills\\web-artifacts-builder.md",
+    "last_used": "2026-04-06T07:13:54.291Z",
+    "created": "2026-04-06T07:13:54.291Z",
+    "usage_count": 0,
+    "task_tags": [
+      "design",
+      "code",
+      "art"
+    ],
+    "status": "active",
+    "hash": "6e248fc7579531fc",
+    "source": "local"
+  },
+  "web-dashboard": {
+    "path": "D:\\BrightForge\\.claude\\skills\\web-dashboard.md",
+    "last_used": "2026-04-06T07:13:54.305Z",
+    "created": "2026-04-06T07:13:54.305Z",
+    "usage_count": 0,
+    "task_tags": [
+      "code"
+    ],
+    "status": "active",
+    "hash": "0e144c4b233bc363",
+    "source": "local"
+  },
+  "cowork:canva-designer": {
+    "path": "D:\\BrightForge\\.claude\\cowork-skills\\skills\\canva-designer\\SKILL.md",
+    "last_used": "2026-04-06T07:13:54.314Z",
+    "created": "2026-04-06T07:13:54.314Z",
+    "usage_count": 0,
+    "task_tags": [
+      "design"
+    ],
+    "status": "active",
+    "hash": "03f620da05902588",
+    "source": "cowork-skills"
+  },
+  "cowork:design-system": {
+    "path": "D:\\BrightForge\\.claude\\cowork-skills\\skills\\design-system\\SKILL.md",
+    "last_used": "2026-04-06T07:13:54.348Z",
+    "created": "2026-04-06T07:13:54.348Z",
+    "usage_count": 0,
+    "task_tags": [
+      "design"
+    ],
+    "status": "active",
+    "hash": "2f737a84d8778135",
+    "source": "cowork-skills"
+  },
+  "cowork:document-designer": {
+    "path": "D:\\BrightForge\\.claude\\cowork-skills\\skills\\document-designer\\SKILL.md",
+    "last_used": "2026-04-06T07:13:54.349Z",
+    "created": "2026-04-06T07:13:54.349Z",
+    "usage_count": 0,
+    "task_tags": [
+      "design"
+    ],
+    "status": "active",
+    "hash": "0bb28219f1e336b8",
+    "source": "cowork-skills"
+  }
+}

@@ -43,3 +43,45 @@ jobs:
           npm run test-forge-db
           npm run test-project-manager
           npm run test-queue
+
+      - name: Run orchestration self-tests
+        run: |
+          npm run test-orch-db
+          npm run test-event-bus
+          npm run test-task-state
+          npm run test-supervisor
+          npm run test-handoff
+          npm run test-orchestrator
+
+      - name: Run skills orchestrator self-test
+        run: npm run test-skills
+
+      - name: Run pipeline agent self-tests
+        run: npm run test-agents
+
+      - name: Run WebSocket event bus self-test
+        run: npm run test-ws-bus
+
+      - name: Run integration test suite
+        run: npm run test-integration
+
+  stability-test:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Run quick stability test (60s CI mode)
+        run: npm run test-stability-quick
+        timeout-minutes: 3
