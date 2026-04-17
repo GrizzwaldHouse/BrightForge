@@ -1,6 +1,6 @@
 ---
 name: BrightForge Testing Guide
-description: How to run and write self-tests for BrightForge modules. Every module uses --test blocks, not a test framework.
+description: Complete test, lint, and quality-gate procedures for BrightForge. Covers self-tests, integration, load test, stability run, and the TASK.md post-feature gate.
 ---
 
 # BrightForge Testing Guide
@@ -9,10 +9,14 @@ description: How to run and write self-tests for BrightForge modules. Every modu
 
 BrightForge uses self-contained `--test` blocks at the bottom of each module instead of a test framework. Each test runs independently via `node <file> --test`.
 
-## Running Tests
+After every feature, run the full quality gate defined in `TASK.md` (project root). All steps must pass with zero errors and zero warnings before committing.
 
+---
+
+## Quick Reference — npm test scripts
+
+### Core Modules
 ```bash
-# Individual core modules
 npm run test-llm           # LLM client provider chain
 npm run test-plan          # Plan engine parsing
 npm run test-context       # File context scanning
@@ -22,30 +26,82 @@ npm run test-terminal      # Terminal UI
 npm run test-history       # Message history
 npm run test-conversation  # Conversation session
 npm run test-multi-step    # Multi-step planner
-npm run test-api           # Web session API (also runs all dependency tests)
+npm run test-api           # Web session API
 npm run test-image         # Image client provider chain
 npm run test-design        # Design engine
-
-# Forge3D modules
-npm run test-bridge          # Python bridge (mock server)
-npm run test-forge-session   # Generation lifecycle
-npm run test-forge-db        # SQLite database CRUD
-npm run test-project-manager # Project + asset management
-npm run test-queue           # Generation queue
-
-# Phase 10 modules (standalone --test)
-node src/core/pipeline-detector.js --test   # Multi-domain prompt detection (6 tests)
-node src/core/creative-pipeline.js --test   # Cross-domain orchestration (4 tests)
-node src/core/project-memory.js --test      # Per-project memory persistence (9 tests)
-node src/core/git-checkpointer.js --test    # Git checkpoint/revert (8 tests)
-
-# Run all core tests
-npm run test-all-core
-
-# Lint check
-npm run lint
-npm run lint:fix
+npm run test-skills        # Skill orchestrator
 ```
+
+### Forge3D Modules
+```bash
+npm run test-bridge           # Python bridge (mock server)
+npm run test-forge-session    # Generation lifecycle
+npm run test-forge-db         # SQLite database CRUD
+npm run test-project-manager  # Project + asset management
+npm run test-queue            # Generation queue
+```
+
+### Multi-Agent Pipeline (Phase 11)
+```bash
+npm run test-planner    # Planner agent
+npm run test-builder    # Builder agent
+npm run test-tester     # Tester agent
+npm run test-reviewer   # Reviewer agent
+npm run test-survey     # Survey agent
+npm run test-recorder   # Recorder agent (OBS)
+npm run test-agents     # All 6 pipeline agents
+npm run test-ws-bus     # WebSocket event bus
+```
+
+### Idea Intelligence System (Phase 12)
+```bash
+npm run test-idea-ingestion   # File scanner + dedup
+npm run test-idea-classifier  # LLM categorization
+npm run test-idea-scoring     # 5-dimension scoring
+npm run test-idea-research    # Competitive analysis agent
+npm run test-idea-indexer     # Embeddings + semantic search
+npm run test-idea-facade      # IdeaIntelligence facade
+npm run test-idea-pipeline    # End-to-end SQLite + fixtures
+npm run test-idea             # All 7 idea tests in sequence
+```
+
+### Model Intelligence System (Phase 13)
+```bash
+npm run test-model-config     # Config loader
+npm run test-model-db         # Database
+npm run test-model-events     # Event type constants
+npm run test-model-scanner    # Scanner (Ollama, HuggingFace, LM Studio)
+npm run test-model-writer     # Inventory writer
+npm run test-model-router     # Model router + scoring
+npm run test-model-intel      # ModelIntelligence facade
+npm run test-model-scanner-py # Python companion scanner
+```
+
+### Integration & Stability
+```bash
+npm run test-integration       # Full integration suite
+npm run test-stability         # 13-minute full-stack stability run
+npm run test-stability-quick   # 60-second CI stability run
+```
+
+### Load Test
+```bash
+node src/tests/user-load-test.js --scenario smoke    # 3 users / 30s (required after every feature)
+node src/tests/user-load-test.js --scenario load     # 20 users / 2min
+node src/tests/user-load-test.js --scenario stress   # 50 users / 2min
+node src/tests/user-load-test.js --scenario soak     # 10 users / 5min
+node src/tests/user-load-test.js --scenario massive  # 1000 users / 5min (concurrency=50)
+```
+
+Load test flags: `--verbose`, `--users N`, `--concurrency N`, `--wave-size N`, `--url URL`
+
+### Lint
+```bash
+npm run lint        # Check — must exit 0 with 0 warnings
+npm run lint:fix    # Auto-fix formatting issues
+```
+
+---
 
 ## Writing a Self-Test Block
 
@@ -73,29 +129,35 @@ if (process.argv.includes('--test')) {
 
 ## Conventions
 
-- Tests print `[PASS]` or `[FAIL]` for each assertion
-- Exit with code 1 on failure (`process.exit(1)`)
-- Tests should be self-contained — no external fixtures or setup required
+- Print `[PASS]` or `[FAIL]` for each assertion
+- Exit code 1 on failure (`process.exit(1)`)
+- Tests must be self-contained — no external fixtures unless in `src/*/fixtures/`
 - Mock external services (LLM APIs, Python server) rather than calling them
 - Prefix unused mock parameters with underscore: `function mockFetch(_url, _opts) {}`
+
+---
 
 ## Frontend Testing Notes
 
 - Frontend JS files use `<script>` tags, NOT ES modules
 - Classes must be exposed via `window.ClassName = ClassName;` (LS-017)
 - Add `/* global ClassName */` declarations for ESLint
-- Test in browser via dashboard (no automated frontend tests yet)
+- Test in browser via dashboard — no automated frontend tests yet
 - Check `sessions/bridge-errors.log` for Python subprocess issues
 
-## Before Committing
+---
 
-```bash
-npm run lint:fix    # Auto-fix formatting (single quotes, semicolons, etc.)
-npm run lint        # Check for remaining issues (especially no-undef for globals)
-npm run test-all-core  # Run core test suite
-```
+## Post-Feature Quality Gate (TASK.md)
 
-Common ESLint issues to check:
-- `no-undef` on global classes: add `/* global ClassName */` at file top
-- Double quotes: ESLint enforces single quotes
-- `no-unused-vars`: prefix unused params with underscore (`_param`)
+See `TASK.md` in the project root for the full 6-step gate:
+
+| Step | Command | Required |
+|------|---------|----------|
+| Lint | `npm run lint` | 0 errors, 0 warnings |
+| Module self-tests | `npm run test-<module>` | All exit 0 |
+| Integration suite | `npm run test-integration` | All pass |
+| Load test smoke | `node src/tests/user-load-test.js --scenario smoke` | VERDICT: PASS |
+| Stability quick | `npm run test-stability-quick` | ≥90% checkpoints |
+| Git push | `git pull && git push` | Clean, pushed |
+
+Do not commit until all 6 pass.

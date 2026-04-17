@@ -87,10 +87,22 @@ npm run test-model-router   # src/model-intelligence/model-router.js --test
 npm run test-model-intel    # src/model-intelligence/index.js --test
 npm run test-model-scanner-py # python/model_scanner.py --test
 
+# Load Test (run smoke after every feature — see TASK.md)
+node src/tests/user-load-test.js --scenario smoke    # 3 users / 30s — required
+node src/tests/user-load-test.js --scenario load     # 20 users / 2min
+node src/tests/user-load-test.js --scenario stress   # 50 users / 2min
+node src/tests/user-load-test.js --scenario soak     # 10 users / 5min
+node src/tests/user-load-test.js --scenario massive  # 1000 users / concurrency=50
+
 # Lint
 npm run lint
 npm run lint:fix
 ```
+
+## Post-Feature Quality Gate
+
+After every feature: lint → self-tests → integration → load test smoke → stability quick → push.
+See **`TASK.md`** (project root) for the full 6-step checklist with pass criteria.
 
 ## Architecture
 
@@ -522,7 +534,7 @@ Skills are stored in two locations:
 | `brightforge-module.md` | Module creation patterns and conventions |
 | `forge3d-workflow.md` | Forge3D 3D generation pipeline workflow |
 | `provider-chain.md` | LLM provider chain configuration guide |
-| `testing-guide.md` | Self-test patterns and verification procedures |
+| `testing-guide.md` | All test scripts (Phases 1-13), load test scenarios, self-test patterns, and post-feature quality gate (links to TASK.md) |
 | `web-dashboard.md` | Web dashboard development patterns |
 | `mcp-builder.md` | MCP server development guide — wrapping BrightForge services as MCP tools |
 | `algorithmic-art.md` | p5.js generative art with seeded randomness, interactive parameter controls |
