@@ -21,6 +21,7 @@
   <link rel="stylesheet" href="/css/security-panel.css">
   <link rel="stylesheet" href="/css/agent-health-panel.css">
   <link rel="stylesheet" href="/css/model-panel.css">
+  <link rel="stylesheet" href="/css/orchestration-panel.css">
 </head>
 <body>
   <div id="app">
@@ -163,6 +164,9 @@
           </button>
           <button class="tab" data-tab="sessions">
             <i data-lucide="list"></i> All Sessions
+          </button>
+          <button class="tab" data-tab="orchestration">
+            <i data-lucide="cpu"></i> Orchestration
           </button>
           <button class="tab" data-tab="models">
             <i data-lucide="database"></i> Models
@@ -558,6 +562,10 @@
           </div>
         </div>
 
+        <div class="tab-panel" data-panel="orchestration">
+          <div id="orchestration-panel"></div>
+        </div>
+
         <div class="tab-panel" data-panel="models">
           <div id="model-panel"></div>
         </div>
@@ -594,6 +602,7 @@
   <script type="module" src="/js/agent-pipeline-panel.js"></script>
   <script type="module" src="/js/recorder-panel.js"></script>
   <script type="module" src="/js/stability-panel.js"></script>
+  <script src="/js/orchestration-panel.js"></script>
   <script type="module" src="/js/system-health.js"></script>
   
   <!-- Init Icons -->
