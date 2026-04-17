@@ -1,0 +1,312 @@
+/**
+ * Agent Health Panel Styles
+ * Scoped with agent- prefix to avoid conflicts.
+ * Uses dashboard CSS variables for theming.
+ */
+
+/* === Layout === */
+.agent-health-layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding: var(--spacing-xl);
+  overflow-y: auto;
+  height: calc(100vh - var(--topbar-height) - 80px);
+}
+
+/* === Header === */
+.agent-health-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--border);
+}
+
+.agent-health-header .header-content h2 {
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 4px 0;
+}
+
+.agent-health-header .header-content p {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* === Section Headers === */
+.agent-health-layout h3 {
+  font-family: var(--font-heading);
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  margin-top: var(--spacing-md);
+  margin-bottom: var(--spacing-sm);
+}
+
+/* === States Grid === */
+.agent-states-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--spacing-md);
+}
+
+/* === Provider Card === */
+.agent-provider-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+  transition: border-color 0.2s;
+}
+
+.agent-provider-card:hover {
+  border-color: var(--border-light);
+}
+
+.agent-card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.agent-provider-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.agent-state-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.agent-state-label.state-active {
+  color: var(--success);
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.agent-state-label.state-loaded {
+  color: var(--accent-amber);
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.agent-state-label.state-sleeping {
+  color: var(--text-dim);
+  background: rgba(82, 82, 91, 0.2);
+}
+
+/* === State Dot === */
+.agent-state-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.agent-state-dot.active {
+  background: var(--success);
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.5);
+  animation: agent-pulse 2s ease-in-out infinite;
+}
+
+.agent-state-dot.loaded {
+  background: var(--accent-amber);
+}
+
+.agent-state-dot.sleeping {
+  background: var(--text-dim);
+}
+
+@keyframes agent-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 6px rgba(34, 197, 94, 0.5); }
+  50% { opacity: 0.7; box-shadow: 0 0 12px rgba(34, 197, 94, 0.8); }
+}
+
+/* === Stats Grid (per-provider) === */
+.agent-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-sm);
+}
+
+.agent-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--spacing-sm);
+  background: var(--bg-app);
+  border-radius: var(--radius-md);
+}
+
+.agent-stat-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: var(--font-heading);
+}
+
+.agent-stat-label {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-top: 2px;
+}
+
+/* === Queue Depth === */
+.agent-queue-depth {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+}
+
+.agent-queue-bar-container {
+  margin-bottom: var(--spacing-sm);
+}
+
+.agent-queue-bar {
+  display: flex;
+  height: 28px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--bg-app);
+}
+
+.agent-queue-segment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #fff;
+  min-width: 24px;
+  transition: width 0.3s ease;
+}
+
+.agent-queue-segment.urgent {
+  background: var(--error);
+}
+
+.agent-queue-segment.normal {
+  background: var(--brand-primary);
+}
+
+.agent-queue-segment.background {
+  background: var(--text-dim);
+}
+
+.agent-queue-empty {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.8125rem;
+  font-style: italic;
+  padding: var(--spacing-sm);
+}
+
+/* === Queue Legend === */
+.agent-queue-legend {
+  display: flex;
+  gap: var(--spacing-md);
+  justify-content: center;
+  margin-top: var(--spacing-sm);
+}
+
+.agent-queue-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.agent-queue-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.agent-queue-swatch.urgent {
+  background: var(--error);
+}
+
+.agent-queue-swatch.normal {
+  background: var(--brand-primary);
+}
+
+.agent-queue-swatch.background {
+  background: var(--text-dim);
+}
+
+/* === Sparkline Container === */
+.agent-sparkline {
+  height: 24px;
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+/* === Diagnostics === */
+.agent-diagnostics {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+}
+
+.agent-diag-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-md);
+}
+
+.agent-diag-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.agent-diag-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: var(--font-heading);
+}
+
+.agent-diag-label {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-top: 2px;
+}
+
+/* === Responsive === */
+@media (max-width: 768px) {
+  .agent-health-layout {
+    padding: var(--spacing-md);
+  }
+
+  .agent-states-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .agent-diag-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

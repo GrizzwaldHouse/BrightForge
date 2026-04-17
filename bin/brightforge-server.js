@@ -30,6 +30,7 @@ config({ path: join(__dirname, '../.env.local') });
 import { createServer } from '../src/api/server.js';
 import { UniversalLLMClient } from '../src/core/llm-client.js';
 import errorHandler from '../src/core/error-handler.js';
+import wsEventBus from '../src/api/ws-event-bus.js';
 
 /**
  * Start the HTTP server.
@@ -46,8 +47,8 @@ async function main() {
   // Initialize error handler (observer-pattern error broadcasting)
   errorHandler.initialize(sessionsDir);
 
-  // Create Express app with HTTP server and WebSocket
-  const { server, store, wsEventBus } = createServer({
+  // Create Express app
+  const { app, store } = createServer({
     sessionsDir,
     sessionTimeout: 30 * 60 * 1000  // 30 minutes
   });
@@ -66,7 +67,7 @@ async function main() {
   }
 
   // Start server
-  server.listen(port, () => {
+  const server = app.listen(port, () => {
     console.log('');
     console.log('  ╔══════════════════════════════════════╗');
     console.log('  ║    BrightForge Server v4.2.0          ║');
@@ -95,6 +96,14 @@ async function main() {
     console.log('');
   });
 
+  // Attach WebSocket event bus to the HTTP server
+  try {
+    wsEventBus.attach(server);
+    console.log(`  [SERVER] WebSocket: ws://localhost:${port}/ws/events`);
+  } catch (err) {
+    console.warn(`  [SERVER] WebSocket bus attach failed: ${err.message}`);
+  }
+
   server.on('error', (error) => {
     if (error.code === 'EADDRINUSE') {
       console.error('');
@@ -112,7 +121,7 @@ async function main() {
   // Graceful shutdown
   const shutdown = () => {
     console.log('\n  [SERVER] Shutting down...');
-    wsEventBus.close();
+    wsEventBus.detach();
     server.close(() => {
       store.destroy();
       process.exit(0);

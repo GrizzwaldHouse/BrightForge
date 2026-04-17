@@ -30,6 +30,13 @@ import * as generateQuests from './generate-quests.js';
 import * as buildGameLogic from './build-game-logic.js';
 import * as validateGameplay from './validate-gameplay.js';
 import * as exportPrototype from './export-prototype.js';
+import * as loadPrototype from './load-prototype.js';
+import * as spawnPlaytestAgents from './spawn-playtest-agents.js';
+import * as simulateQuestCompletion from './simulate-quest-completion.js';
+import * as analyzePathing from './analyze-pathing.js';
+import * as detectDeadlocks from './detect-deadlocks.js';
+import * as generateBalanceReport from './generate-balance-report.js';
+import * as suggestBalanceAdjustments from './suggest-balance-adjustments.js';
 
 // Registry maps handler name (from YAML) to module with execute()
 const stageRegistry = new Map([
@@ -59,7 +66,14 @@ const stageRegistry = new Map([
   ['generate-quests', generateQuests],
   ['build-game-logic', buildGameLogic],
   ['validate-gameplay', validateGameplay],
-  ['export-prototype', exportPrototype]
+  ['export-prototype', exportPrototype],
+  ['load-prototype', loadPrototype],
+  ['spawn-playtest-agents', spawnPlaytestAgents],
+  ['simulate-quest-completion', simulateQuestCompletion],
+  ['analyze-pathing', analyzePathing],
+  ['detect-deadlocks', detectDeadlocks],
+  ['generate-balance-report', generateBalanceReport],
+  ['suggest-balance-adjustments', suggestBalanceAdjustments]
 ]);
 
 /**

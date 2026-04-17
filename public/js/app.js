@@ -122,10 +122,6 @@ class App {
       this.stabilityPanel = new StabilityPanel(this);
       console.log('[APP] StabilityPanel initialized');
 
-      console.log('[APP] Initializing OrchestrationPanel...');
-      this.orchestrationPanel = new OrchestrationPanel();
-      console.log('[APP] OrchestrationPanel initialized');
-
       this.fileBrowser = null; // Initialized after DOM ready
       this.memoryPanel = null; // Initialized after DOM ready
       this.modelPanel = null; // Initialized on first tab view
@@ -195,6 +191,11 @@ class App {
       console.log('[APP] Step 6c: Creating model panel...');
       this.modelPanel = new ModelPanel();
       console.log('[APP] ✓ Model panel created');
+
+      // Create orchestration panel (lazy init on first tab view)
+      console.log('[APP] Step 6d: Creating orchestration panel...');
+      this.orchestrationPanel = new OrchestrationPanel();
+      console.log('[APP] ✓ Orchestration panel created');
 
       // Start provider status polling (every 30 seconds)
       console.log('[APP] Step 7: Starting provider status polling...');
@@ -393,7 +394,7 @@ class App {
         if (targetTab === 'models' && this.modelPanel && !this.modelPanel.initialized) {
           this.modelPanel.init();
         }
-        if (targetTab === 'orchestration' && !this.orchestrationPanel.initialized) {
+        if (targetTab === 'orchestration' && this.orchestrationPanel && !this.orchestrationPanel.initialized) {
           const container = document.getElementById('orchestration-panel');
           this.orchestrationPanel.render(container);
           this.orchestrationPanel.initialized = true;

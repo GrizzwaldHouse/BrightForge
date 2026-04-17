@@ -1,0 +1,183 @@
+/**
+ * Debug Panel Styles
+ * Scoped with `debug-` prefix to avoid conflicts.
+ * Uses dashboard CSS variables for theming.
+ */
+
+/* === Layout === */
+.debug-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  height: 100%;
+}
+
+.debug-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-xl);
+}
+
+/* === Section === */
+.debug-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+}
+
+.debug-section-title {
+  font-family: var(--font-heading);
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-md);
+}
+
+/* === Stats Grid === */
+.debug-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--spacing-md);
+}
+
+.debug-stat-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--spacing-md);
+  text-align: center;
+}
+
+.debug-stat-value {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: var(--font-heading);
+}
+
+.debug-stat-label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-top: var(--spacing-sm);
+}
+
+/* === Table === */
+.debug-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.debug-table th,
+.debug-table td {
+  padding: var(--spacing-sm) var(--spacing-md);
+  text-align: left;
+  font-size: 0.8125rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.debug-table th {
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 0.7rem;
+}
+
+.debug-table td {
+  color: var(--text-primary);
+}
+
+.debug-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.debug-table-empty {
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  font-style: italic;
+  padding: var(--spacing-md) 0;
+}
+
+/* === Status Badge === */
+.debug-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #fff;
+}
+
+.debug-status-badge.running {
+  background: var(--brand-primary);
+}
+
+.debug-status-badge.completed {
+  background: var(--success);
+}
+
+.debug-status-badge.failed {
+  background: var(--error);
+}
+
+.debug-status-badge.cancelled {
+  background: var(--warning);
+}
+
+/* === Memory Bar === */
+.debug-memory-bar {
+  height: 8px;
+  background: var(--bg-surface);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: var(--spacing-sm);
+}
+
+.debug-memory-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--brand-primary);
+  transition: width 0.4s ease;
+}
+
+.debug-memory-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+/* === Trend Indicators === */
+.debug-trend-up {
+  color: var(--error);
+  font-size: 0.75rem;
+  margin-left: var(--spacing-sm);
+}
+
+.debug-trend-down {
+  color: var(--success);
+  font-size: 0.75rem;
+  margin-left: var(--spacing-sm);
+}
+
+/* === Responsive === */
+@media (max-width: 768px) {
+  .debug-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .debug-content {
+    padding: var(--spacing-md);
+  }
+}

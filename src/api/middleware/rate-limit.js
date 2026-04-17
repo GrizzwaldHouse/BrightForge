@@ -41,6 +41,12 @@ function createLimiter(maxRequests, label) {
     max: maxRequests,
     standardHeaders: true,
     legacyHeaders: false,
+    // Skip rate limiting for test suite requests (local-only, non-production)
+    skip: (req) => {
+      const hasTestHeader = req.headers['x-brightforge-test'] === 'true';
+      const isLocalhost = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.ip);
+      return hasTestHeader && isLocalhost;
+    },
     message: { error: 'Too many requests', retryAfter: 60 },
     handler: (_req, res) => {
       console.warn(`[RATE-LIMIT] ${label} limit exceeded (${maxRequests}/min)`);

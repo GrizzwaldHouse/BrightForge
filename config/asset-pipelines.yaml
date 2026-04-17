@@ -359,3 +359,58 @@ pipelines:
           formats:
             - gltf
         gate: null
+
+  run_playtest:
+    description: "AI Playtest: load prototype, spawn agents, simulate, analyze, report"
+    stages:
+      - name: load_prototype
+        handler: load-prototype
+        config:
+          load_from_db: true
+        gate: null
+
+      - name: spawn_playtest_agents
+        handler: spawn-playtest-agents
+        config:
+          agent_types:
+            - explorer
+            - quest_focused
+            - speedrunner
+          agents_per_type: 1
+        gate: null
+
+      - name: simulate_quest_completion
+        handler: simulate-quest-completion
+        config:
+          max_ticks: 1000
+          record_events: true
+        gate: null
+
+      - name: analyze_pathing
+        handler: analyze-pathing
+        config:
+          detect_bottlenecks: true
+          build_heatmap: true
+        gate: null
+
+      - name: detect_deadlocks
+        handler: detect-deadlocks
+        config:
+          check_cycles: true
+          check_unreachable: true
+          check_impossible: true
+        gate: null
+
+      - name: generate_balance_report
+        handler: generate-balance-report
+        config:
+          save_to_project: true
+          save_to_db: true
+        gate: null
+
+      - name: suggest_balance_adjustments
+        handler: suggest-balance-adjustments
+        config:
+          save_to_project: true
+          severity_threshold: minor
+        gate: null

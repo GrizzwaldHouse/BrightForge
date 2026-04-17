@@ -153,7 +153,7 @@ export function createOrchestrationRoutes() {
 // Self-test
 if (process.argv.includes('--test')) {
   console.log('[ORCH-ROUTES] Self-test: creating routes');
-  const router = createOrchestrationRoutes();
+  const _router = createOrchestrationRoutes();
   console.log('[ORCH-ROUTES] ✓ Routes created successfully');
   console.log('[ORCH-ROUTES] Available routes:');
   console.log('  GET  /api/orchestration/status');

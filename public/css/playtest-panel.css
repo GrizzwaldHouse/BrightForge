@@ -1,0 +1,552 @@
+/**
+ * Playtest Panel Styles
+ *
+ * Scoped with playtest- prefix. Uses dashboard CSS variables.
+ */
+
+/* === Layout === */
+.playtest-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  padding: var(--spacing-lg);
+  gap: var(--spacing-lg);
+}
+
+/* === Section Titles === */
+.playtest-section-title {
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-md);
+  letter-spacing: -0.01em;
+}
+
+.playtest-subsection-title {
+  font-family: var(--font-heading);
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+
+/* === Run Form === */
+.playtest-run-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  flex-shrink: 0;
+}
+
+.playtest-run-form {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--spacing-md);
+}
+
+.playtest-select-wrapper {
+  flex: 1;
+}
+
+.playtest-label {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  margin-bottom: var(--spacing-xs);
+}
+
+.playtest-select {
+  width: 100%;
+  background: var(--bg-app);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  appearance: none;
+  cursor: pointer;
+}
+
+.playtest-select:focus {
+  outline: none;
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+/* === Buttons === */
+.playtest-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  font-size: 0.875rem;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.playtest-btn-primary {
+  background: var(--brand-primary);
+  color: #fff;
+}
+
+.playtest-btn-primary:hover {
+  background: var(--brand-hover);
+}
+
+.playtest-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* === Progress Section === */
+.playtest-progress-section {
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--border);
+}
+
+.playtest-progress-title {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-sm);
+  font-weight: 600;
+}
+
+.playtest-progress-stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+}
+
+.playtest-stage {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  background: var(--bg-app);
+  border: 1px solid var(--border);
+  transition: all 0.3s;
+}
+
+.playtest-stage-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.playtest-stage-active .playtest-stage-dot {
+  background: var(--brand-primary);
+  animation: playtest-pulse 1.5s ease-in-out infinite;
+}
+
+.playtest-stage-active {
+  border-color: rgba(59, 130, 246, 0.3);
+  color: var(--brand-primary);
+}
+
+.playtest-stage-complete .playtest-stage-dot {
+  background: var(--success);
+}
+
+.playtest-stage-complete {
+  border-color: rgba(34, 197, 94, 0.3);
+  color: var(--success);
+}
+
+.playtest-stage-failed .playtest-stage-dot {
+  background: var(--error);
+}
+
+.playtest-stage-failed {
+  border-color: rgba(239, 68, 68, 0.3);
+  color: var(--error);
+}
+
+.playtest-stage-label {
+  color: inherit;
+}
+
+@keyframes playtest-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.3); }
+}
+
+.playtest-progress-status {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+/* === Main Content Layout === */
+.playtest-main {
+  display: flex;
+  gap: var(--spacing-lg);
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.playtest-list-column {
+  width: 320px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.playtest-report-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* === Playtest List === */
+.playtest-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  overflow-y: auto;
+  flex: 1;
+}
+
+.playtest-empty {
+  color: var(--text-dim);
+  font-style: italic;
+  font-size: 0.85rem;
+  text-align: center;
+  padding: var(--spacing-xl) var(--spacing-md);
+}
+
+/* === Run Card === */
+.playtest-run-card {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.playtest-run-card:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-light);
+}
+
+.playtest-run-card.active {
+  border-color: var(--brand-primary);
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.playtest-run-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.playtest-run-id {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.playtest-run-proto {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playtest-run-time {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+/* === Status Badges === */
+.playtest-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+
+.playtest-badge-running {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--brand-primary);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+.playtest-badge-complete {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--success);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+.playtest-badge-failed {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--error);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.playtest-badge-pending {
+  background: rgba(161, 161, 170, 0.1);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+/* === Grade Preview (in list card) === */
+.playtest-grade-preview {
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+}
+
+/* === Report === */
+.playtest-report {
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+/* === Grade Display === */
+.playtest-grade-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--spacing-xl);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.playtest-grade-circle {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--spacing-md);
+  border: 3px solid;
+}
+
+.playtest-grade-text {
+  font-family: var(--font-heading);
+  font-size: 2.5rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.playtest-grade-summary {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  text-align: center;
+  max-width: 400px;
+}
+
+/* Grade color variants */
+.playtest-grade-green {
+  color: var(--success);
+  border-color: var(--success);
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.playtest-grade-blue {
+  color: var(--brand-primary);
+  border-color: var(--brand-primary);
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.playtest-grade-amber {
+  color: var(--accent-amber);
+  border-color: var(--accent-amber);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.playtest-grade-warning {
+  color: var(--warning);
+  border-color: var(--warning);
+  background: rgba(245, 158, 11, 0.15);
+}
+
+.playtest-grade-red {
+  color: var(--error);
+  border-color: var(--error);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* === Metrics Grid === */
+.playtest-metrics-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+}
+
+.playtest-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--spacing-sm);
+}
+
+.playtest-metric-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--spacing-md);
+  background: var(--bg-app);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.playtest-metric-value {
+  font-family: var(--font-mono);
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.playtest-metric-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* === Suggestions === */
+.playtest-suggestions-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+}
+
+.playtest-suggestions-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.playtest-suggestion-card {
+  background: var(--bg-app);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  transition: border-color 0.2s;
+}
+
+.playtest-suggestion-card:hover {
+  border-color: var(--border-light);
+}
+
+.playtest-suggestion-title {
+  font-family: var(--font-heading);
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  font-weight: 600;
+  margin-bottom: var(--spacing-xs);
+}
+
+.playtest-suggestion-text {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.playtest-suggestion-priority {
+  display: inline-block;
+  margin-top: var(--spacing-sm);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.playtest-priority-high {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--error);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.playtest-priority-medium {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--warning);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.playtest-priority-low {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--success);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+/* === Responsive === */
+@media (max-width: 768px) {
+  .playtest-main {
+    flex-direction: column;
+  }
+
+  .playtest-list-column {
+    width: 100%;
+    max-height: 200px;
+  }
+
+  .playtest-run-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .playtest-grade-circle {
+    width: 72px;
+    height: 72px;
+  }
+
+  .playtest-grade-text {
+    font-size: 2rem;
+  }
+
+  .playtest-metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

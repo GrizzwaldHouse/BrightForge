@@ -28,7 +28,7 @@ export class AgentSimulator {
     };
   }
 
-  async runSinglePlaythrough(prototypeId, quests, _npcs, _interactions) {
+  async runSinglePlaythrough(prototypeId, _quests, _npcs, _interactions) {
     // Simplified simulation
     const questsCompleted = [];
     let steps = 0;

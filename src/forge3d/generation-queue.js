@@ -114,8 +114,12 @@ class GenerationQueue extends EventEmitter {
     // Rate limiting: reject if queue is full
     const currentSize = this._getQueuePosition() + (this.processing ? 1 : 0);
     if (currentSize >= forge3dConfig.queue.max_size) {
-      throw new Error(`Queue full (${currentSize}/${forge3dConfig.queue.max_size}). Try again later.`);
+      console.warn(`[QUEUE] Rejected job — queue at capacity (${currentSize}/${forge3dConfig.queue.max_size})`);
+      throw new Error(`Queue is full (max ${forge3dConfig.queue.max_size} jobs). Try again when current jobs complete.`);
     }
+
+    const priorityMap = { urgent: 0, normal: 1, background: 2 };
+    const priorityValue = priorityMap[params.priority] ?? 1;
 
     const histId = forge3dDb.createHistoryEntry({
       projectId: params.projectId || null,
@@ -129,6 +133,9 @@ class GenerationQueue extends EventEmitter {
       }
     });
 
+    // Set priority in the DB
+    forge3dDb.db.prepare('UPDATE generation_history SET priority = ? WHERE id = ?').run(priorityValue, histId);
+
     // Store image buffer in memory for processing (not in DB)
     if (params.imageBuffer) {
       if (!this._imageBuffers) this._imageBuffers = new Map();
@@ -137,12 +144,13 @@ class GenerationQueue extends EventEmitter {
 
     const position = this._getQueuePosition();
 
-    console.log(`[QUEUE] Job enqueued: ${histId} (type=${params.type}, position=${position})`);
+    console.log(`[QUEUE] Job enqueued: ${histId} (type=${params.type}, priority=${priorityValue}, position=${position})`);
 
     telemetryBus.emit('forge3d_job_queued', {
       jobId: histId,
       type: params.type,
-      position
+      position,
+      priority: priorityValue
     });
 
     this.emit('enqueued', { jobId: histId, position });
@@ -154,7 +162,8 @@ class GenerationQueue extends EventEmitter {
       jobId: histId,
       type: params.type,
       status: 'queued',
-      position
+      position,
+      priority: priorityValue
     };
   }
 
@@ -210,6 +219,18 @@ class GenerationQueue extends EventEmitter {
    * Get queue status.
    */
   getStatus() {
+    if (!forge3dDb.db) {
+      return {
+        paused: this.paused,
+        processing: this.processing,
+        currentJobId: this.currentJobId,
+        queuedCount: 0,
+        processingCount: 0,
+        jobs: [],
+        initialized: false
+      };
+    }
+
     const queued = forge3dDb.listHistory({ status: 'queued' });
     const processing = forge3dDb.listHistory({ status: 'processing' });
 
@@ -219,7 +240,8 @@ class GenerationQueue extends EventEmitter {
       currentJobId: this.currentJobId,
       queuedCount: queued.length,
       processingCount: processing.length,
-      jobs: [...processing, ...queued]
+      jobs: [...processing, ...queued],
+      initialized: true
     };
   }
 
@@ -280,21 +302,27 @@ class GenerationQueue extends EventEmitter {
   async _processNext() {
     if (this.processing || this.paused) return;
 
-    // Get oldest queued job
-    const queued = forge3dDb.listHistory({ status: 'queued', limit: 1 });
-    if (queued.length === 0) return;
+    // Get highest-priority queued job (priority ASC = urgent first, then oldest)
+    const job = forge3dDb.db.prepare(
+      'SELECT * FROM generation_history WHERE status = ? ORDER BY priority ASC, created_at ASC LIMIT 1'
+    ).get('queued');
+    if (!job) return;
+    // Parse metadata if needed
+    if (job.metadata && typeof job.metadata === 'string') {
+      try { job.metadata = JSON.parse(job.metadata); } catch (_e) { /* keep as string */ }
+    }
 
-    const job = queued[queued.length - 1]; // listHistory is DESC, so last = oldest
     this.processing = true;
     this.currentJobId = job.id;
 
-    console.log(`[QUEUE] Processing job ${job.id} (type=${job.type})...`);
+    console.log(`[QUEUE] Processing job ${job.id} (type=${job.type}, priority=${job.priority})...`);
 
     forge3dDb.updateHistoryEntry(job.id, { status: 'processing' });
 
     telemetryBus.emit('forge3d_job_started', {
       jobId: job.id,
-      type: job.type
+      type: job.type,
+      priority: job.priority
     });
 
     this.emit('processing', { jobId: job.id });
@@ -330,7 +358,8 @@ class GenerationQueue extends EventEmitter {
       telemetryBus.emit('forge3d_job_complete', {
         jobId: job.id,
         type: job.type,
-        generationTime: result.generationTime || result.totalTime
+        generationTime: result.generationTime || result.totalTime,
+        priority: job.priority
       });
 
       this.emit('complete', { jobId: job.id, result });
@@ -371,7 +400,8 @@ class GenerationQueue extends EventEmitter {
           jobId: job.id,
           type: job.type,
           error: err.message,
-          retries: retryCount
+          retries: retryCount,
+          priority: job.priority
         });
 
         this.emit('failed', { jobId: job.id, error: err.message });
@@ -383,6 +413,20 @@ class GenerationQueue extends EventEmitter {
 
     // Process next job
     this._scheduleProcess();
+  }
+
+  /**
+   * Get queue depth broken down by priority tier.
+   */
+  getQueueDepthByPriority() {
+    const rows = forge3dDb.db.prepare(
+      'SELECT priority, COUNT(*) as count FROM generation_history WHERE status = ? GROUP BY priority'
+    ).all('queued');
+    return {
+      urgent: rows.find(r => r.priority === 0)?.count || 0,
+      normal: rows.find(r => r.priority === 1)?.count || 0,
+      background: rows.find(r => r.priority === 2)?.count || 0
+    };
   }
 
   /**

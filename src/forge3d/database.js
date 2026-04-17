@@ -21,7 +21,7 @@
 import Database from 'better-sqlite3';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { mkdirSync, existsSync } from 'fs';
+import { mkdirSync, existsSync, copyFileSync, readdirSync, unlinkSync, statSync } from 'fs';
 import { randomUUID } from 'crypto';
 import forge3dConfig from './config-loader.js';
 
@@ -190,6 +190,7 @@ const MIGRATIONS = [
         name TEXT NOT NULL,
         world_type TEXT DEFAULT 'fantasy',
         prompt TEXT,
+        pipeline_id TEXT,
         world_size TEXT DEFAULT 'medium'
           CHECK (world_size IN ('small','medium','large')),
         status TEXT NOT NULL DEFAULT 'pending'
@@ -311,6 +312,62 @@ const MIGRATIONS = [
       CREATE INDEX IF NOT EXISTS idx_quests_prototype ON quests(prototype_id);
       CREATE INDEX IF NOT EXISTS idx_interactions_prototype ON interactions(prototype_id);
     `
+  },
+  {
+    version: 9,
+    description: 'Add playtest_runs and playtest_reports tables for AI Playtest Engine (Phase 17)',
+    sql: `
+      CREATE TABLE IF NOT EXISTS playtest_runs (
+        id TEXT PRIMARY KEY,
+        prototype_id TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending'
+          CHECK (status IN ('pending','simulating','analyzing','complete','failed')),
+        pipeline_id TEXT,
+        agent_count INTEGER DEFAULT 3,
+        agent_types TEXT DEFAULT '["explorer","quest_focused","speedrunner"]',
+        max_ticks INTEGER DEFAULT 1000,
+        actual_ticks INTEGER,
+        overall_score REAL,
+        grade TEXT,
+        generation_time REAL,
+        error TEXT,
+        metadata TEXT DEFAULT '{}',
+        created_at TEXT DEFAULT (datetime('now')),
+        completed_at TEXT,
+        FOREIGN KEY (prototype_id) REFERENCES prototypes(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS playtest_reports (
+        id TEXT PRIMARY KEY,
+        playtest_run_id TEXT NOT NULL,
+        report_type TEXT NOT NULL DEFAULT 'full'
+          CHECK (report_type IN ('full','summary')),
+        report_json TEXT DEFAULT '{}',
+        suggestions_json TEXT DEFAULT '{}',
+        quest_completion_rate REAL,
+        avg_quest_time REAL,
+        npc_interaction_rate REAL,
+        navigation_failure_rate REAL,
+        deadlock_count INTEGER DEFAULT 0,
+        bottleneck_count INTEGER DEFAULT 0,
+        overall_score REAL,
+        grade TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (playtest_run_id) REFERENCES playtest_runs(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_playtest_runs_prototype ON playtest_runs(prototype_id);
+      CREATE INDEX IF NOT EXISTS idx_playtest_runs_status ON playtest_runs(status);
+      CREATE INDEX IF NOT EXISTS idx_playtest_reports_run ON playtest_reports(playtest_run_id);
+    `
+  },
+  {
+    version: 10,
+    description: 'Add priority column and index to generation_history',
+    sql: `
+      ALTER TABLE generation_history ADD COLUMN priority INTEGER DEFAULT 1;
+      CREATE INDEX IF NOT EXISTS idx_history_priority ON generation_history(priority, status, created_at);
+    `
   }
 ];
 
@@ -351,6 +408,62 @@ class Forge3DDatabase {
     }
 
     console.log('[DB] Database ready');
+
+    // Daily backup on open (non-fatal)
+    this.backupDatabase();
+  }
+
+  /**
+   * Copy the database file to data/backups/forge3d-YYYY-MM-DD.db.
+   * Creates the backups directory if needed. Keeps only the last 7 daily backups.
+   */
+  backupDatabase() {
+    try {
+      const backupDir = join(dirname(this.dbPath), 'backups');
+      if (!existsSync(backupDir)) {
+        mkdirSync(backupDir, { recursive: true });
+      }
+
+      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const destPath = join(backupDir, `forge3d-${today}.db`);
+
+      copyFileSync(this.dbPath, destPath);
+      console.log(`[FORGE3D-DB] Daily backup written: ${destPath}`);
+
+      // Prune old backups — keep only the 7 most recent
+      const MAX_BACKUPS = 7;
+      const files = readdirSync(backupDir)
+        .filter(f => f.startsWith('forge3d-') && f.endsWith('.db'))
+        .map(f => ({ name: f, mtime: statSync(join(backupDir, f)).mtimeMs }))
+        .sort((a, b) => b.mtime - a.mtime); // newest first
+
+      const toDelete = files.slice(MAX_BACKUPS);
+      for (const file of toDelete) {
+        unlinkSync(join(backupDir, file.name));
+        console.log(`[FORGE3D-DB] Old backup pruned: ${file.name}`);
+      }
+    } catch (err) {
+      console.warn(`[FORGE3D-DB] Backup failed (non-fatal): ${err.message}`);
+    }
+  }
+
+  /**
+   * Delete generation_history rows older than daysToKeep days.
+   * @param {number} daysToKeep - Number of days to retain (default 30)
+   * @returns {number} Count of deleted rows
+   */
+  pruneHistory(daysToKeep = 30) {
+    if (!this.db) return 0;
+    const result = this.db.prepare(
+      'DELETE FROM generation_history WHERE created_at < datetime(\'now\', \'-\' || ? || \' days\')'
+    ).run(daysToKeep);
+    const deleted = result.changes;
+    if (deleted > 0) {
+      console.log(`[FORGE3D-DB] Pruned ${deleted} history entries older than ${daysToKeep} days`);
+    } else {
+      console.log(`[FORGE3D-DB] No history entries to prune (retention: ${daysToKeep} days)`);
+    }
+    return deleted;
   }
 
   /**
@@ -909,6 +1022,7 @@ class Forge3DDatabase {
     const values = [];
 
     if (updates.status !== undefined) { fields.push('status = ?'); values.push(updates.status); }
+    if (updates.pipelineId !== undefined) { fields.push('pipeline_id = ?'); values.push(updates.pipelineId); }
     if (updates.regionCount !== undefined) { fields.push('region_count = ?'); values.push(updates.regionCount); }
     if (updates.worldGraph !== undefined) {
       fields.push('world_graph = ?');
@@ -1186,6 +1300,141 @@ class Forge3DDatabase {
       try { i.metadata = JSON.parse(i.metadata); } catch (_e) { /* keep */ }
       return i;
     });
+  }
+
+  // --- Playtest Runs (Phase 17) ---
+
+  createPlaytestRun({ prototypeId, agentCount, agentTypes, maxTicks }) {
+    if (!prototypeId) return null;
+    const id = randomUUID().slice(0, forge3dConfig.session.id_length);
+    this.db.prepare(
+      'INSERT INTO playtest_runs (id, prototype_id, agent_count, agent_types, max_ticks) VALUES (?, ?, ?, ?, ?)'
+    ).run(id, prototypeId, agentCount || 3, JSON.stringify(agentTypes || ['explorer', 'quest_focused', 'speedrunner']), maxTicks || 1000);
+    console.log(`[DB] Playtest run created: ${id}`);
+    return this.getPlaytestRun(id);
+  }
+
+  getPlaytestRun(id) {
+    if (!id) return null;
+    const run = this.db.prepare('SELECT * FROM playtest_runs WHERE id = ?').get(id);
+    if (!run) return null;
+    try { run.agent_types = JSON.parse(run.agent_types); } catch (_e) { /* keep */ }
+    try { run.metadata = JSON.parse(run.metadata); } catch (_e) { /* keep */ }
+    return run;
+  }
+
+  updatePlaytestRun(id, updates) {
+    if (!id) return null;
+    const fields = [];
+    const values = [];
+
+    const allowed = {
+      status: 'status', pipeline_id: 'pipeline_id', pipelineId: 'pipeline_id',
+      actual_ticks: 'actual_ticks', actualTicks: 'actual_ticks',
+      overall_score: 'overall_score', overallScore: 'overall_score',
+      grade: 'grade', generation_time: 'generation_time', generationTime: 'generation_time',
+      error: 'error', completedAt: 'completed_at', completed_at: 'completed_at'
+    };
+
+    for (const [key, col] of Object.entries(allowed)) {
+      if (updates[key] !== undefined) {
+        fields.push(`${col} = ?`);
+        values.push(updates[key]);
+      }
+    }
+
+    if (updates.metadata) {
+      fields.push('metadata = ?');
+      values.push(JSON.stringify(updates.metadata));
+    }
+
+    if (fields.length === 0) return this.getPlaytestRun(id);
+    values.push(id);
+    this.db.prepare(`UPDATE playtest_runs SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+    return this.getPlaytestRun(id);
+  }
+
+  listPlaytestRuns(options = {}) {
+    let sql = 'SELECT * FROM playtest_runs';
+    const conditions = [];
+    const params = [];
+
+    if (options.prototypeId) {
+      conditions.push('prototype_id = ?');
+      params.push(options.prototypeId);
+    }
+    if (options.status) {
+      conditions.push('status = ?');
+      params.push(options.status);
+    }
+    if (conditions.length > 0) {
+      sql += ' WHERE ' + conditions.join(' AND ');
+    }
+    sql += ' ORDER BY created_at DESC';
+
+    const limit = Math.min(Math.max(parseInt(options.limit) || 50, 1), 100);
+    sql += ` LIMIT ${limit}`;
+
+    const runs = this.db.prepare(sql).all(...params);
+    return runs.map((r) => {
+      try { r.agent_types = JSON.parse(r.agent_types); } catch (_e) { /* keep */ }
+      try { r.metadata = JSON.parse(r.metadata); } catch (_e) { /* keep */ }
+      return r;
+    });
+  }
+
+  deletePlaytestRun(id) {
+    if (!id) return false;
+    const result = this.db.prepare('DELETE FROM playtest_runs WHERE id = ?').run(id);
+    console.log(`[DB] Playtest run deleted: ${id} (${result.changes} rows)`);
+    return result.changes > 0;
+  }
+
+  // --- Playtest Reports ---
+
+  createPlaytestReport({ playtestRunId, reportType, reportJson, suggestionsJson, metrics }) {
+    if (!playtestRunId) return null;
+    const id = randomUUID().slice(0, forge3dConfig.session.id_length);
+    const m = metrics || {};
+
+    this.db.prepare(
+      `INSERT INTO playtest_reports (id, playtest_run_id, report_type, report_json, suggestions_json,
+        quest_completion_rate, avg_quest_time, npc_interaction_rate, navigation_failure_rate,
+        deadlock_count, bottleneck_count, overall_score, grade)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      id, playtestRunId, reportType || 'full',
+      JSON.stringify(reportJson || {}),
+      JSON.stringify(suggestionsJson || {}),
+      m.questCompletionRate || 0,
+      m.averageQuestTime || 0,
+      m.npcInteractionRate || 0,
+      m.navigationFailureRate || 0,
+      m.deadlockCount || 0,
+      m.bottleneckCount || 0,
+      m.overallScore || 0,
+      m.grade || 'F'
+    );
+    console.log(`[DB] Playtest report created: ${id}`);
+    return this.getPlaytestReport(id);
+  }
+
+  getPlaytestReport(id) {
+    if (!id) return null;
+    const report = this.db.prepare('SELECT * FROM playtest_reports WHERE id = ?').get(id);
+    if (!report) return null;
+    try { report.report_json = JSON.parse(report.report_json); } catch (_e) { /* keep */ }
+    try { report.suggestions_json = JSON.parse(report.suggestions_json); } catch (_e) { /* keep */ }
+    return report;
+  }
+
+  getPlaytestReportByRunId(playtestRunId) {
+    if (!playtestRunId) return null;
+    const report = this.db.prepare('SELECT * FROM playtest_reports WHERE playtest_run_id = ? ORDER BY created_at DESC LIMIT 1').get(playtestRunId);
+    if (!report) return null;
+    try { report.report_json = JSON.parse(report.report_json); } catch (_e) { /* keep */ }
+    try { report.suggestions_json = JSON.parse(report.suggestions_json); } catch (_e) { /* keep */ }
+    return report;
   }
 }
 
@@ -1500,6 +1749,83 @@ if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(pr
   db.deleteWorld(world.id);
   console.assert(db.getWorld(world.id) === null, 'Deleted world should not be found');
   console.assert(db.getWorldRegions(world.id).length === 0, 'Regions should cascade delete');
+
+  // --- Test playtest runs (Phase 17, migration v9) ---
+  const proto2 = db.createPrototype({ name: 'Test Proto', prompt: 'test', genre: 'adventure' });
+
+  const ptRun = db.createPlaytestRun({
+    prototypeId: proto2.id,
+    agentCount: 3,
+    agentTypes: ['explorer', 'quest_focused', 'speedrunner'],
+    maxTicks: 500
+  });
+  console.assert(ptRun !== null, 'Playtest run should be created');
+  console.assert(ptRun.prototype_id === proto2.id, 'Proto ID should match');
+  console.assert(ptRun.agent_count === 3, 'Agent count should be 3');
+  console.assert(ptRun.max_ticks === 500, 'Max ticks should be 500');
+  console.assert(Array.isArray(ptRun.agent_types), 'Agent types should be parsed array');
+  console.assert(ptRun.status === 'pending', 'Status should be pending');
+
+  // Update playtest run
+  const updatedRun = db.updatePlaytestRun(ptRun.id, {
+    status: 'complete',
+    actualTicks: 250,
+    overallScore: 85.5,
+    grade: 'B',
+    completedAt: new Date().toISOString()
+  });
+  console.assert(updatedRun.status === 'complete', 'Updated status');
+  console.assert(updatedRun.actual_ticks === 250, 'Updated actual ticks');
+  console.assert(updatedRun.overall_score === 85.5, 'Updated overall score');
+  console.assert(updatedRun.grade === 'B', 'Updated grade');
+
+  // List playtest runs
+  const ptRuns = db.listPlaytestRuns({ prototypeId: proto2.id });
+  console.assert(ptRuns.length >= 1, 'Should list at least 1 run');
+
+  // Null guards
+  console.assert(db.createPlaytestRun({ prototypeId: null }) === null, 'Null protoId should return null');
+  console.assert(db.getPlaytestRun(null) === null, 'getPlaytestRun(null) should return null');
+  console.assert(db.updatePlaytestRun(null, {}) === null, 'updatePlaytestRun(null) should return null');
+  console.assert(db.deletePlaytestRun(null) === false, 'deletePlaytestRun(null) should return false');
+
+  // Test playtest reports
+  const ptReport = db.createPlaytestReport({
+    playtestRunId: ptRun.id,
+    reportType: 'full',
+    reportJson: { version: 1, agents: [] },
+    suggestionsJson: { version: 1, categories: {} },
+    metrics: {
+      questCompletionRate: 90,
+      averageQuestTime: 45,
+      npcInteractionRate: 80,
+      navigationFailureRate: 5,
+      deadlockCount: 0,
+      bottleneckCount: 1,
+      overallScore: 85.5,
+      grade: 'B'
+    }
+  });
+  console.assert(ptReport !== null, 'Playtest report should be created');
+  console.assert(ptReport.quest_completion_rate === 90, 'Quest completion rate should match');
+  console.assert(typeof ptReport.report_json === 'object', 'Report JSON should be parsed');
+
+  // Get by run ID
+  const foundReport = db.getPlaytestReportByRunId(ptRun.id);
+  console.assert(foundReport !== null, 'Should find report by run ID');
+  console.assert(foundReport.playtest_run_id === ptRun.id, 'Run ID should match');
+
+  // Null guards
+  console.assert(db.createPlaytestReport({ playtestRunId: null }) === null, 'Null runId should return null');
+  console.assert(db.getPlaytestReport(null) === null, 'getPlaytestReport(null) should return null');
+  console.assert(db.getPlaytestReportByRunId(null) === null, 'getPlaytestReportByRunId(null) should return null');
+
+  // Cascade: delete playtest run should delete reports
+  db.deletePlaytestRun(ptRun.id);
+  console.assert(db.getPlaytestRun(ptRun.id) === null, 'Deleted run should not be found');
+  console.assert(db.getPlaytestReportByRunId(ptRun.id) === null, 'Reports should cascade delete');
+
+  db.deletePrototype(proto2.id);
 
   // Cleanup
   db.deleteProject(project.id);

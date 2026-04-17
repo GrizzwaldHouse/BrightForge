@@ -165,11 +165,11 @@
           <button class="tab" data-tab="sessions">
             <i data-lucide="list"></i> All Sessions
           </button>
-          <button class="tab" data-tab="models">
-            <i data-lucide="database"></i> Models
-          </button>
           <button class="tab" data-tab="orchestration">
             <i data-lucide="cpu"></i> Orchestration
+          </button>
+          <button class="tab" data-tab="models">
+            <i data-lucide="database"></i> Models
           </button>
         </div>
 
@@ -562,12 +562,12 @@
           </div>
         </div>
 
-        <div class="tab-panel" data-panel="models">
-          <div id="model-panel"></div>
-        </div>
-
         <div class="tab-panel" data-panel="orchestration">
           <div id="orchestration-panel"></div>
+        </div>
+
+        <div class="tab-panel" data-panel="models">
+          <div id="model-panel"></div>
         </div>
       </main>
     </div>
@@ -589,7 +589,6 @@
   <script src="/js/sse-client.js"></script>
   <script src="/js/model-panel.js"></script>
   <script src="/js/memory-panel.js"></script>
-  <script src="/js/orchestration-panel.js"></script>
   <script src="/js/forge3d-pipeline-panel.js"></script>
   <script type="module" src="/js/app.js"></script>
   <script type="module" src="/js/forge3d-panel.js"></script>
@@ -603,6 +602,7 @@
   <script type="module" src="/js/agent-pipeline-panel.js"></script>
   <script type="module" src="/js/recorder-panel.js"></script>
   <script type="module" src="/js/stability-panel.js"></script>
+  <script src="/js/orchestration-panel.js"></script>
   <script type="module" src="/js/system-health.js"></script>
   
   <!-- Init Icons -->

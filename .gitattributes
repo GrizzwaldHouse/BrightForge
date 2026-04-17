@@ -1,0 +1,41 @@
+# BrightForge uses CRLF line endings enforced by ESLint (linebreak-style: windows).
+# This file ensures all platforms (Windows, Linux CI, macOS) check out source
+# files with CRLF so `npm run lint` passes on GitHub Actions runners.
+
+# Default: normalize to LF in the repo, but let .gitattributes rules below
+# override this for source files that must stay CRLF for the lint rule.
+* text=auto
+
+# Source code — force CRLF on checkout (matches ESLint linebreak-style: windows)
+*.js    text eol=crlf
+*.mjs   text eol=crlf
+*.cjs   text eol=crlf
+*.json  text eol=crlf
+*.yaml  text eol=crlf
+*.yml   text eol=crlf
+*.md    text eol=crlf
+*.html  text eol=crlf
+*.css   text eol=crlf
+*.txt   text eol=crlf
+
+# Python files — LF (standard for Python tooling)
+*.py    text eol=lf
+
+# Shell scripts — must be LF to execute on Linux
+*.sh    text eol=lf
+
+# Binary files — never touch
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.webp  binary
+*.glb   binary
+*.gltf  binary
+*.db    binary
+*.sqlite binary
+*.pdf   binary
+*.zip   binary
+*.gz    binary
+*.tar   binary

@@ -3,7 +3,7 @@
 // Date: 2026-04-15
 // Purpose: Orchestration runtime dashboard panel
 
-/* global SSEClient */
+/* global SSEClient */ // eslint-disable-line no-unused-vars
 
 class OrchestrationPanel {
   constructor() {
@@ -302,7 +302,7 @@ class OrchestrationPanel {
         throw new Error(`HTTP ${res.status}: ${await res.text()}`);
       }
 
-      const result = await res.json();
+      const _result = await res.json();
       alert(`Handoff successful!\nTask ${taskId} transferred from ${fromAgent} to ${toAgent}`);
       await this.loadTasks();
     } catch (err) {
