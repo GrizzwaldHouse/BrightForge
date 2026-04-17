@@ -1,0 +1,8 @@
+# idea-scoring.yaml
+# Weighted scoring criteria for idea evaluation
+
+weights:
+  impact: 0.4      # Business/user value (40%)
+  effort: 0.3      # Development complexity (30%)
+  risk: 0.2        # Technical/business risk (20%)
+  alignment: 0.1   # Strategic alignment (10%)

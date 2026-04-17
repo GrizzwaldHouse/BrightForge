@@ -40,9 +40,13 @@ import { agentHealthRoutes } from './routes/agent-health.js';
 import { skillRoutes } from './routes/skills.js';
 import { agentRoutes } from './routes/agents.js';
 import modelIntelligenceRoutes from './routes/model-intelligence.js';
+import { createOrchestrationRoutes } from './routes/orchestration.js';
+import orchestrator from '../orchestration/index.js';
 import { authMiddleware } from './middleware/auth.js';
 import { generalLimiter } from './middleware/rate-limit.js';
 import errorHandler from '../core/error-handler.js';
+// WS event bus singleton — attached by the entry point (bin/brightforge-server.js)
+import './ws-event-bus.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -50,6 +54,16 @@ const __dirname = dirname(__filename);
 export function createServer(options = {}) {
   const app = express();
   const store = new SessionStore({ timeoutMs: options.sessionTimeout || 30 * 60 * 1000 });
+
+  // Initialize orchestration runtime
+  try {
+    if (!orchestrator.initialized) {
+      console.log('[SERVER] Initializing orchestration runtime...');
+      orchestrator.init();
+    }
+  } catch (err) {
+    console.warn('[SERVER] Failed to initialize orchestration runtime:', err.message);
+  }
 
   // ModelBridge is NOT started here on purpose.
   // Python takes 30s+ to start (model loading), so we use lazy-init in forge3d routes.
@@ -124,6 +138,7 @@ export function createServer(options = {}) {
   app.use('/api/security', securityRoutes());
   app.use('/api/health', agentHealthRoutes());
   app.use('/api/models', modelIntelligenceRoutes);
+  app.use('/api/orchestration', createOrchestrationRoutes());
   app.use('/api', configRoutes());
 
   // Static frontend

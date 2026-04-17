@@ -35,6 +35,17 @@ const VALID_EVENT_TYPES = [
   'task_completed',
   'audit_warning',
   'audit_passed',
+  // Idea Intelligence (Phase 12) event types
+  'idea_detected',
+  'idea_duplicate',
+  'idea_classified',
+  'idea_scored',
+  'idea_ranked',
+  'idea_indexed',
+  'idea_linked',
+  'research_started',
+  'research_completed',
+  // Multi-Agent Pipeline (Phase 11) event types
   'agent_registered',
   'agent_heartbeat',
   'agent_disconnected',
@@ -53,16 +64,7 @@ const VALID_EVENT_TYPES = [
   'recording_failed',
   'stability_started',
   'stability_checkpoint',
-  'stability_completed',
-  'idea_detected',
-  'idea_classified',
-  'idea_duplicate',
-  'idea_scored',
-  'idea_ranked',
-  'research_started',
-  'research_completed',
-  'idea_indexed',
-  'idea_linked'
+  'stability_completed'
 ];
 
 class OrchestrationEventBus extends EventEmitter {

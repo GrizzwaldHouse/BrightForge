@@ -53,11 +53,12 @@ export async function execute(context, stageConfig) {
         for (const npc of npcs) {
           forge3dDb.createNPC({
             prototypeId: context.prototypeId,
+            npcId: npc.id,
             name: npc.name,
             role: npc.role,
-            behavior: npc.personality || 'idle',
-            regionId: npc.location || null,
-            dialogueSeed: npc.backstory || null
+            personality: npc.personality,
+            location: npc.location,
+            backstory: npc.backstory || ''
           });
         }
       } catch (dbErr) {

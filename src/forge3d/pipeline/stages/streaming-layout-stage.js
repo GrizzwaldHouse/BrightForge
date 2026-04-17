@@ -34,18 +34,18 @@ export async function execute(context, _stageConfig) {
     }
 
     // Generate streaming layout (chunks + LOD assignments)
-    const chunks = streamingLayout.generateChunks(worldGraph);
-    if (!chunks || !Array.isArray(chunks)) {
+    const layout = streamingLayout.generateLayout(worldGraph);
+    if (!layout) {
       throw new Error('Streaming layout generation returned null');
     }
 
     // Generate streaming manifest (metadata for runtime streaming system)
-    const streamingManifest = streamingLayout.toStreamingManifest(chunks, worldGraph);
+    const streamingManifest = streamingLayout.generateManifest(worldGraph);
     if (!streamingManifest) {
       throw new Error('Streaming manifest generation returned null');
     }
 
-    const chunkCount = chunks.length;
+    const chunkCount = layout.chunks ? layout.chunks.length : 0;
 
     // Persist streaming manifest to DB if we have a world record
     if (context.worldId && streamingManifest) {
