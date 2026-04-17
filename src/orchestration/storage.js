@@ -84,8 +84,82 @@ const MIGRATIONS = [
       CREATE INDEX IF NOT EXISTS idx_audit_task ON audit_results(task_id);
       CREATE INDEX IF NOT EXISTS idx_audit_type ON audit_results(audit_type);
     `
+  },
+  {
+    version: 2,
+    description: 'Idea Intelligence schema: ideas + idea_relationships',
+    sql: `
+      CREATE TABLE IF NOT EXISTS ideas (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        summary TEXT,
+        category TEXT CHECK (category IN (
+          'AI', 'Tooling', 'Product', 'Experimental', 'Game Dev', 'Infrastructure'
+        )),
+        score_total REAL DEFAULT 0.0,
+        priority_label TEXT CHECK (priority_label IN ('HIGH', 'MID', 'LOW', 'SHINY_OBJECT')),
+        profitability_score REAL DEFAULT 0.0,
+        portfolio_score REAL DEFAULT 0.0,
+        complexity_score REAL DEFAULT 0.0,
+        novelty_score REAL DEFAULT 0.0,
+        execution_speed_score REAL DEFAULT 0.0,
+        related_projects TEXT DEFAULT '[]',
+        missing_features TEXT DEFAULT '[]',
+        source_path TEXT,
+        content_hash TEXT NOT NULL,
+        embedding TEXT,
+        vault_path TEXT,
+        status TEXT DEFAULT 'raw' CHECK (status IN (
+          'raw', 'classified', 'scored', 'researched', 'indexed', 'executing', 'completed'
+        )),
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+      );
+
+      CREATE TABLE IF NOT EXISTS idea_relationships (
+        id TEXT PRIMARY KEY,
+        idea_id TEXT NOT NULL,
+        related_idea_id TEXT NOT NULL,
+        similarity_score REAL DEFAULT 0.0,
+        relationship_type TEXT CHECK (relationship_type IN (
+          'duplicate', 'related', 'extends', 'conflicts', 'supersedes'
+        )),
+        created_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (idea_id) REFERENCES ideas(id) ON DELETE CASCADE,
+        FOREIGN KEY (related_idea_id) REFERENCES ideas(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_ideas_priority ON ideas(priority_label);
+      CREATE INDEX IF NOT EXISTS idx_ideas_category ON ideas(category);
+      CREATE INDEX IF NOT EXISTS idx_ideas_score ON ideas(score_total DESC);
+      CREATE INDEX IF NOT EXISTS idx_ideas_hash ON ideas(content_hash);
+      CREATE INDEX IF NOT EXISTS idx_ideas_status ON ideas(status);
+      CREATE INDEX IF NOT EXISTS idx_idea_rels_idea ON idea_relationships(idea_id);
+      CREATE INDEX IF NOT EXISTS idx_idea_rels_related ON idea_relationships(related_idea_id);
+    `
   }
 ];
+
+// Allowed columns for updateIdea partial UPDATE (prevents SQL injection via field names)
+const IDEA_UPDATABLE_COLUMNS = new Set([
+  'title',
+  'summary',
+  'category',
+  'score_total',
+  'priority_label',
+  'profitability_score',
+  'portfolio_score',
+  'complexity_score',
+  'novelty_score',
+  'execution_speed_score',
+  'related_projects',
+  'missing_features',
+  'source_path',
+  'content_hash',
+  'embedding',
+  'vault_path',
+  'status'
+]);
 
 class OrchestrationStorage {
   constructor(dbPath = DEFAULT_DB_PATH) {
@@ -516,6 +590,223 @@ class OrchestrationStorage {
     stmt.run(status, agentName);
   }
 
+  // ========== CRUD: ideas ==========
+
+  /**
+   * Insert a new idea record.
+   * @param {Object} idea - Idea record
+   * @param {string} idea.id - Short UUID (12 chars)
+   * @param {string} idea.title
+   * @param {string} [idea.summary]
+   * @param {string} [idea.category] - AI|Tooling|Product|Experimental|Game Dev|Infrastructure
+   * @param {string} idea.content_hash - SHA-256 hex of source content
+   * @param {string} [idea.source_path]
+   * @param {string} [idea.status='raw']
+   * @returns {string} The inserted id
+   */
+  insertIdea(idea) {
+    const stmt = this.db.prepare(`
+      INSERT INTO ideas (
+        id, title, summary, category,
+        score_total, priority_label,
+        profitability_score, portfolio_score, complexity_score,
+        novelty_score, execution_speed_score,
+        related_projects, missing_features,
+        source_path, content_hash, embedding, vault_path, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    stmt.run(
+      idea.id,
+      idea.title,
+      idea.summary || null,
+      idea.category || null,
+      idea.score_total || 0.0,
+      idea.priority_label || null,
+      idea.profitability_score || 0.0,
+      idea.portfolio_score || 0.0,
+      idea.complexity_score || 0.0,
+      idea.novelty_score || 0.0,
+      idea.execution_speed_score || 0.0,
+      idea.related_projects || '[]',
+      idea.missing_features || '[]',
+      idea.source_path || null,
+      idea.content_hash,
+      idea.embedding || null,
+      idea.vault_path || null,
+      idea.status || 'raw'
+    );
+
+    return idea.id;
+  }
+
+  /**
+   * Get a single idea by id.
+   * @param {string} id
+   * @returns {Object|null}
+   */
+  getIdea(id) {
+    const stmt = this.db.prepare('SELECT * FROM ideas WHERE id = ?');
+    return stmt.get(id) || null;
+  }
+
+  /**
+   * Partial update of an idea. Only whitelisted columns are allowed.
+   * Automatically updates updated_at timestamp.
+   * @param {string} id
+   * @param {Object} fields - Partial field set to update
+   * @returns {boolean} true if a row was updated
+   */
+  updateIdea(id, fields) {
+    const keys = Object.keys(fields).filter(k => IDEA_UPDATABLE_COLUMNS.has(k));
+    if (keys.length === 0) return false;
+
+    const setClauses = keys.map(k => `${k} = ?`).join(', ');
+    const values = keys.map(k => fields[k]);
+
+    const sql = `UPDATE ideas SET ${setClauses}, updated_at = datetime('now') WHERE id = ?`;
+    const stmt = this.db.prepare(sql);
+    const result = stmt.run(...values, id);
+    return result.changes > 0;
+  }
+
+  /**
+   * Delete an idea (cascades to idea_relationships via foreign key).
+   * @param {string} id
+   * @returns {boolean}
+   */
+  deleteIdea(id) {
+    const stmt = this.db.prepare('DELETE FROM ideas WHERE id = ?');
+    return stmt.run(id).changes > 0;
+  }
+
+  /**
+   * Get ideas filtered by priority label.
+   * @param {string} label - HIGH|MID|LOW|SHINY_OBJECT
+   * @returns {Array<Object>}
+   */
+  getIdeasByPriority(label) {
+    const stmt = this.db.prepare('SELECT * FROM ideas WHERE priority_label = ? ORDER BY score_total DESC');
+    return stmt.all(label);
+  }
+
+  /**
+   * Get ideas filtered by category.
+   * @param {string} category
+   * @returns {Array<Object>}
+   */
+  getIdeasByCategory(category) {
+    const stmt = this.db.prepare('SELECT * FROM ideas WHERE category = ? ORDER BY score_total DESC');
+    return stmt.all(category);
+  }
+
+  /**
+   * Get ideas filtered by processing status.
+   * @param {string} status - raw|classified|scored|researched|indexed|executing|completed
+   * @returns {Array<Object>}
+   */
+  getIdeasByStatus(status) {
+    const stmt = this.db.prepare('SELECT * FROM ideas WHERE status = ? ORDER BY created_at DESC');
+    return stmt.all(status);
+  }
+
+  /**
+   * Find an idea by content hash (used for deduplication on ingestion).
+   * @param {string} hash - SHA-256 hex digest
+   * @returns {Object|null}
+   */
+  findByHash(hash) {
+    const stmt = this.db.prepare('SELECT * FROM ideas WHERE content_hash = ?');
+    return stmt.get(hash) || null;
+  }
+
+  /**
+   * Text search on title and summary (LIKE, case-insensitive).
+   * @param {string} query
+   * @param {number} [limit=50]
+   * @returns {Array<Object>}
+   */
+  searchIdeas(query, limit = 50) {
+    const pattern = `%${query}%`;
+    const stmt = this.db.prepare(`
+      SELECT * FROM ideas
+      WHERE title LIKE ? COLLATE NOCASE OR summary LIKE ? COLLATE NOCASE
+      ORDER BY score_total DESC
+      LIMIT ?
+    `);
+    return stmt.all(pattern, pattern, limit);
+  }
+
+  /**
+   * Get top N ideas by score.
+   * @param {number} [limit=10]
+   * @returns {Array<Object>}
+   */
+  getTopIdeas(limit = 10) {
+    const stmt = this.db.prepare('SELECT * FROM ideas ORDER BY score_total DESC LIMIT ?');
+    return stmt.all(limit);
+  }
+
+  /**
+   * Get all ideas.
+   * @returns {Array<Object>}
+   */
+  getAllIdeas() {
+    const stmt = this.db.prepare('SELECT * FROM ideas ORDER BY created_at DESC');
+    return stmt.all();
+  }
+
+  // ========== CRUD: idea_relationships ==========
+
+  /**
+   * Insert a relationship between two ideas.
+   * @param {Object} rel
+   * @param {string} rel.idea_id
+   * @param {string} rel.related_idea_id
+   * @param {number} [rel.similarity_score=0.0]
+   * @param {string} rel.relationship_type - duplicate|related|extends|conflicts|supersedes
+   * @returns {string} Generated relationship id
+   */
+  insertRelationship(rel) {
+    const relId = randomUUID().slice(0, 12);
+    const stmt = this.db.prepare(`
+      INSERT INTO idea_relationships (id, idea_id, related_idea_id, similarity_score, relationship_type)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    stmt.run(
+      relId,
+      rel.idea_id,
+      rel.related_idea_id,
+      rel.similarity_score || 0.0,
+      rel.relationship_type
+    );
+    return relId;
+  }
+
+  /**
+   * Get all relationships anchored on a given idea.
+   * @param {string} ideaId
+   * @returns {Array<Object>}
+   */
+  getRelationships(ideaId) {
+    const stmt = this.db.prepare('SELECT * FROM idea_relationships WHERE idea_id = ? ORDER BY similarity_score DESC');
+    return stmt.all(ideaId);
+  }
+
+  /**
+   * Get duplicate relationships for an idea.
+   * @param {string} ideaId
+   * @returns {Array<Object>}
+   */
+  findDuplicates(ideaId) {
+    const stmt = this.db.prepare(`
+      SELECT * FROM idea_relationships
+      WHERE idea_id = ? AND relationship_type = 'duplicate'
+      ORDER BY similarity_score DESC
+    `);
+    return stmt.all(ideaId);
+  }
+
   // ========== Utility Methods ==========
 
   /**
@@ -706,6 +997,140 @@ if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(pr
     testDb.close();
     testDb.open();
     console.log('✓ Migrations are idempotent\n');
+
+    // Test 10: Migration v2 — idea CRUD
+    console.log('Test 10: Idea CRUD (migration v2)');
+
+    const ideaA = {
+      id: randomUUID().slice(0, 12),
+      title: 'AI Blueprint Analyzer',
+      summary: 'Tool that analyzes UE5 Blueprint graphs for anti-patterns.',
+      category: 'Tooling',
+      content_hash: 'hash-aaa-111',
+      source_path: '/fake/a.md',
+      status: 'raw'
+    };
+    const ideaB = {
+      id: randomUUID().slice(0, 12),
+      title: 'Vulkan Shader Hot-Reload',
+      summary: 'Desktop app that hot-reloads shaders in running Vulkan applications.',
+      category: 'Infrastructure',
+      content_hash: 'hash-bbb-222',
+      source_path: '/fake/b.md',
+      status: 'raw'
+    };
+
+    testDb.insertIdea(ideaA);
+    testDb.insertIdea(ideaB);
+    console.log('✓ Inserted 2 ideas');
+
+    const loadedA = testDb.getIdea(ideaA.id);
+    if (!loadedA || loadedA.title !== ideaA.title) {
+      throw new Error('getIdea failed');
+    }
+    console.log(`✓ getIdea: ${loadedA.title}`);
+
+    const hashHit = testDb.findByHash('hash-aaa-111');
+    if (!hashHit || hashHit.id !== ideaA.id) {
+      throw new Error('findByHash failed');
+    }
+    console.log('✓ findByHash: dedup check works');
+
+    const updated = testDb.updateIdea(ideaA.id, {
+      status: 'scored',
+      score_total: 0.82,
+      priority_label: 'HIGH',
+      profitability_score: 0.8,
+      portfolio_score: 0.9
+    });
+    if (!updated) throw new Error('updateIdea returned false');
+    const afterUpdate = testDb.getIdea(ideaA.id);
+    if (afterUpdate.priority_label !== 'HIGH' || afterUpdate.score_total < 0.8) {
+      throw new Error('updateIdea did not persist fields');
+    }
+    console.log(`✓ updateIdea: score=${afterUpdate.score_total} priority=${afterUpdate.priority_label}`);
+
+    // Reject unknown columns — should not update injected column
+    const safeReject = testDb.updateIdea(ideaA.id, { id: 'hacked', nonexistent: 'x' });
+    if (safeReject) throw new Error('updateIdea accepted disallowed columns');
+    console.log('✓ updateIdea: whitelist rejected disallowed columns');
+
+    const highIdeas = testDb.getIdeasByPriority('HIGH');
+    if (highIdeas.length !== 1) throw new Error('getIdeasByPriority failed');
+    console.log(`✓ getIdeasByPriority(HIGH): ${highIdeas.length}`);
+
+    const toolingIdeas = testDb.getIdeasByCategory('Tooling');
+    if (toolingIdeas.length !== 1) throw new Error('getIdeasByCategory failed');
+    console.log(`✓ getIdeasByCategory(Tooling): ${toolingIdeas.length}`);
+
+    const rawIdeas = testDb.getIdeasByStatus('raw');
+    if (rawIdeas.length !== 1) throw new Error('getIdeasByStatus failed');
+    console.log(`✓ getIdeasByStatus(raw): ${rawIdeas.length}`);
+
+    const searchHits = testDb.searchIdeas('blueprint');
+    if (searchHits.length !== 1) throw new Error('searchIdeas failed');
+    console.log(`✓ searchIdeas(blueprint): ${searchHits.length}`);
+
+    const top = testDb.getTopIdeas(10);
+    if (top.length !== 2 || top[0].id !== ideaA.id) {
+      throw new Error('getTopIdeas did not order by score');
+    }
+    console.log(`✓ getTopIdeas: ${top.length}, top=${top[0].title}`);
+
+    const all = testDb.getAllIdeas();
+    if (all.length !== 2) throw new Error('getAllIdeas failed');
+    console.log(`✓ getAllIdeas: ${all.length}`);
+
+    // Relationships
+    const relId = testDb.insertRelationship({
+      idea_id: ideaA.id,
+      related_idea_id: ideaB.id,
+      similarity_score: 0.75,
+      relationship_type: 'related'
+    });
+    console.log(`✓ insertRelationship: ${relId}`);
+
+    const rels = testDb.getRelationships(ideaA.id);
+    if (rels.length !== 1 || rels[0].relationship_type !== 'related') {
+      throw new Error('getRelationships failed');
+    }
+    console.log(`✓ getRelationships: ${rels.length}`);
+
+    const dupRelId = testDb.insertRelationship({
+      idea_id: ideaA.id,
+      related_idea_id: ideaB.id,
+      similarity_score: 0.95,
+      relationship_type: 'duplicate'
+    });
+    const dups = testDb.findDuplicates(ideaA.id);
+    if (dups.length !== 1 || dups[0].id !== dupRelId) {
+      throw new Error('findDuplicates failed');
+    }
+    console.log(`✓ findDuplicates: ${dups.length}`);
+
+    // Verify indexes exist
+    const indexRows = testDb.db.prepare(
+      "SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_idea%'"
+    ).all();
+    const expectedIdx = [
+      'idx_ideas_priority', 'idx_ideas_category', 'idx_ideas_score',
+      'idx_ideas_hash', 'idx_ideas_status',
+      'idx_idea_rels_idea', 'idx_idea_rels_related'
+    ];
+    for (const name of expectedIdx) {
+      if (!indexRows.find(r => r.name === name)) {
+        throw new Error(`Missing index: ${name}`);
+      }
+    }
+    console.log(`✓ All ${expectedIdx.length} idea indexes present`);
+
+    // Cascade delete — deleting ideaA should drop its relationships
+    testDb.deleteIdea(ideaA.id);
+    const relsAfterDelete = testDb.getRelationships(ideaA.id);
+    if (relsAfterDelete.length !== 0) {
+      throw new Error('Cascade delete of idea_relationships failed');
+    }
+    console.log('✓ deleteIdea: cascade dropped relationships\n');
 
     testDb.close();
 
