@@ -207,6 +207,34 @@
 
 ---
 
+## Phase 13: Model Intelligence System
+
+**Status:** COMPLETE
+**Goal:** Discover and inventory all local AI model files, detect installed runtimes, map storage volumes, and expose smart routing for selecting the best available model.
+
+### Core Modules
+
+| # | Task | Files | Status |
+|---|------|-------|--------|
+| 13.1 | Create config loader with env var expansion | src/model-intelligence/config-loader.js | DONE |
+| 13.2 | Create SQLite persistence layer (4-table schema, WAL mode) | src/model-intelligence/database.js | DONE |
+| 13.3 | Create event type constants and payload factory helpers | src/model-intelligence/event-types.js | DONE |
+| 13.4 | Create scanner (instant + deep scan, Ollama/HuggingFace/LM Studio) | src/model-intelligence/scanner.js | DONE |
+| 13.5 | Create inventory writer (model_inventory.json, runtime_inventory.json, storage_topology.json) | src/model-intelligence/inventory-writer.js | DONE |
+| 13.6 | Create model router (weighted scoring: availability, locality, VRAM, cost) | src/model-intelligence/model-router.js | DONE |
+| 13.7 | Create ModelIntelligence facade (lazy init, event wiring, public API) | src/model-intelligence/index.js | DONE |
+
+### API and Config
+
+| # | Task | Files | Status |
+|---|------|-------|--------|
+| 13.8 | Create REST API routes (10 endpoints at /api/models) with SSE stream | src/api/routes/model-intelligence.js | DONE |
+| 13.9 | Create YAML config (known locations, runtimes, extensions, storage, DB path) | config/model-intelligence.yaml | DONE |
+| 13.10 | Add model-intelligence test scripts to package.json | package.json | DONE |
+| 13.11 | Create Python companion scanner | python/model_scanner.py | DONE |
+
+---
+
 ## Cumulative Statistics
 
 ### Files by Category

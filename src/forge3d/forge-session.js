@@ -54,6 +54,9 @@ class ForgeSession extends EventEmitter {
   init() {
     if (this._dbReady) return;
     try {
+      // Recover any sessions left in a generating state from a previous server run
+      ForgeSession.recoverStaleSession(forge3dDb);
+
       // Load recent completed sessions from DB
       const rows = forge3dDb.listSessions({ limit: 50 });
       for (const row of rows) {
@@ -440,6 +443,37 @@ class ForgeSession extends EventEmitter {
     } catch (err) {
       console.warn(`[FORGE] Session persist failed (non-fatal): ${err.message}`);
     }
+  }
+
+  /**
+   * Recover stale 'generating*' sessions left behind by a server restart.
+   * Any session with a generating state older than 10 minutes is marked failed.
+   * @param {Object} db - A Forge3DDatabase instance (open)
+   * @returns {string[]} Array of recovered session IDs
+   */
+  static recoverStaleSession(db) {
+    if (!db || !db.db) return [];
+
+    const STALE_MINUTES = 10;
+    const stale = db.db.prepare(
+      `SELECT id FROM sessions
+       WHERE state LIKE 'generating%'
+       AND created_at < datetime('now', '-${STALE_MINUTES} minutes')`
+    ).all();
+
+    const recovered = [];
+    for (const row of stale) {
+      db.db.prepare(
+        'UPDATE sessions SET state = ?, error = ?, completed_at = datetime(\'now\') WHERE id = ?'
+      ).run('failed', 'server_restart', row.id);
+      recovered.push(row.id);
+    }
+
+    if (recovered.length > 0) {
+      console.log(`[FORGE3D-SESSION] Recovered ${recovered.length} stale session(s) from previous run: ${recovered.join(', ')}`);
+    }
+
+    return recovered;
   }
 
   /**
