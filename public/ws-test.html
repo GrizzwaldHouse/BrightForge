@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>WebSocket Test - BrightForge</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      background: #1a1a1a;
+      color: #e0e0e0;
+    }
+    h1 {
+      color: #00d4ff;
+    }
+    button {
+      background: #00d4ff;
+      color: #000;
+      border: none;
+      padding: 0.5rem 1rem;
+      margin: 0.5rem 0.5rem 0.5rem 0;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button:hover {
+      background: #00b8e6;
+    }
+    button:disabled {
+      background: #444;
+      color: #888;
+      cursor: not-allowed;
+    }
+    #log {
+      background: #000;
+      color: #0f0;
+      padding: 1rem;
+      border-radius: 4px;
+      height: 400px;
+      overflow-y: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+      margin-top: 1rem;
+    }
+    .status {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-left: 0.5rem;
+    }
+    .status.connected {
+      background: #0f0;
+      color: #000;
+    }
+    .status.disconnected {
+      background: #f00;
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <h1>WebSocket Event Bus Test</h1>
+  <p>
+    Connection status:
+    <span id="status" class="status disconnected">DISCONNECTED</span>
+  </p>
+
+  <div>
+    <button id="connect">Connect</button>
+    <button id="disconnect" disabled>Disconnect</button>
+    <button id="subscribe" disabled>Subscribe to llm_request</button>
+    <button id="unsubscribe" disabled>Unsubscribe</button>
+    <button id="subscribeErrors" disabled>Subscribe to errors</button>
+    <button id="clear">Clear Log</button>
+  </div>
+
+  <pre id="log"></pre>
+
+  <script>
+    let ws = null;
+    const log = document.getElementById('log');
+    const statusEl = document.getElementById('status');
+    const connectBtn = document.getElementById('connect');
+    const disconnectBtn = document.getElementById('disconnect');
+    const subscribeBtn = document.getElementById('subscribe');
+    const unsubscribeBtn = document.getElementById('unsubscribe');
+    const subscribeErrorsBtn = document.getElementById('subscribeErrors');
+    const clearBtn = document.getElementById('clear');
+
+    function addLog(message) {
+      const timestamp = new Date().toISOString().split('T')[1].slice(0, -1);
+      log.textContent += `[${timestamp}] ${message}\n`;
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function setStatus(connected) {
+      if (connected) {
+        statusEl.textContent = 'CONNECTED';
+        statusEl.className = 'status connected';
+        connectBtn.disabled = true;
+        disconnectBtn.disabled = false;
+        subscribeBtn.disabled = false;
+        unsubscribeBtn.disabled = false;
+        subscribeErrorsBtn.disabled = false;
+      } else {
+        statusEl.textContent = 'DISCONNECTED';
+        statusEl.className = 'status disconnected';
+        connectBtn.disabled = false;
+        disconnectBtn.disabled = true;
+        subscribeBtn.disabled = true;
+        unsubscribeBtn.disabled = true;
+        subscribeErrorsBtn.disabled = true;
+      }
+    }
+
+    connectBtn.onclick = () => {
+      ws = new WebSocket('ws://localhost:3847/ws/events');
+
+      ws.onopen = () => {
+        addLog('✓ Connected to WebSocket');
+        setStatus(true);
+      };
+
+      ws.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+        if (data.type === 'connected') {
+          addLog(`✓ Assigned client ID: ${data.clientId}`);
+        } else if (data.type === 'subscribed') {
+          addLog(`✓ Subscribed to: ${data.events.join(', ')}`);
+        } else if (data.type === 'unsubscribed') {
+          addLog(`✓ Unsubscribed from: ${data.events.join(', ')}`);
+        } else {
+          addLog(`📨 Event: ${data.type}`);
+          addLog(JSON.stringify(data.data, null, 2));
+        }
+      };
+
+      ws.onerror = (e) => {
+        addLog('❌ WebSocket error');
+        console.error(e);
+      };
+
+      ws.onclose = () => {
+        addLog('✗ Disconnected from WebSocket');
+        setStatus(false);
+        ws = null;
+      };
+    };
+
+    disconnectBtn.onclick = () => {
+      if (ws) {
+        ws.close();
+      }
+    };
+
+    subscribeBtn.onclick = () => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'subscribe', events: ['llm_request', 'llm_success', 'llm_failure'] }));
+        addLog('→ Sent subscribe request for LLM events');
+      }
+    };
+
+    unsubscribeBtn.onclick = () => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'unsubscribe', events: ['llm_request', 'llm_success', 'llm_failure'] }));
+        addLog('→ Sent unsubscribe request for LLM events');
+      }
+    };
+
+    subscribeErrorsBtn.onclick = () => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'subscribe', events: ['error'] }));
+        addLog('→ Sent subscribe request for error events');
+      }
+    };
+
+    clearBtn.onclick = () => {
+      log.textContent = '';
+    };
+
+    // Initial status
+    setStatus(false);
+  </script>
+</body>
+</html>

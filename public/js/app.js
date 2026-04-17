@@ -6,6 +6,7 @@
 /* global SSEClient */
 /* global MemoryPanel */
 /* global ModelPanel */
+/* global OrchestrationPanel */
 
 console.log('[APP] ===== app.js LOADING =====');
 
@@ -120,6 +121,10 @@ class App {
       console.log('[APP] Initializing StabilityPanel...');
       this.stabilityPanel = new StabilityPanel(this);
       console.log('[APP] StabilityPanel initialized');
+
+      console.log('[APP] Initializing OrchestrationPanel...');
+      this.orchestrationPanel = new OrchestrationPanel();
+      console.log('[APP] OrchestrationPanel initialized');
 
       this.fileBrowser = null; // Initialized after DOM ready
       this.memoryPanel = null; // Initialized after DOM ready
@@ -387,6 +392,11 @@ class App {
         }
         if (targetTab === 'models' && this.modelPanel && !this.modelPanel.initialized) {
           this.modelPanel.init();
+        }
+        if (targetTab === 'orchestration' && !this.orchestrationPanel.initialized) {
+          const container = document.getElementById('orchestration-panel');
+          this.orchestrationPanel.render(container);
+          this.orchestrationPanel.initialized = true;
         }
       });
     });

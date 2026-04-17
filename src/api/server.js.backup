@@ -15,7 +15,6 @@
 
 import express from 'express';
 import helmet from 'helmet';
-import http from 'http';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -35,18 +34,15 @@ import playtestRoutes from './routes/playtest.js';
 import { memoryRoutes } from './routes/memory.js';
 import { costRoutes } from './routes/cost.js';
 import pipelineRoutes from './routes/pipelines.js';
-// import debugRoutes from './routes/debug.js'; // TODO: Tier 2 - Not yet implemented
-// import { securityRoutes } from './routes/security.js'; // TODO: Tier 2 - Not yet implemented
-// import { agentHealthRoutes } from './routes/agent-health.js'; // TODO: Tier 2 - Not yet implemented
-// import { skillRoutes } from './routes/skills.js'; // TODO: Tier 2 - Not yet implemented
-// import { agentRoutes } from './routes/agents.js'; // TODO: Tier 2 - Not yet implemented
+import debugRoutes from './routes/debug.js';
+import { securityRoutes } from './routes/security.js';
+import { agentHealthRoutes } from './routes/agent-health.js';
+import { skillRoutes } from './routes/skills.js';
+import { agentRoutes } from './routes/agents.js';
 import modelIntelligenceRoutes from './routes/model-intelligence.js';
-import { createOrchestrationRoutes } from './routes/orchestration.js';
-import orchestrator from '../orchestration/index.js';
 import { authMiddleware } from './middleware/auth.js';
 import { generalLimiter } from './middleware/rate-limit.js';
 import errorHandler from '../core/error-handler.js';
-import { createWSEventBus } from './ws-event-bus.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -54,16 +50,6 @@ const __dirname = dirname(__filename);
 export function createServer(options = {}) {
   const app = express();
   const store = new SessionStore({ timeoutMs: options.sessionTimeout || 30 * 60 * 1000 });
-
-  // Initialize orchestration runtime
-  try {
-    if (!orchestrator.initialized) {
-      console.log('[SERVER] Initializing orchestration runtime...');
-      orchestrator.init();
-    }
-  } catch (err) {
-    console.warn('[SERVER] Failed to initialize orchestration runtime:', err.message);
-  }
 
   // ModelBridge is NOT started here on purpose.
   // Python takes 30s+ to start (model loading), so we use lazy-init in forge3d routes.
@@ -128,17 +114,16 @@ export function createServer(options = {}) {
   app.use('/api/scene', sceneRoutes);
   app.use('/api/world', worldRoutes);
   app.use('/api/prototype', prototypeRoutes);
-  app.use('/api/playtest', playtestRoutes());
+  app.use('/api/playtest', playtestRoutes);
   app.use('/api/memory', memoryRoutes());
   app.use('/api/cost', costRoutes());
   app.use('/api/pipelines', pipelineRoutes);
-  // app.use('/api/debug', debugRoutes); // TODO: Tier 2 - Not yet implemented
-  // app.use('/api/skills', skillRoutes()); // TODO: Tier 2 - Not yet implemented
-  // app.use('/api/agents', agentRoutes()); // TODO: Tier 2 - Not yet implemented
-  // app.use('/api/security', securityRoutes()); // TODO: Tier 2 - Not yet implemented
-  // app.use('/api/health', agentHealthRoutes()); // TODO: Tier 2 - Not yet implemented
+  app.use('/api/debug', debugRoutes);
+  app.use('/api/skills', skillRoutes());
+  app.use('/api/agents', agentRoutes());
+  app.use('/api/security', securityRoutes());
+  app.use('/api/health', agentHealthRoutes());
   app.use('/api/models', modelIntelligenceRoutes);
-  app.use('/api/orchestration', createOrchestrationRoutes());
   app.use('/api', configRoutes());
 
   // Static frontend
@@ -170,14 +155,7 @@ export function createServer(options = {}) {
 
   console.log('[SERVER] Server configured with routes and middleware');
 
-  // Create HTTP server
-  const server = http.createServer(app);
-
-  // Initialize WebSocket event bus
-  const wsEventBus = createWSEventBus(server);
-  console.log('[SERVER] WebSocket event bus initialized on /ws/events');
-
-  return { app, server, store, wsEventBus };
+  return { app, store };
 }
 
 export default createServer;

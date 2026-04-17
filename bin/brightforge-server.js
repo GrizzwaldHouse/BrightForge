@@ -46,8 +46,8 @@ async function main() {
   // Initialize error handler (observer-pattern error broadcasting)
   errorHandler.initialize(sessionsDir);
 
-  // Create Express app
-  const { app, store } = createServer({
+  // Create Express app with HTTP server and WebSocket
+  const { server, store, wsEventBus } = createServer({
     sessionsDir,
     sessionTimeout: 30 * 60 * 1000  // 30 minutes
   });
@@ -66,7 +66,7 @@ async function main() {
   }
 
   // Start server
-  const server = app.listen(port, () => {
+  server.listen(port, () => {
     console.log('');
     console.log('  ╔══════════════════════════════════════╗');
     console.log('  ║    BrightForge Server v4.2.0          ║');
@@ -112,6 +112,7 @@ async function main() {
   // Graceful shutdown
   const shutdown = () => {
     console.log('\n  [SERVER] Shutting down...');
+    wsEventBus.close();
     server.close(() => {
       store.destroy();
       process.exit(0);
