@@ -5,7 +5,13 @@
 //   Covers: health check, WebSocket connect, chat turn + SSE stream, memory read/write,
 //   project memory, agent list, forge3d queue, skills, metrics, cost, design, pipeline detect.
 //   Run: node src/tests/user-load-test.js [--users N] [--delay MS] [--verbose] [--scenario SCENARIO]
-//   Scenarios: smoke (5 users), load (20 users), stress (50 users), soak (10 users, 5 minutes)
+//   Scenarios: smoke (3u/30s), load (20u/2min), stress (50u/2min), soak (10u/5min), massive (1000u/5min)
+//
+//   Concurrency model:
+//   - Users are launched in waves (default: 50 per wave, 200ms between waves)
+//   - A semaphore limits max concurrent in-flight sessions (default: 50)
+//   - 429 rate-limit responses are recorded as data, not errors — they show the server ceiling
+//   - Live progress ticker updates every 2 seconds
 
 import http from 'http';
 import https from 'https';
@@ -37,17 +43,21 @@ const WS_URL = getArg('--ws', DEFAULT_WS_URL);
 const VERBOSE = hasFlag('--verbose');
 
 // Scenario configs
+// waveSize: users launched per wave | waveDelayMs: ms between waves | concurrency: max simultaneous
 const SCENARIOS = {
-  smoke:  { users: 3,  delayMs: 500,  durationMs: 30_000,  label: 'Smoke (3 users, 30s)' },
-  load:   { users: 20, delayMs: 100,  durationMs: 120_000, label: 'Load (20 users, 2min)' },
-  stress: { users: 50, delayMs: 0,    durationMs: 120_000, label: 'Stress (50 users, 2min)' },
-  soak:   { users: 10, delayMs: 200,  durationMs: 300_000, label: 'Soak (10 users, 5min)' }
+  smoke:   { users: 3,    waveSize: 3,   waveDelayMs: 500,  durationMs: 30_000,   concurrency: 3,   label: 'Smoke   (3 users / 30s)' },
+  load:    { users: 20,   waveSize: 10,  waveDelayMs: 200,  durationMs: 120_000,  concurrency: 20,  label: 'Load    (20 users / 2min)' },
+  stress:  { users: 50,   waveSize: 10,  waveDelayMs: 200,  durationMs: 120_000,  concurrency: 50,  label: 'Stress  (50 users / 2min)' },
+  soak:    { users: 10,   waveSize: 5,   waveDelayMs: 500,  durationMs: 300_000,  concurrency: 10,  label: 'Soak    (10 users / 5min)' },
+  massive: { users: 1000, waveSize: 50,  waveDelayMs: 200,  durationMs: 300_000,  concurrency: 50,  label: 'Massive (1000 users / 5min)' }
 };
 
 const scenarioCfg = SCENARIOS[SCENARIO] || SCENARIOS.smoke;
-const USER_COUNT   = parseInt(getArg('--users',   String(scenarioCfg.users)), 10);
-const DELAY_MS     = parseInt(getArg('--delay',   String(scenarioCfg.delayMs)), 10);
-const DURATION_MS  = parseInt(getArg('--duration', String(scenarioCfg.durationMs)), 10);
+const USER_COUNT   = parseInt(getArg('--users',      String(scenarioCfg.users)), 10);
+const DELAY_MS     = parseInt(getArg('--delay',      String(scenarioCfg.waveDelayMs)), 10);
+const DURATION_MS  = parseInt(getArg('--duration',   String(scenarioCfg.durationMs)), 10);
+const CONCURRENCY  = parseInt(getArg('--concurrency', String(scenarioCfg.concurrency)), 10);
+const WAVE_SIZE    = parseInt(getArg('--wave-size',   String(scenarioCfg.waveSize)), 10);
 
 // ─── HTTP helpers ─────────────────────────────────────────────────────────────
 
@@ -181,43 +191,101 @@ function readSseStream(sessionId, timeoutMs = 45_000) {
   });
 }
 
+// ─── Semaphore (concurrency limiter) ─────────────────────────────────────────
+
+// Limits max simultaneous in-flight user sessions to avoid OOM and thundering herd
+class Semaphore {
+  constructor(maxConcurrent) {
+    this._max = maxConcurrent;
+    this._count = 0;
+    this._queue = [];
+  }
+
+  acquire() {
+    return new Promise((resolve) => {
+      const tryAcquire = () => {
+        if (this._count < this._max) {
+          this._count++;
+          resolve();
+        } else {
+          this._queue.push(tryAcquire);
+        }
+      };
+      tryAcquire();
+    });
+  }
+
+  release() {
+    this._count--;
+    if (this._queue.length > 0) {
+      const next = this._queue.shift();
+      next();
+    }
+  }
+
+  get active() { return this._count; }
+  get waiting() { return this._queue.length; }
+}
+
 // ─── Metrics collector ────────────────────────────────────────────────────────
 
 class Metrics {
   constructor() {
     this.results = [];
     this.errors = [];
+    this.rateLimited = 0;   // count of 429 responses
+    this.completed = 0;     // users fully finished
+    this.startTime = Date.now();
   }
 
   record(step, userId, ms, status, ok, detail = '') {
+    if (status === 429) this.rateLimited++;
     this.results.push({ step, userId, ms, status, ok, detail, ts: Date.now() });
     if (VERBOSE) {
       const icon = ok ? '✓' : '✗';
-      console.log(`  [U${String(userId).padStart(2,'0')}] ${icon} ${step} ${ms}ms (${status}) ${detail}`);
+      const tag = status === 429 ? ' [RATE LIMITED]' : '';
+      process.stdout.write(`\n  [U${String(userId).padStart(4,'0')}] ${icon} ${step} ${ms}ms (${status})${tag} ${detail}`);
     }
   }
 
   error(step, userId, message) {
     this.errors.push({ step, userId, message, ts: Date.now() });
-    console.error(`  [U${String(userId).padStart(2,'0')}] ERROR ${step}: ${message}`);
+    if (VERBOSE) {
+      process.stdout.write(`\n  [U${String(userId).padStart(4,'0')}] ERR ${step}: ${message}`);
+    }
+  }
+
+  finishUser() { this.completed++; }
+
+  // Live progress line — printed on a ticker
+  progressLine(active, waiting, total) {
+    const elapsed = ((Date.now() - this.startTime) / 1000).toFixed(0);
+    const totalR = this.results.length;
+    const passes = this.results.filter((r) => r.ok).length;
+    const rate = totalR > 0 ? Math.round((passes / totalR) * 100) : 0;
+    const rps = totalR > 0 ? (totalR / Math.max(1, (Date.now() - this.startTime) / 1000)).toFixed(1) : 0;
+    return `  [${elapsed}s] done=${this.completed}/${total} active=${active} queued=${waiting} ` +
+           `steps=${totalR} pass=${rate}% rps=${rps} 429s=${this.rateLimited}`;
   }
 
   summary() {
     const byStep = {};
     for (const r of this.results) {
-      if (!byStep[r.step]) byStep[r.step] = { count: 0, pass: 0, fail: 0, times: [] };
+      if (!byStep[r.step]) byStep[r.step] = { count: 0, pass: 0, fail: 0, times: [], rateLimited: 0 };
       byStep[r.step].count++;
       r.ok ? byStep[r.step].pass++ : byStep[r.step].fail++;
       byStep[r.step].times.push(r.ms);
+      if (r.status === 429) byStep[r.step].rateLimited++;
     }
 
     const rows = Object.entries(byStep).map(([step, s]) => {
       const sorted = [...s.times].sort((a, b) => a - b);
       const p50 = sorted[Math.floor(sorted.length * 0.5)] || 0;
       const p95 = sorted[Math.floor(sorted.length * 0.95)] || 0;
+      const p99 = sorted[Math.floor(sorted.length * 0.99)] || 0;
       const avg = Math.round(s.times.reduce((a, b) => a + b, 0) / s.times.length);
       const rate = Math.round((s.pass / s.count) * 100);
-      return { step, count: s.count, pass: s.pass, fail: s.fail, rate, avg, p50, p95 };
+      return { step, count: s.count, pass: s.pass, fail: s.fail, rate, avg, p50, p95, p99, rateLimited: s.rateLimited };
     });
 
     return { rows, errors: this.errors, totalResults: this.results.length };
@@ -227,14 +295,16 @@ class Metrics {
 // ─── User session simulation ──────────────────────────────────────────────────
 
 // Simulates one user's full session lifecycle
-async function simulateUser(userId, metrics, stopSignal) {
-  const log = (msg) => VERBOSE && console.log(`  [U${String(userId).padStart(2, '0')}] ${msg}`);
+async function simulateUser(userId, metrics, stopSignal, semaphore) {
+  await semaphore.acquire();
+  const log = (msg) => VERBOSE && process.stdout.write(`\n  [U${String(userId).padStart(4, '0')}] ${msg}`);
   log('Starting session');
 
   // T1: Health check
   try {
     const r = await httpRequest('GET', `${BASE_URL}/api/health`);
-    metrics.record('health_check', userId, r.ms, r.status, r.status === 200);
+    // 429 on health = rate limit hit, count it but don't fail the user
+    metrics.record('health_check', userId, r.ms, r.status, r.status === 200 || r.status === 429);
   } catch (e) {
     metrics.error('health_check', userId, e.message);
   }
@@ -448,24 +518,31 @@ async function simulateUser(userId, metrics, stopSignal) {
   }
 
   log('Session complete');
+  semaphore.release();
+  metrics.finishUser();
 }
 
 // ─── Main runner ──────────────────────────────────────────────────────────────
 
 async function run() {
-  console.log('\n╔══════════════════════════════════════════╗');
-  console.log(`║  BrightForge Load Test — ${scenarioCfg.label}`);
-  console.log(`║  Users: ${USER_COUNT}  Delay: ${DELAY_MS}ms  Duration: ${DURATION_MS / 1000}s`);
-  console.log('╚══════════════════════════════════════════╝\n');
+  const label = scenarioCfg.label || `Custom (${USER_COUNT} users)`;
+  console.log('\n╔══════════════════════════════════════════════════════╗');
+  console.log('║  BrightForge Load Test');
+  console.log(`║  Scenario:    ${label}`);
+  console.log(`║  Users:       ${USER_COUNT}`);
+  console.log(`║  Concurrency: ${CONCURRENCY} (max simultaneous sessions)`);
+  console.log(`║  Wave size:   ${WAVE_SIZE} users every ${DELAY_MS}ms`);
+  console.log(`║  Duration:    ${DURATION_MS / 1000}s max`);
+  console.log('╚══════════════════════════════════════════════════════╝\n');
 
   // Pre-flight: verify server is up
   try {
     const health = await httpRequest('GET', `${BASE_URL}/api/health`, null, 5_000);
-    if (health.status !== 200) {
+    if (health.status !== 200 && health.status !== 429) {
       console.error(`✗ Server not healthy (${health.status}). Start it with: npm run server`);
       process.exit(1);
     }
-    console.log(`✓ Server healthy (${health.ms}ms)\n`);
+    console.log(`✓ Server reachable (${health.ms}ms, status=${health.status})\n`);
   } catch (e) {
     console.error(`✗ Cannot reach server at ${BASE_URL}: ${e.message}`);
     console.error('  Start it with: npm run server');
@@ -474,56 +551,76 @@ async function run() {
 
   const metrics = new Metrics();
   const stopSignal = { stopped: false };
+  const semaphore = new Semaphore(CONCURRENCY);
   const startTime = Date.now();
 
   // Stop after DURATION_MS
-  const stopTimer = setTimeout(() => { stopSignal.stopped = true; }, DURATION_MS);
+  const stopTimer = setTimeout(() => {
+    stopSignal.stopped = true;
+    console.log('\n  [!] Duration limit reached — stopping new users');
+  }, DURATION_MS);
 
-  // Launch users with staggered delay
+  // Live progress ticker (every 2s)
+  const ticker = setInterval(() => {
+    process.stdout.write('\r' + metrics.progressLine(semaphore.active, semaphore.waiting, USER_COUNT) + '   ');
+  }, 2_000);
+
+  // Wave-based launch: WAVE_SIZE users every DELAY_MS ms
   const userPromises = [];
-  for (let i = 0; i < USER_COUNT; i++) {
-    const userId = i + 1;
-    const userStart = async () => {
-      if (DELAY_MS > 0) await sleep(i * DELAY_MS);
-      if (stopSignal.stopped) return;
-      process.stdout.write(`\r  Launched ${userId}/${USER_COUNT} users...`);
-      await simulateUser(userId, metrics, stopSignal);
-    };
-    userPromises.push(userStart());
+  let launched = 0;
+
+  while (launched < USER_COUNT && !stopSignal.stopped) {
+    const waveEnd = Math.min(launched + WAVE_SIZE, USER_COUNT);
+    for (let i = launched; i < waveEnd; i++) {
+      const userId = i + 1;
+      userPromises.push(simulateUser(userId, metrics, stopSignal, semaphore));
+    }
+    launched = waveEnd;
+    if (launched < USER_COUNT && !stopSignal.stopped) {
+      await sleep(DELAY_MS);
+    }
   }
 
+  console.log(`\n  All ${USER_COUNT} users queued. Waiting for completion...\n`);
   await Promise.allSettled(userPromises);
+
+  clearInterval(ticker);
   clearTimeout(stopTimer);
 
   const elapsed = Date.now() - startTime;
-  console.log(`\n\n  All users complete. Elapsed: ${(elapsed / 1000).toFixed(1)}s\n`);
+  process.stdout.write('\r' + ' '.repeat(120) + '\r');
+  console.log(`  Done. Elapsed: ${(elapsed / 1000).toFixed(1)}s  |  Rate limited: ${metrics.rateLimited} requests\n`);
 
   // ─── Print report ──────────────────────────────────────────────────────────
 
   const { rows, errors } = metrics.summary();
 
-  console.log('┌─────────────────────────────────────────────────────────────────┐');
-  console.log('│  Step                      Count  Pass  Fail  Rate   Avg   P95  │');
-  console.log('├─────────────────────────────────────────────────────────────────┤');
+  console.log('┌──────────────────────────────────────────────────────────────────────────┐');
+  console.log('│  Step                      Count   Pass   Fail  Rate    Avg    P95    P99 │');
+  console.log('├──────────────────────────────────────────────────────────────────────────┤');
 
   for (const row of rows) {
-    const name  = row.step.padEnd(26);
-    const count = String(row.count).padStart(5);
-    const pass  = String(row.pass).padStart(5);
-    const fail  = String(row.fail).padStart(5);
-    const rate  = `${row.rate}%`.padStart(5);
-    const avg   = `${row.avg}ms`.padStart(6);
-    const p95   = `${row.p95}ms`.padStart(6);
-    const ok    = row.fail === 0 ? '✓' : '✗';
-    console.log(`│ ${ok} ${name} ${count} ${pass} ${fail} ${rate} ${avg} ${p95} │`);
+    const name    = row.step.padEnd(26);
+    const count   = String(row.count).padStart(6);
+    const pass    = String(row.pass).padStart(6);
+    const fail    = String(row.fail).padStart(6);
+    const rate    = `${row.rate}%`.padStart(5);
+    const avg     = `${row.avg}ms`.padStart(7);
+    const p95     = `${row.p95}ms`.padStart(7);
+    const p99     = `${row.p99}ms`.padStart(7);
+    const rl      = row.rateLimited > 0 ? ` 429x${row.rateLimited}` : '';
+    const ok      = row.fail === 0 ? '✓' : row.rate >= 70 ? '⚠' : '✗';
+    console.log(`│ ${ok} ${name} ${count} ${pass} ${fail} ${rate} ${avg} ${p95} ${p99}${rl.padEnd(7)} │`);
   }
 
-  console.log('└─────────────────────────────────────────────────────────────────┘');
+  console.log('└──────────────────────────────────────────────────────────────────────────┘');
 
+  // Errors summary (capped to first 20 for readability at 1000-user scale)
   if (errors.length > 0) {
-    console.log(`\n  Errors (${errors.length}):`);
-    for (const e of errors) {
-      console.log(`    [U${String(e.userId).padStart(2,'0')}] ${e.step}: ${e.message}`);
+    const shown = errors.slice(0, 20);
+    console.log(`\n  Errors (${errors.length} total${errors.length > 20 ? ', showing first 20' : ''}):`);
+    for (const e of shown) {
+      console.log(`    [U${String(e.userId).padStart(4,'0')}] ${e.step}: ${e.message}`);
     }
   }
 
@@ -534,14 +631,20 @@ async function run() {
   const totalFail     = rows.reduce((s, r) => s + r.fail, 0);
   const overallRate   = Math.round((totalPass / totalSteps) * 100);
   const chatRow       = rows.find((r) => r.step === 'chat_turn_start');
+  const sseRow        = rows.find((r) => r.step === 'chat_sse_stream');
   const avgChatMs     = chatRow?.avg || 0;
+  const p99SseMs      = sseRow?.p99 || 0;
 
-  console.log('\n  ─── Verdict ───');
-  console.log(`  Total steps:   ${totalSteps}`);
-  console.log(`  Pass rate:     ${overallRate}%  (${totalPass} pass, ${totalFail} fail)`);
-  console.log(`  Avg chat turn: ${avgChatMs}ms`);
-  console.log(`  Errors:        ${errors.length}`);
-  console.log(`  Elapsed:       ${(elapsed / 1000).toFixed(1)}s`);
+  console.log('\n  ─── Verdict ───────────────────────────────────────────');
+  console.log(`  Total users:     ${USER_COUNT}`);
+  console.log(`  Total steps:     ${totalSteps}`);
+  console.log(`  Pass rate:       ${overallRate}%  (${totalPass} pass / ${totalFail} fail)`);
+  console.log(`  Rate limited:    ${metrics.rateLimited} requests (429s)`);
+  console.log(`  Avg chat turn:   ${avgChatMs}ms`);
+  console.log(`  P99 SSE stream:  ${p99SseMs}ms`);
+  console.log(`  Errors:          ${errors.length}`);
+  console.log(`  Elapsed:         ${(elapsed / 1000).toFixed(1)}s`);
+  console.log(`  Throughput:      ${(totalSteps / (elapsed / 1000)).toFixed(1)} steps/sec`);
 
   const VERDICT = overallRate >= 90 ? 'PASS' : overallRate >= 70 ? 'WARN' : 'FAIL';
   console.log(`\n  ${VERDICT === 'PASS' ? '✓' : VERDICT === 'WARN' ? '⚠' : '✗'} VERDICT: ${VERDICT}\n`);
@@ -555,7 +658,7 @@ async function run() {
   writeFileSync(reportPath, JSON.stringify({
     timestamp: new Date().toISOString(),
     scenario: SCENARIO,
-    config: { users: USER_COUNT, delayMs: DELAY_MS, durationMs: DURATION_MS },
+    config: { users: USER_COUNT, concurrency: CONCURRENCY, waveSize: WAVE_SIZE, waveDelayMs: DELAY_MS, durationMs: DURATION_MS },
     elapsed,
     summary: { totalSteps, totalPass, totalFail, overallRate, verdict: VERDICT },
     steps: rows,
