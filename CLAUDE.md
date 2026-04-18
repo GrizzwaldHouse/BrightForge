@@ -538,6 +538,19 @@ Cloned from `https://github.com/GrizzwaldHouse/cowork-skills.git`.
 | `canva-designer` | user-invocable | Canva prompt engineering and quality review |
 | `document-designer` | auto-loaded | Excel, Word, PowerPoint, PDF formatting |
 
+### Karpathy Guidelines (`.claude/karpathy-skills/` — git submodule)
+
+Cloned from `https://github.com/forrestchang/andrej-karpathy-skills.git`. Always active — these four principles govern all coding work in this repo.
+
+| Principle | Rule |
+|-----------|------|
+| **Think Before Coding** | State assumptions explicitly; ask rather than guess; surface tradeoffs; stop and name confusion rather than guessing through it |
+| **Simplicity First** | Minimum code that solves the problem; no speculative features, abstractions, or error handling for impossible scenarios; if 200 lines could be 50, rewrite |
+| **Surgical Changes** | Touch only what the task requires; don't refactor adjacent code; don't delete pre-existing dead code unless asked; every changed line must trace to the user's request |
+| **Goal-Driven Execution** | Define verifiable success criteria before starting; for multi-step tasks state a brief plan with a verification step per item; loop until criteria are met |
+
+Skill file: `.claude/karpathy-skills/skills/karpathy-guidelines/SKILL.md`
+
 ## Python Environment (Forge3D)
 
 The 3D generation pipeline requires a Python environment:

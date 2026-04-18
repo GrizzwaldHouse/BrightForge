@@ -1,3 +1,6 @@
 [submodule ".claude/cowork-skills"]
 	path = .claude/cowork-skills
 	url = https://github.com/GrizzwaldHouse/cowork-skills.git
+[submodule ".claude/karpathy-skills"]
+	path = .claude/karpathy-skills
+	url = https://github.com/forrestchang/andrej-karpathy-skills.git
