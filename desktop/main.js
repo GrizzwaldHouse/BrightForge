@@ -221,26 +221,12 @@ function showNotification(title, body) {
 }
 
 // IPC handlers
-ipcMain.handle('select-directory', async () => {
-  const result = await dialog.showOpenDialog(mainWindow, {
-    properties: ['openDirectory'],
-    title: 'Select Project Directory'
-  });
-  if (result.canceled) return null;
-  return result.filePaths[0];
-});
-
-// Alias for file-browser.js compatibility
 ipcMain.handle('dialog:selectFolder', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openDirectory'],
     title: 'Select Project Folder'
   });
   return result.canceled ? null : result.filePaths[0];
-});
-
-ipcMain.handle('show-notification', (event, { title, body }) => {
-  showNotification(title, body);
 });
 
 // Initialize error handler (dynamic import for ESM module in CommonJS Electron main)
