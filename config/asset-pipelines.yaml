@@ -317,6 +317,7 @@ pipelines:
             - quest_giver
             - wanderer
           max_per_region: 5
+          regionCount: 3
         gate: null
 
       - name: generate_interactions
