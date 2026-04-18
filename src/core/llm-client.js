@@ -265,12 +265,19 @@ class UniversalLLMClient {
       });
     }
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers,
-      body,
-      signal: options.signal || AbortSignal.timeout(options.timeout || 60000)
-    });
+    let response;
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        body,
+        signal: options.signal || AbortSignal.timeout(options.timeout || 60000)
+      });
+    } catch (fetchErr) {
+      // Strip any URL (which may contain API key for Gemini) from the error message
+      const safeMessage = fetchErr.message.replace(/https?:\/\/[^\s]*/g, '[url-redacted]');
+      throw new Error(`${providerName} network error: ${safeMessage}`);
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -354,6 +361,8 @@ class UniversalLLMClient {
     this.dailyUsage.cost_usd += cost;
     this.dailyUsage.requests[provider] = (this.dailyUsage.requests[provider] || 0) + 1;
     this.dailyUsage.tokens[provider] = (this.dailyUsage.tokens[provider] || 0) + usage.total_tokens;
+    this.dailyUsage.costs = this.dailyUsage.costs || {};
+    this.dailyUsage.costs[provider] = (this.dailyUsage.costs[provider] || 0) + cost;
   }
 
   /**
@@ -366,7 +375,7 @@ class UniversalLLMClient {
 
     const providerBudget = this.budget.per_provider?.[providerName];
     if (providerBudget) {
-      const providerCost = this.dailyUsage.requests[providerName] || 0;
+      const providerCost = this.dailyUsage.costs?.[providerName] || 0;
       if (providerBudget.max_cost_usd && providerCost >= providerBudget.max_cost_usd) {
         return { allowed: false, reason: `${providerName} budget exceeded` };
       }

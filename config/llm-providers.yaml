@@ -122,9 +122,9 @@ task_routing:
   morning_brief:
     description: "Daily summary generation"
     prefer:
+      - ollama
       - groq
       - cerebras
-      - ollama
     fallback: "claude:simple"
     max_tokens: 2048
 
@@ -140,18 +140,18 @@ task_routing:
   email_parsing:
     description: "Parse Fiverr order emails"
     prefer:
+      - ollama:fast
       - groq:fast
       - cerebras
-      - ollama:fast
     fallback: "claude:simple"
     max_tokens: 1024
 
   pr_analysis:
     description: "Analyze pull requests"
     prefer:
+      - ollama:code
       - mistral:code
       - together:code
-      - ollama:code
     fallback: "claude:balanced"
     max_tokens: 4096
 
@@ -165,6 +165,7 @@ task_routing:
   client_communication:
     description: "Generate client emails, responses"
     prefer:
+      - ollama
       - groq
       - cerebras
     fallback: "claude:simple"
@@ -190,6 +191,7 @@ task_routing:
   code_generation_complex:
     description: "Complex multi-file code generation"
     prefer:
+      - ollama
       - groq
       - gemini:code
       - together:code
@@ -201,6 +203,7 @@ task_routing:
   task_decomposition:
     description: "Break complex tasks into sequential sub-tasks"
     prefer:
+      - ollama
       - groq
       - cerebras
       - gemini
@@ -211,16 +214,17 @@ task_routing:
   prompt_enhance:
     description: "Enhance short 3D generation prompts into detailed descriptions"
     prefer:
+      - ollama:fast
       - groq:fast
       - cerebras
       - gemini
-      - ollama:fast
     fallback: "together"
     max_tokens: 300
 
   scene_analysis:
     description: "Decompose scene prompts into structured asset lists with positions"
     prefer:
+      - ollama
       - groq
       - cerebras
       - together

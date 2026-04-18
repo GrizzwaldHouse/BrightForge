@@ -1,7 +1,14 @@
 node_modules/
-.env.local
 .env
+.env.local
 .env.docker
+.env.production
+.env.staging
+.env.test
+.env.*
+!.env.local.example
+!.env.example
+*.env
 sessions/
 *.llcapp-backup
 *.brightforge-backup

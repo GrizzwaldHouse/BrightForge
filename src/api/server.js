@@ -99,7 +99,7 @@ export function createServer(options = {}) {
     if (!origin || allowedOrigins.includes(origin)) {
       res.header('Access-Control-Allow-Origin', origin || allowedOrigins[0]);
     }
-    res.header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     if (req.method === 'OPTIONS') return res.sendStatus(204);
     next();

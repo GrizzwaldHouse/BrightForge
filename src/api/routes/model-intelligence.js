@@ -149,7 +149,7 @@ router.get('/inventory/files', async (req, res) => {
     if (req.query.format) filters.format = req.query.format;
     if (req.query.limit) filters.limit = req.query.limit;
 
-    const files = modelIntelligence._db.getModelFiles(filters);
+    const files = modelIntelligence._db?.getModelFiles(filters) ?? [];
     res.json({ files, count: files.length });
   } catch (err) {
     errorHandler.report('model_intel_error', err, { route: 'GET /inventory/files' });
@@ -164,7 +164,7 @@ router.get('/inventory/files', async (req, res) => {
 router.get('/inventory/runtimes', async (req, res) => {
   try {
     await ensureInit();
-    const runtimes = modelIntelligence._db.getRuntimes();
+    const runtimes = modelIntelligence._db?.getRuntimes() ?? [];
     res.json({ runtimes, count: runtimes.length });
   } catch (err) {
     errorHandler.report('model_intel_error', err, { route: 'GET /inventory/runtimes' });
@@ -179,7 +179,7 @@ router.get('/inventory/runtimes', async (req, res) => {
 router.get('/inventory/storage', async (req, res) => {
   try {
     await ensureInit();
-    const storage = modelIntelligence._db.getStorageVolumes();
+    const storage = modelIntelligence._db?.getStorageVolumes() ?? [];
     res.json({ storage, count: storage.length });
   } catch (err) {
     errorHandler.report('model_intel_error', err, { route: 'GET /inventory/storage' });

@@ -12,7 +12,7 @@
 import { EventEmitter } from 'events';
 import { fileURLToPath } from 'url';
 import { dirname, join, basename, extname } from 'path';
-import { readFileSync, readdirSync, statSync, existsSync } from 'fs';
+import { openSync, readSync, closeSync, readdirSync, statSync, existsSync } from 'fs';
 import { readdir, stat } from 'fs/promises';
 import { execFile } from 'child_process';
 import { randomUUID } from 'crypto';
@@ -515,18 +515,20 @@ class ModelScanner extends EventEmitter {
     // Try to extract quantization from filename
     result.quantization = this._extractQuantization(name);
 
-    // For GGUF files, try to read header magic
+    // For GGUF files, read exactly 4 bytes to check header magic
     if (ext === '.gguf' && existsSync(filePath)) {
+      let fd2 = -1;
       try {
-        const fd = readFileSync(filePath, { encoding: null, flag: 'r', length: 4 });
-        if (fd.length >= 4) {
-          const magic = fd.toString('ascii', 0, 4);
-          if (magic === 'GGUF') {
-            result.format = 'GGUF';
-          }
+        fd2 = openSync(filePath, 'r');
+        const buf = Buffer.alloc(4);
+        const bytesRead = readSync(fd2, buf, 0, 4, 0);
+        if (bytesRead >= 4 && buf.toString('ascii', 0, 4) === 'GGUF') {
+          result.format = 'GGUF';
         }
       } catch (_e) {
         // Keep extension-based format
+      } finally {
+        if (fd2 >= 0) { try { closeSync(fd2); } catch (_e) { /* best-effort */ } }
       }
     }
 

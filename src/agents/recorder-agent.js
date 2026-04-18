@@ -160,7 +160,10 @@ class RecorderAgent extends EventEmitter {
 
     console.log(`[RECORDER] Starting recording ${recordingId}`);
 
-    if (this.dryRun) {
+    if (this.dryRun || !this.obs || !this.connected) {
+      if (!this.dryRun) {
+        console.warn('[RECORDER] OBS not connected — dry-run mode');
+      }
       console.log('[RECORDER] Dry-run mode: simulating recording start');
       this.recording = true;
       this.currentRecordingId = recordingId;
@@ -215,7 +218,10 @@ class RecorderAgent extends EventEmitter {
     const recordingId = this.currentRecordingId;
     console.log(`[RECORDER] Stopping recording ${recordingId}`);
 
-    if (this.dryRun) {
+    if (this.dryRun || !this.obs || !this.connected) {
+      if (!this.dryRun) {
+        console.warn('[RECORDER] OBS not connected — dry-run mode');
+      }
       console.log('[RECORDER] Dry-run mode: simulating recording stop');
       this.recording = false;
       this.currentRecordingId = null;

@@ -67,7 +67,7 @@ const MIGRATIONS = [
 
       CREATE TABLE IF NOT EXISTS agent_registry (
         name TEXT PRIMARY KEY,
-        type TEXT NOT NULL CHECK (type IN ('cloud', 'local')),
+        type TEXT NOT NULL CHECK (type IN ('cloud', 'local', 'pipeline')),
         capabilities TEXT NOT NULL DEFAULT '{}',
         status TEXT NOT NULL DEFAULT 'available'
           CHECK (status IN ('available', 'busy', 'offline')),
@@ -136,6 +136,25 @@ const MIGRATIONS = [
       CREATE INDEX IF NOT EXISTS idx_ideas_status ON ideas(status);
       CREATE INDEX IF NOT EXISTS idx_idea_rels_idea ON idea_relationships(idea_id);
       CREATE INDEX IF NOT EXISTS idx_idea_rels_related ON idea_relationships(related_idea_id);
+    `
+  },
+  {
+    version: 3,
+    description: 'Expand agent_registry type CHECK to include pipeline agents',
+    sql: `
+      CREATE TABLE IF NOT EXISTS agent_registry_new (
+        name TEXT PRIMARY KEY,
+        type TEXT NOT NULL CHECK (type IN ('cloud', 'local', 'pipeline')),
+        capabilities TEXT NOT NULL DEFAULT '{}',
+        status TEXT NOT NULL DEFAULT 'available'
+          CHECK (status IN ('available', 'busy', 'offline')),
+        last_active_at TEXT DEFAULT (datetime('now')),
+        registered_at TEXT DEFAULT (datetime('now'))
+      );
+
+      INSERT OR IGNORE INTO agent_registry_new SELECT * FROM agent_registry;
+      DROP TABLE agent_registry;
+      ALTER TABLE agent_registry_new RENAME TO agent_registry;
     `
   }
 ];

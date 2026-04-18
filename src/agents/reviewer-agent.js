@@ -129,8 +129,9 @@ class ReviewerAgent extends EventEmitter {
   _checkStructure(buildArtifacts, findings, recommendations) {
     let score = 100;
     let issueCount = 0;
+    const artifacts = buildArtifacts ?? [];
 
-    for (const artifact of buildArtifacts) {
+    for (const artifact of artifacts) {
       if (artifact.type !== 'file' || !artifact.path.endsWith('.js')) continue;
 
       // Check file exists (simulated - would check actual files)
@@ -182,8 +183,9 @@ class ReviewerAgent extends EventEmitter {
   _checkStandards(buildArtifacts, findings, recommendations) {
     let score = 100;
     let issueCount = 0;
+    const artifacts = buildArtifacts ?? [];
 
-    for (const artifact of buildArtifacts) {
+    for (const artifact of artifacts) {
       if (artifact.type !== 'file' || !artifact.path.endsWith('.js')) continue;
 
       // Check file exists

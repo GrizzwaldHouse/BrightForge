@@ -291,13 +291,20 @@ class ImageClient {
       }
     };
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(requestBody)
-    });
+    let response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
+    } catch (fetchErr) {
+      // Strip URL (which contains the API key) from any network-level error
+      const safeMessage = fetchErr.message.replace(/https?:\/\/[^\s]*/g, '[url-redacted]');
+      throw new Error(`Gemini network error: ${safeMessage}`);
+    }
 
     if (!response.ok) {
       const errorText = await response.text();

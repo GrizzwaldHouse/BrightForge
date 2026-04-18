@@ -26,7 +26,7 @@ export async function execute(context, stageConfig) {
   try {
     console.log(`${LOG_TAG} Parsing world prompt via LLM...`);
 
-    const { worldDescription, worldGraph } = await worldAnalyzer.analyzePrompt(context.prompt, {
+    const { description: worldDescription, worldGraph } = await worldAnalyzer.analyzePrompt(context.prompt, {
       maxRegions: stageConfig.max_regions
     });
 

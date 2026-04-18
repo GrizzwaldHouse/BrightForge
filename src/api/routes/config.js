@@ -171,10 +171,16 @@ export function configRoutes() {
       // Usage stats
       const usage = client.getUsageSummary();
 
+      const ollamaRunning = providerStatus.ollama?.available === 'available';
+      const anyCloudConfigured = Object.values(providerStatus).some(
+        p => p.available === 'configured'
+      );
+      const healthStatus = (ollamaRunning || anyCloudConfigured) ? 'ok' : 'degraded';
+
       res.json({
-        status: 'ok',
+        status: healthStatus,
         providers: providerStatus,
-        ollamaRunning: providerStatus.ollama?.available === 'available',
+        ollamaRunning,
         budget: {
           daily_limit: usage.budget_remaining + usage.cost_usd,
           used: usage.cost_usd,

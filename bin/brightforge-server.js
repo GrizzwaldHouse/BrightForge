@@ -31,6 +31,9 @@ import { createServer } from '../src/api/server.js';
 import { UniversalLLMClient } from '../src/core/llm-client.js';
 import errorHandler from '../src/core/error-handler.js';
 import wsEventBus from '../src/api/ws-event-bus.js';
+import orchestrator from '../src/orchestration/index.js';
+import modelIntelligence from '../src/model-intelligence/index.js';
+import forgeDb from '../src/forge3d/database.js';
 
 /**
  * Start the HTTP server.
@@ -104,14 +107,6 @@ async function main() {
     }
   });
 
-  // Attach WebSocket event bus to the HTTP server
-  try {
-    wsEventBus.attach(server);
-    console.log(`  [SERVER] WebSocket: ws://localhost:${port}/ws/events`);
-  } catch (err) {
-    console.warn(`  [SERVER] WebSocket bus attach failed: ${err.message}`);
-  }
-
   server.on('error', (error) => {
     if (error.code === 'EADDRINUSE') {
       console.error('');
@@ -130,6 +125,9 @@ async function main() {
   const shutdown = () => {
     console.log('\n  [SERVER] Shutting down...');
     wsEventBus.detach();
+    try { orchestrator.shutdown(); } catch (_e) { /* best-effort */ }
+    try { modelIntelligence.shutdown(); } catch (_e) { /* best-effort */ }
+    try { forgeDb.close(); } catch (_e) { /* best-effort */ }
     server.close(() => {
       store.destroy();
       process.exit(0);

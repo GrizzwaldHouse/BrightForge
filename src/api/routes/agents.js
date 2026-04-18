@@ -323,7 +323,7 @@ async function _runPipeline(prompt) {
 
     // Step 4: Review
     pipelineState.currentAgent = 'Reviewer';
-    const reviewResult = await reviewerAgent.review(testResult);
+    const reviewResult = await reviewerAgent.review(testResult, buildResult.artifacts ?? []);
 
     pipelineState.status = 'completed';
     pipelineState.completedAt = new Date().toISOString();
