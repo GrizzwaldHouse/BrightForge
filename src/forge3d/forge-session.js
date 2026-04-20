@@ -27,6 +27,7 @@ import modelBridge from './model-bridge.js';
 import universalMeshClient from './universal-mesh-client.js';
 import forge3dDb from './database.js';
 import forge3dConfig from './config-loader.js';
+import selfHealingOrchestrator from '../core/self-healing-orchestrator.js';
 
 const SESSION_STATES = {
   IDLE: 'idle',
@@ -162,22 +163,29 @@ class ForgeSession extends EventEmitter {
       prompt: session.prompt ? session.prompt.slice(0, 80) : null
     });
 
-    try {
-      let result;
+    const healResult = await selfHealingOrchestrator.execute({
+      name: `forge3d_${session.type}`,
+      operation: async (_correlationId) => {
+        switch (session.type) {
+        case 'mesh':
+          return await this._runMesh(session);
+        case 'image':
+          return await this._runImage(session);
+        case 'full':
+          return await this._runFull(session);
+        default:
+          throw new Error(`Unknown generation type: ${session.type}`);
+        }
+      },
+      guards: {
+        bridge_ready: async () => modelBridge.state === 'running'
+      },
+      correlationId: sessionId,
+      context: { sessionId, type: session.type, prompt: session.prompt?.slice(0, 80) }
+    });
 
-      switch (session.type) {
-      case 'mesh':
-        result = await this._runMesh(session);
-        break;
-      case 'image':
-        result = await this._runImage(session);
-        break;
-      case 'full':
-        result = await this._runFull(session);
-        break;
-      default:
-        throw new Error(`Unknown generation type: ${session.type}`);
-      }
+    if (healResult.success) {
+      const result = healResult.result;
 
       session.state = SESSION_STATES.COMPLETE;
       session.completedAt = Date.now();
@@ -223,26 +231,28 @@ class ForgeSession extends EventEmitter {
       this.emit('complete', { sessionId, result });
       return result;
 
-    } catch (err) {
+    } else {
+      const reason = healResult.failure?.reason || 'Unknown generation failure';
+
       session.state = SESSION_STATES.FAILED;
       session.completedAt = Date.now();
-      session.error = err.message;
+      session.error = reason;
 
       const duration = session.completedAt - session.startedAt;
-      console.error(`[FORGE] Session ${sessionId} failed after ${duration}ms: ${err.message}`);
+      console.error(`[FORGE] Session ${sessionId} failed after ${duration}ms: ${reason}`);
 
       // Persist failure to DB
-      this._persistState(sessionId, SESSION_STATES.FAILED, err.message);
+      this._persistState(sessionId, SESSION_STATES.FAILED, reason);
 
       telemetryBus.emit('forge3d_generation_failed', {
         sessionId,
         type: session.type,
         duration,
-        error: err.message
+        error: reason
       });
 
-      this.emit('failed', { sessionId, error: err.message });
-      throw err;
+      this.emit('failed', { sessionId, error: reason });
+      throw new Error(reason);
     }
   }
 

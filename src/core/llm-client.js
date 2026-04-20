@@ -15,6 +15,7 @@ import { dirname, join } from 'path';
 import errorHandler from './error-handler.js';
 import telemetryBus from './telemetry-bus.js';
 import contextAdapter from './context-adapter.js';
+import selfHealingOrchestrator from './self-healing-orchestrator.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -395,110 +396,126 @@ class UniversalLLMClient {
     const task = options.task || 'default';
     const routing = this.taskRouting[task] || { prefer: ['groq', 'ollama'], fallback: null };
 
-    const errors = [];
-    const routingLog = [];
-    const endTimer = telemetryBus.startTimer('llm_request', { task });
-
-    // Adapt context for target providers
+    // Adapt context for target providers (outside healing scope — pure transform, no I/O)
     const adaptedMessages = contextAdapter.adaptContext(messages, routing.prefer[0] || 'groq', options.modelHint);
 
-    // Try preferred providers in order
-    for (const providerSpec of routing.prefer) {
-      const { provider, modelHint } = this.parseProviderModel(providerSpec);
+    const healingResult = await selfHealingOrchestrator.execute({
+      name: 'llm_chat',
+      correlationId: options.correlationId,
+      context: { task: options.task },
+      operation: async () => {
+        const errors = [];
+        const routingLog = [];
+        const endTimer = telemetryBus.startTimer('llm_request', { task });
 
-      // Check if cancelled before trying next provider
-      if (options.signal?.aborted) {
-        const cancelError = new Error('Request cancelled');
-        cancelError.routingLog = routingLog;
-        throw cancelError;
-      }
+        // Try preferred providers in order
+        for (const providerSpec of routing.prefer) {
+          const { provider, modelHint } = this.parseProviderModel(providerSpec);
 
-      if (!this.isProviderAvailable(provider)) {
-        routingLog.push({ provider, status: 'skipped', reason: 'Not available' });
-        errors.push({ provider, error: 'Not available' });
-        continue;
-      }
-
-      const budgetCheck = this.checkBudget(provider);
-      if (!budgetCheck.allowed) {
-        routingLog.push({ provider, status: 'skipped', reason: budgetCheck.reason });
-        errors.push({ provider, error: budgetCheck.reason });
-        continue;
-      }
-
-      try {
-        const model = this.getModel(provider, modelHint, options.complexity);
-        console.log(`[LLM] Trying ${provider}${modelHint ? ':' + modelHint : ''}...`);
-
-        if (options.onProviderTrying) {
-          options.onProviderTrying(provider, model);
-        }
-
-        const result = await this.callProvider(provider, adaptedMessages, {
-          ...options,
-          modelHint,
-          max_tokens: routing.max_tokens || options.max_tokens
-        });
-
-        routingLog.push({ provider, model: result.model, status: 'success', cost: result.cost });
-        console.log(`[LLM] Success with ${provider} (${result.model}), cost: $${result.cost.toFixed(4)}`);
-        endTimer({ provider, status: 'success', tokens: result.usage?.total_tokens || 0, cost: result.cost });
-        return { ...result, routingLog };
-
-      } catch (error) {
-        console.warn(`[LLM] ${provider} failed: ${error.message}`);
-        routingLog.push({ provider, status: 'failed', error: error.message });
-
-        if (options.onProviderFailed) {
-          options.onProviderFailed(provider, error);
-        }
-
-        errorHandler.report('provider_error', error, { provider, task, severity: 'warning' });
-        endTimer({ provider, status: 'failed', error: error.message });
-        errors.push({ provider, error: error.message });
-        continue;
-      }
-    }
-
-    // Try fallback if all preferred failed
-    if (routing.fallback) {
-      const { provider: fallbackProvider, modelHint } = this.parseProviderModel(routing.fallback);
-
-      if (this.isProviderAvailable(fallbackProvider)) {
-        try {
-          const model = this.getModel(fallbackProvider, modelHint, options.complexity);
-          console.log(`[LLM] Trying fallback: ${routing.fallback}...`);
-
-          if (options.onProviderTrying) {
-            options.onProviderTrying(fallbackProvider, model);
+          // Check if cancelled before trying next provider
+          if (options.signal?.aborted) {
+            const cancelError = new Error('Request cancelled');
+            cancelError.routingLog = routingLog;
+            throw cancelError;
           }
 
-          const result = await this.callProvider(fallbackProvider, adaptedMessages, {
-            ...options,
-            modelHint,
-            max_tokens: routing.max_tokens || options.max_tokens
-          });
-
-          routingLog.push({ provider: fallbackProvider, model: result.model, status: 'success', cost: result.cost, fallback: true });
-          return { ...result, routingLog };
-
-        } catch (error) {
-          routingLog.push({ provider: fallbackProvider, status: 'failed', error: error.message, fallback: true });
-
-          if (options.onProviderFailed) {
-            options.onProviderFailed(fallbackProvider, error);
+          if (!this.isProviderAvailable(provider)) {
+            routingLog.push({ provider, status: 'skipped', reason: 'Not available' });
+            errors.push({ provider, error: 'Not available' });
+            continue;
           }
 
-          errors.push({ provider: fallbackProvider, error: error.message });
+          const budgetCheck = this.checkBudget(provider);
+          if (!budgetCheck.allowed) {
+            routingLog.push({ provider, status: 'skipped', reason: budgetCheck.reason });
+            errors.push({ provider, error: budgetCheck.reason });
+            continue;
+          }
+
+          try {
+            const model = this.getModel(provider, modelHint, options.complexity);
+            console.log(`[LLM] Trying ${provider}${modelHint ? ':' + modelHint : ''}...`);
+
+            if (options.onProviderTrying) {
+              options.onProviderTrying(provider, model);
+            }
+
+            const result = await this.callProvider(provider, adaptedMessages, {
+              ...options,
+              modelHint,
+              max_tokens: routing.max_tokens || options.max_tokens
+            });
+
+            routingLog.push({ provider, model: result.model, status: 'success', cost: result.cost });
+            console.log(`[LLM] Success with ${provider} (${result.model}), cost: $${result.cost.toFixed(4)}`);
+            endTimer({ provider, status: 'success', tokens: result.usage?.total_tokens || 0, cost: result.cost });
+            return { ...result, routingLog };
+
+          } catch (error) {
+            console.warn(`[LLM] ${provider} failed: ${error.message}`);
+            routingLog.push({ provider, status: 'failed', error: error.message });
+
+            if (options.onProviderFailed) {
+              options.onProviderFailed(provider, error);
+            }
+
+            errorHandler.report('provider_error', error, { provider, task, severity: 'warning' });
+            endTimer({ provider, status: 'failed', error: error.message });
+            errors.push({ provider, error: error.message });
+            continue;
+          }
         }
+
+        // Try fallback if all preferred failed
+        if (routing.fallback) {
+          const { provider: fallbackProvider, modelHint } = this.parseProviderModel(routing.fallback);
+
+          if (this.isProviderAvailable(fallbackProvider)) {
+            try {
+              const model = this.getModel(fallbackProvider, modelHint, options.complexity);
+              console.log(`[LLM] Trying fallback: ${routing.fallback}...`);
+
+              if (options.onProviderTrying) {
+                options.onProviderTrying(fallbackProvider, model);
+              }
+
+              const result = await this.callProvider(fallbackProvider, adaptedMessages, {
+                ...options,
+                modelHint,
+                max_tokens: routing.max_tokens || options.max_tokens
+              });
+
+              routingLog.push({ provider: fallbackProvider, model: result.model, status: 'success', cost: result.cost, fallback: true });
+              return { ...result, routingLog };
+
+            } catch (error) {
+              routingLog.push({ provider: fallbackProvider, status: 'failed', error: error.message, fallback: true });
+
+              if (options.onProviderFailed) {
+                options.onProviderFailed(fallbackProvider, error);
+              }
+
+              errors.push({ provider: fallbackProvider, error: error.message });
+            }
+          }
+        }
+
+        // All providers failed
+        const allFailedError = new Error(`All LLM providers failed:\n${errors.map(e => `  - ${e.provider}: ${e.error}`).join('\n')}`);
+        allFailedError.routingLog = routingLog;
+        errorHandler.report('provider_error', allFailedError, { task, allProvidersFailed: true, providers: errors });
+        throw allFailedError;
       }
+    });
+
+    if (!healingResult.success) {
+      const err = new Error(healingResult.failure.reason);
+      err.failure = healingResult.failure;
+      err.routingLog = [];
+      throw err;
     }
 
-    // All providers failed
-    const allFailedError = new Error(`All LLM providers failed:\n${errors.map(e => `  - ${e.provider}: ${e.error}`).join('\n')}`);
-    allFailedError.routingLog = routingLog;
-    errorHandler.report('provider_error', allFailedError, { task, allProvidersFailed: true, providers: errors });
-    throw allFailedError;
+    return healingResult.result;
   }
 
   /**

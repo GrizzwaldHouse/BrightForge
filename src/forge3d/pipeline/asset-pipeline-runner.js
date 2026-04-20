@@ -25,6 +25,7 @@ import { getStageHandler } from './stages/index.js';
 import orchestrator from '../../orchestration/index.js';
 import errorHandler from '../../core/error-handler.js';
 import telemetryBus from '../../core/telemetry-bus.js';
+import selfHealingOrchestrator from '../../core/self-healing-orchestrator.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -409,88 +410,90 @@ class AssetPipelineRunner extends EventEmitter {
       return false;
     }
 
-    try {
-      // Execute the handler
-      const result = await handler.execute(exec.context, stage.config);
+    // Execute handler via self-healing orchestrator
+    const healResult = await selfHealingOrchestrator.execute({
+      name: `pipeline_stage_${stage.name}`,
+      operation: async (_correlationId) => handler.execute(exec.context, stage.config),
+      correlationId: `${exec.id}-stage-${stageIndex}`,
+      context: { pipelineId: exec.id, stageName: stage.name, stageIndex }
+    });
 
-      if (!result.success) {
-        stage.status = 'failed';
-        stage.error = result.error || 'Stage handler returned failure';
-        stage.result = result.result;
-        stage.completedAt = new Date().toISOString();
-
-        this._emitEvent('stage_failed', {
-          pipelineId: exec.id,
-          stageName: stage.name,
-          stageIndex,
-          error: stage.error
-        });
-
-        return false;
-      }
-
-      // Merge stage results into pipeline context
-      if (result.result) {
-        Object.assign(exec.context, result.result);
-      }
-
-      stage.status = 'completed';
-      stage.result = result.result;
-      stage.completedAt = new Date().toISOString();
-
-      // Run supervisor gate if configured
-      if (stage.gate === 'supervisor') {
-        const gateResult = this._runSupervisorGate(exec, stage, stageIndex);
-        if (!gateResult) {
-          return false;
-        }
-      }
-
-      // Emit stage_completed
-      this._emitEvent('stage_completed', {
-        pipelineId: exec.id,
-        pipelineName: exec.pipelineName,
-        stageName: stage.name,
-        stageIndex,
-        totalStages: exec.stages.length
-      });
-
-      // Update orchestration task next action
-      if (orchTaskId && orchestrator.initialized) {
-        try {
-          const nextStage = exec.stages[stageIndex + 1];
-          if (nextStage) {
-            orchestrator.taskState.update(orchTaskId, {
-              agent: 'Claude',
-              next_action: `Execute stage: ${nextStage.name}`
-            });
-          }
-        } catch (_e) {
-          // Non-fatal
-        }
-      }
-
-      return true;
-    } catch (err) {
+    if (!healResult.success) {
       stage.status = 'failed';
-      stage.error = err.message;
+      stage.error = healResult.failure.reason;
       stage.completedAt = new Date().toISOString();
-
-      errorHandler.report('pipeline_error', err, {
-        pipelineId: exec.id,
-        stage: stage.name,
-        stageIndex
-      });
 
       this._emitEvent('stage_failed', {
         pipelineId: exec.id,
         stageName: stage.name,
         stageIndex,
-        error: err.message
+        error: stage.error
       });
 
       return false;
     }
+
+    // healResult.result is the value returned by handler.execute()
+    const handlerResult = healResult.result;
+
+    if (!handlerResult.success) {
+      stage.status = 'failed';
+      stage.error = handlerResult.error || 'Stage handler returned failure';
+      stage.result = handlerResult.result;
+      stage.completedAt = new Date().toISOString();
+
+      this._emitEvent('stage_failed', {
+        pipelineId: exec.id,
+        stageName: stage.name,
+        stageIndex,
+        error: stage.error
+      });
+
+      return false;
+    }
+
+    // Merge stage results into pipeline context
+    if (handlerResult.result) {
+      Object.assign(exec.context, handlerResult.result);
+    }
+
+    stage.status = 'completed';
+    stage.result = handlerResult.result;
+    stage.completedAt = new Date().toISOString();
+
+    // Run supervisor gate if configured
+    if (stage.gate === 'supervisor') {
+      const gateResult = this._runSupervisorGate(exec, stage, stageIndex);
+      if (!gateResult) {
+        return false;
+      }
+    }
+
+    // Emit stage_completed
+    this._emitEvent('stage_completed', {
+      pipelineId: exec.id,
+      pipelineName: exec.pipelineName,
+      stageName: stage.name,
+      stageIndex,
+      totalStages: exec.stages.length
+    });
+
+    // Update orchestration task next action
+    if (orchTaskId && orchestrator.initialized) {
+      try {
+        const nextStage = exec.stages[stageIndex + 1];
+        if (nextStage) {
+          orchestrator.taskState.update(orchTaskId, {
+            agent: 'Claude',
+            next_action: `Execute stage: ${nextStage.name}`
+          });
+        }
+      } catch (_e) {
+        // Non-fatal
+      }
+    }
+
+    return true;
   }
 
   /**
