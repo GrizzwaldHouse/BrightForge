@@ -77,6 +77,7 @@ function httpRequest(method, url, body = null, timeoutMs = 15_000) {
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        'x-brightforge-test': 'true',
         ...(payload ? { 'Content-Length': Buffer.byteLength(payload) } : {})
       }
     };
