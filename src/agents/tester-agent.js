@@ -9,11 +9,11 @@
  */
 
 import { EventEmitter } from 'events';
-import { execSync } from 'child_process';
 import { randomUUID } from 'crypto';
 import { existsSync } from 'fs';
 import telemetryBus from '../core/telemetry-bus.js';
 import errorHandler from '../core/error-handler.js';
+import sandbox from '../security/sandbox.js';
 
 class TesterAgent extends EventEmitter {
   constructor() {
@@ -134,12 +134,20 @@ class TesterAgent extends EventEmitter {
         };
       }
 
-      // Real execution (would run if file exists)
-      const output = execSync(`node ${file} --test`, {
-        encoding: 'utf8',
-        timeout: 30000,
-        stdio: 'pipe'
-      });
+      // Real execution via sandbox (no shell interpolation)
+      const projectRoot = process.cwd();
+      const result = sandbox.runNodeTest(file, projectRoot, 30000);
+
+      if (result.timedOut) {
+        throw new Error(`Test timed out after 30s: ${file}`);
+      }
+
+      if (result.status !== 0) {
+        const err = new Error(result.stderr || result.stdout || 'Test exited with non-zero status');
+        err.stdout = result.stdout;
+        err.stderr = result.stderr;
+        throw err;
+      }
 
       if (verbose) {
         console.log('[TESTER] [AAA] Assert: Test passed');
@@ -149,7 +157,7 @@ class TesterAgent extends EventEmitter {
         file,
         success: true,
         duration: 0,
-        output: output.trim(),
+        output: result.stdout.trim(),
         aaa: { arrange, act, assert: 'Test passed' }
       };
     } catch (error) {
@@ -172,14 +180,15 @@ class TesterAgent extends EventEmitter {
     const errors = [];
 
     try {
-      // Run ESLint on files
-      const fileList = files.join(' ');
-      const output = execSync(`npx eslint ${fileList} --format json`, {
-        encoding: 'utf8',
-        timeout: 30000,
-        stdio: 'pipe'
-      });
+      const projectRoot = process.cwd();
+      const result = sandbox.runEslint(files, projectRoot, 30000);
 
+      if (result.timedOut) {
+        console.warn('[TESTER] ESLint timed out');
+        return { errors };
+      }
+
+      const output = result.stdout || result.stderr;
       const results = JSON.parse(output);
 
       for (const result of results) {
@@ -196,25 +205,8 @@ class TesterAgent extends EventEmitter {
       if (verbose && errors.length > 0) {
         console.log(`[TESTER] ESLint found ${errors.length} file(s) with issues`);
       }
-    } catch (error) {
-      // ESLint returns non-zero exit code if there are errors
-      if (error.stdout) {
-        try {
-          const results = JSON.parse(error.stdout);
-          for (const result of results) {
-            if (result.errorCount > 0 || result.warningCount > 0) {
-              errors.push({
-                file: result.filePath,
-                errorCount: result.errorCount,
-                warningCount: result.warningCount,
-                messages: result.messages
-              });
-            }
-          }
-        } catch (parseError) {
-          console.warn(`[TESTER] Failed to parse ESLint output: ${parseError.message}`);
-        }
-      }
+    } catch (parseError) {
+      console.warn(`[TESTER] Failed to parse ESLint output: ${parseError.message}`);
     }
 
     return { errors };

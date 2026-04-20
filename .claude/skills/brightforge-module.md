@@ -59,11 +59,33 @@ if (process.argv.includes('--test')) {
 - [ ] `fileURLToPath`/`dirname` for path resolution
 - [ ] `[PREFIX]` logging tag chosen and documented
 - [ ] Singleton + named class export
-- [ ] `--test` self-test block at bottom
+- [ ] `--test` self-test block guarded with `process.argv[1] === __filename` (Phase 15-16 pattern)
 - [ ] npm script added to package.json
 - [ ] YAML config if needed (loaded with `readFileSync` + `parse`)
 - [ ] Import and use `telemetryBus` and `errorHandler` for observability
 - [ ] No new dependencies (use native fetch, existing packages only)
+- [ ] Subprocess execution uses `sandbox.run()` — never `execSync` with string interpolation
+- [ ] Async route handlers have `try/catch` → `errorHandler.report` + `res.status(500)`
+- [ ] Static routes declared before param routes (e.g., `/pipeline/status` before `/:name/status`)
+
+## Import-Safe Test Block (Phase 15-16)
+
+When a module is imported by other modules that also use `--test`, guard the block so it only fires when the file is the entry point:
+
+```javascript
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+
+if (process.argv.includes('--test') && process.argv[1] === __filename) {
+  let passed = 0; let failed = 0;
+  const assert = (label, condition) => {
+    if (condition) { console.log(`  ✓ ${label}`); passed++; }
+    else { console.error(`  ✗ ${label}`); failed++; }
+  };
+  // ... tests ...
+  process.exit(failed > 0 ? 1 : 0);
+}
+```
 
 ## API Route Template
 

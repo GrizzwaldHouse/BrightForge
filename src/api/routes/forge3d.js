@@ -264,11 +264,16 @@ router.post('/generate', forge3dLimiter, express.raw({ type: 'image/*', limit: f
  * Check generation progress.
  */
 router.get('/status/:id', (req, res) => {
-  const status = forgeSession.getStatus(req.params.id);
-  if (!status) {
-    return res.status(404).json({ error: 'Session not found' });
+  try {
+    const status = forgeSession.getStatus(req.params.id);
+    if (!status) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+    res.json(status);
+  } catch (err) {
+    errorHandler.report('forge3d_error', err, { endpoint: 'status', id: req.params.id });
+    res.status(500).json({ error: sanitizeError(err) });
   }
-  res.json(status);
 });
 
 /**
@@ -277,47 +282,54 @@ router.get('/status/:id', (req, res) => {
  * Replaces polling for active generation sessions.
  */
 router.get('/stream/:id', (req, res) => {
-  res.set({
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive'
-  });
-  res.flushHeaders();
+  try {
+    res.set({
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive'
+    });
+    res.flushHeaders();
 
-  const sessionId = req.params.id;
+    const sessionId = req.params.id;
 
-  // Heartbeat keepalive every 15s
-  const heartbeat = setInterval(() => {
-    res.write(':keepalive\n\n');
-  }, 15000);
+    // Heartbeat keepalive every 15s
+    const heartbeat = setInterval(() => {
+      res.write(':keepalive\n\n');
+    }, 15000);
 
-  const onProgress = (data) => {
-    if (data.sessionId === sessionId) {
-      res.write(`data: ${JSON.stringify(data)}\n\n`);
-    }
-  };
+    const onProgress = (data) => {
+      if (data.sessionId === sessionId) {
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+      }
+    };
 
-  const onComplete = (data) => {
-    if (data.sessionId === sessionId) {
+    const onComplete = (data) => {
+      if (data.sessionId === sessionId) {
+        clearInterval(heartbeat);
+        res.write(`data: ${JSON.stringify({ ...data, done: true })}\n\n`);
+        cleanup();
+        res.end();
+      }
+    };
+
+    const cleanup = () => {
       clearInterval(heartbeat);
-      res.write(`data: ${JSON.stringify({ ...data, done: true })}\n\n`);
-      cleanup();
-      res.end();
+      forgeSession.off('progress', onProgress);
+      forgeSession.off('complete', onComplete);
+      forgeSession.off('failed', onComplete);
+    };
+
+    forgeSession.on('progress', onProgress);
+    forgeSession.on('complete', onComplete);
+    forgeSession.on('failed', onComplete);
+
+    req.on('close', cleanup);
+  } catch (err) {
+    errorHandler.report('forge3d_error', err, { endpoint: 'stream', id: req.params.id });
+    if (!res.headersSent) {
+      res.status(500).json({ error: sanitizeError(err) });
     }
-  };
-
-  const cleanup = () => {
-    clearInterval(heartbeat);
-    forgeSession.off('progress', onProgress);
-    forgeSession.off('complete', onComplete);
-    forgeSession.off('failed', onComplete);
-  };
-
-  forgeSession.on('progress', onProgress);
-  forgeSession.on('complete', onComplete);
-  forgeSession.on('failed', onComplete);
-
-  req.on('close', cleanup);
+  }
 });
 
 /**
@@ -400,16 +412,21 @@ router.post('/projects', (req, res) => {
  * Get project details.
  */
 router.get('/projects/:id', (req, res) => {
-  ensureInit();
-  const project = projectManager.getProject(req.params.id);
-  if (!project) {
-    return res.status(404).json({ error: 'Project not found' });
+  try {
+    ensureInit();
+    const project = projectManager.getProject(req.params.id);
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    const assets = projectManager.listAssets(req.params.id);
+    const diskUsage = projectManager.getProjectDiskUsage(req.params.id);
+
+    res.json({ ...project, assets, diskUsage });
+  } catch (err) {
+    errorHandler.report('forge3d_error', err, { endpoint: 'get_project', projectId: req.params.id });
+    res.status(500).json({ error: sanitizeError(err) });
   }
-
-  const assets = projectManager.listAssets(req.params.id);
-  const diskUsage = projectManager.getProjectDiskUsage(req.params.id);
-
-  res.json({ ...project, assets, diskUsage });
 });
 
 /**
@@ -864,8 +881,13 @@ router.get('/bridge', async (_req, res) => {
  * List recent forge sessions (in-memory).
  */
 router.get('/sessions', (_req, res) => {
-  const sessions = forgeSession.list(20);
-  res.json({ sessions });
+  try {
+    const sessions = forgeSession.list(20);
+    res.json({ sessions });
+  } catch (err) {
+    errorHandler.report('forge3d_error', err, { endpoint: 'sessions' });
+    res.status(500).json({ error: sanitizeError(err) });
+  }
 });
 
 // --- Queue ---
@@ -890,8 +912,13 @@ router.get('/queue', (_req, res) => {
  * Pause the generation queue.
  */
 router.post('/queue/pause', (_req, res) => {
-  generationQueue.pause();
-  res.json({ paused: true });
+  try {
+    generationQueue.pause();
+    res.json({ paused: true });
+  } catch (err) {
+    errorHandler.report('forge3d_error', err, { endpoint: 'queue_pause' });
+    res.status(500).json({ error: sanitizeError(err) });
+  }
 });
 
 /**
@@ -899,8 +926,13 @@ router.post('/queue/pause', (_req, res) => {
  * Resume the generation queue.
  */
 router.post('/queue/resume', (_req, res) => {
-  generationQueue.resume();
-  res.json({ paused: false });
+  try {
+    generationQueue.resume();
+    res.json({ paused: false });
+  } catch (err) {
+    errorHandler.report('forge3d_error', err, { endpoint: 'queue_resume' });
+    res.status(500).json({ error: sanitizeError(err) });
+  }
 });
 
 /**
@@ -908,11 +940,16 @@ router.post('/queue/resume', (_req, res) => {
  * Cancel a queued job.
  */
 router.delete('/queue/:id', (req, res) => {
-  const cancelled = generationQueue.cancel(req.params.id);
-  if (cancelled) {
-    res.json({ cancelled: true });
-  } else {
-    res.status(400).json({ error: 'Job cannot be cancelled (may be processing or already complete)' });
+  try {
+    const cancelled = generationQueue.cancel(req.params.id);
+    if (cancelled) {
+      res.json({ cancelled: true });
+    } else {
+      res.status(400).json({ error: 'Job cannot be cancelled (may be processing or already complete)' });
+    }
+  } catch (err) {
+    errorHandler.report('forge3d_error', err, { endpoint: 'queue_cancel', jobId: req.params.id });
+    res.status(500).json({ error: sanitizeError(err) });
   }
 });
 

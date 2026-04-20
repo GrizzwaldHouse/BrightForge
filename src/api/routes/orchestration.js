@@ -6,6 +6,14 @@
 import express from 'express';
 import orchestrator from '../../orchestration/index.js';
 
+function guardOrch(res) {
+  if (!orchestrator || !orchestrator.initialized) {
+    res.status(503).json({ error: 'dependency_uninitialized', detail: 'Orchestration runtime not ready' });
+    return false;
+  }
+  return true;
+}
+
 /**
  * Create Express router for orchestration endpoints.
  * @returns {express.Router} Router instance
@@ -16,6 +24,7 @@ export function createOrchestrationRoutes() {
   // GET /api/orchestration/status - Get orchestration runtime status
   router.get('/status', async (req, res) => {
     try {
+      if (!guardOrch(res)) return;
       const status = orchestrator.getStatus();
       res.json(status);
     } catch (err) {
@@ -27,6 +36,7 @@ export function createOrchestrationRoutes() {
   // POST /api/orchestration/task - Create new orchestration task
   router.post('/task', async (req, res) => {
     try {
+      if (!guardOrch(res)) return;
       const { taskName, agent, phase, nextAction } = req.body;
 
       if (!taskName || !agent) {
@@ -50,6 +60,7 @@ export function createOrchestrationRoutes() {
   // GET /api/orchestration/tasks - List all tasks with optional filters
   router.get('/tasks', async (req, res) => {
     try {
+      if (!guardOrch(res)) return;
       const filters = {
         status: req.query.status,
         agent: req.query.agent,
@@ -70,6 +81,7 @@ export function createOrchestrationRoutes() {
   // GET /api/orchestration/task/:id - Get single task by ID
   router.get('/task/:id', async (req, res) => {
     try {
+      if (!guardOrch(res)) return;
       const { id } = req.params;
       const task = orchestrator.taskState.load(id);
 
@@ -87,6 +99,7 @@ export function createOrchestrationRoutes() {
   // PATCH /api/orchestration/task/:id - Update task
   router.patch('/task/:id', async (req, res) => {
     try {
+      if (!guardOrch(res)) return;
       const { id } = req.params;
       const updates = req.body;
 
@@ -104,6 +117,7 @@ export function createOrchestrationRoutes() {
   // POST /api/orchestration/handoff - Initiate handoff between agents
   router.post('/handoff', async (req, res) => {
     try {
+      if (!guardOrch(res)) return;
       const { taskId, fromAgent, toAgent, reason } = req.body;
 
       if (!taskId || !fromAgent || !toAgent) {
@@ -130,6 +144,7 @@ export function createOrchestrationRoutes() {
   // GET /api/orchestration/handoff/history/:taskId - Get handoff history for task
   router.get('/handoff/history/:taskId', async (req, res) => {
     try {
+      if (!guardOrch(res)) return;
       const { taskId } = req.params;
       const history = orchestrator.handoff.getHistory(taskId);
       res.json(history);
@@ -142,6 +157,7 @@ export function createOrchestrationRoutes() {
   // GET /api/orchestration/agents - List registered agents
   router.get('/agents', async (req, res) => {
     try {
+      if (!guardOrch(res)) return;
       const agents = orchestrator.storage.listAgents();
       res.json(agents);
     } catch (err) {

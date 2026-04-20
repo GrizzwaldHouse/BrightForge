@@ -198,7 +198,7 @@ class ImageClient {
 
     console.log(`[IMAGE] Pollinations URL: ${url}`);
 
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
     if (!response.ok) {
       throw new Error(`Pollinations API error: ${response.status} ${response.statusText}`);
     }
@@ -242,7 +242,8 @@ class ImageClient {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify(requestBody),
+      signal: AbortSignal.timeout(30000)
     });
 
     if (!response.ok) {
@@ -255,7 +256,7 @@ class ImageClient {
     if (!imageUrl) throw new Error('No image URL in Together API response');
 
     // Download image
-    const imageResponse = await fetch(imageUrl);
+    const imageResponse = await fetch(imageUrl, { signal: AbortSignal.timeout(30000) });
     const imageBuffer = await imageResponse.arrayBuffer();
     const outputPath = await this.saveImage(Buffer.from(imageBuffer), 'together', options);
 
@@ -298,7 +299,8 @@ class ImageClient {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify(requestBody),
+        signal: AbortSignal.timeout(30000)
       });
     } catch (fetchErr) {
       // Strip URL (which contains the API key) from any network-level error
@@ -377,7 +379,8 @@ class ImageClient {
         'Authorization': `Bearer ${apiKey}`,
         'Accept': 'image/*'
       },
-      body: formData
+      body: formData,
+      signal: AbortSignal.timeout(30000)
     });
 
     if (!response.ok) {

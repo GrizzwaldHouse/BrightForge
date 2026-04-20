@@ -79,8 +79,50 @@ export function agentRoutes() {
   });
 
   /**
+   * GET /api/agents/pipeline/status
+   * Pipeline progress.
+   * MUST be declared before /:name/status to avoid route shadowing.
+   */
+  router.get('/pipeline/status', (_req, res) => {
+    try {
+      res.json(pipelineState);
+    } catch (error) {
+      console.error(`[ROUTE] /api/agents/pipeline/status error: ${error.message}`);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  /**
+   * GET /api/agents/recorder/status
+   * OBS connection status.
+   * MUST be declared before /:name/status to avoid route shadowing.
+   */
+  router.get('/recorder/status', (_req, res) => {
+    try {
+      res.json(recorderAgent.getStatus());
+    } catch (error) {
+      console.error(`[ROUTE] /api/agents/recorder/status error: ${error.message}`);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  /**
+   * GET /api/agents/stability/status
+   * Stability run progress.
+   * MUST be declared before /:name/status to avoid route shadowing.
+   */
+  router.get('/stability/status', (_req, res) => {
+    try {
+      res.json(stabilityState);
+    } catch (error) {
+      console.error(`[ROUTE] /api/agents/stability/status error: ${error.message}`);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  /**
    * GET /api/agents/:name/status
-   * Single agent status.
+   * Single agent status. Declared AFTER the static status routes (pipeline/recorder/stability).
    */
   router.get('/:name/status', (req, res) => {
     try {
@@ -152,19 +194,6 @@ export function agentRoutes() {
   });
 
   /**
-   * GET /api/agents/pipeline/status
-   * Pipeline progress.
-   */
-  router.get('/pipeline/status', (_req, res) => {
-    try {
-      res.json(pipelineState);
-    } catch (error) {
-      console.error(`[ROUTE] /api/agents/pipeline/status error: ${error.message}`);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-  /**
    * POST /api/agents/recorder/start
    * Start OBS recording.
    */
@@ -189,19 +218,6 @@ export function agentRoutes() {
     } catch (error) {
       console.error(`[ROUTE] /api/agents/recorder/stop error: ${error.message}`);
       res.status(500).json({ error: error.message });
-    }
-  });
-
-  /**
-   * GET /api/agents/recorder/status
-   * OBS connection status.
-   */
-  router.get('/recorder/status', (_req, res) => {
-    try {
-      res.json(recorderAgent.getStatus());
-    } catch (error) {
-      console.error(`[ROUTE] /api/agents/recorder/status error: ${error.message}`);
-      res.status(500).json({ error: 'Internal server error' });
     }
   });
 
@@ -275,19 +291,6 @@ export function agentRoutes() {
       res.status(202).json({ status: 'started' });
     } catch (error) {
       console.error(`[ROUTE] /api/agents/stability/start error: ${error.message}`);
-      res.status(500).json({ error: 'Internal server error' });
-    }
-  });
-
-  /**
-   * GET /api/agents/stability/status
-   * Stability run progress.
-   */
-  router.get('/stability/status', (_req, res) => {
-    try {
-      res.json(stabilityState);
-    } catch (error) {
-      console.error(`[ROUTE] /api/agents/stability/status error: ${error.message}`);
       res.status(500).json({ error: 'Internal server error' });
     }
   });

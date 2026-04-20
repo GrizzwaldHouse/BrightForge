@@ -28,3 +28,7 @@ StructuredLogging/
 __pycache__/
 *.pyc
 .claude/worktrees/
+qa-reports/
+logs/
+output/
+live_validation_report.json

@@ -1,15 +1,15 @@
 ---
 name: BrightForge Testing Guide
-description: Complete test, lint, and quality-gate procedures for BrightForge. Covers self-tests, integration, load test, stability run, and the TASK.md post-feature gate.
+description: Complete test, lint, and quality-gate procedures for BrightForge Phases 1-16. Covers self-tests, security tests, integration, load test, stability run, and the TASK.md post-feature gate.
 ---
 
 # BrightForge Testing Guide
 
 ## Test Philosophy
 
-BrightForge uses self-contained `--test` blocks at the bottom of each module instead of a test framework. Each test runs independently via `node <file> --test`.
+BrightForge uses self-contained `--test` blocks at the bottom of each module. Each test runs independently via `node <file> --test`. New modules in Phase 15-16 guard their test blocks with `process.argv[1] === import.meta.url` to prevent test pollution when imported by other modules.
 
-After every feature, run the full quality gate defined in `TASK.md` (project root). All steps must pass with zero errors and zero warnings before committing.
+After every feature, run the full quality gate defined in `TASK.md`. All steps must pass before committing.
 
 ---
 
@@ -32,6 +32,13 @@ npm run test-design        # Design engine
 npm run test-skills        # Skill orchestrator
 ```
 
+### Security & Reliability (Phase 15-16)
+```bash
+npm run test-sandbox              # Hardened sandbox: injection, traversal, deny-all env (15 assertions)
+npm run test-failure-classifier   # Failure classification: 11 categories, false-positive detection (20 assertions)
+npm run test-healing              # Self-healing: guards, retry, correlation, backoff (17 assertions)
+```
+
 ### Forge3D Modules
 ```bash
 npm run test-bridge           # Python bridge (mock server)
@@ -45,7 +52,7 @@ npm run test-queue            # Generation queue
 ```bash
 npm run test-planner    # Planner agent
 npm run test-builder    # Builder agent
-npm run test-tester     # Tester agent
+npm run test-tester     # Tester agent (now uses sandboxed exec)
 npm run test-reviewer   # Reviewer agent
 npm run test-survey     # Survey agent
 npm run test-recorder   # Recorder agent (OBS)
@@ -90,74 +97,112 @@ node src/tests/user-load-test.js --scenario smoke    # 3 users / 30s (required a
 node src/tests/user-load-test.js --scenario load     # 20 users / 2min
 node src/tests/user-load-test.js --scenario stress   # 50 users / 2min
 node src/tests/user-load-test.js --scenario soak     # 10 users / 5min
-node src/tests/user-load-test.js --scenario massive  # 1000 users / 5min (concurrency=50)
+node src/tests/user-load-test.js --scenario massive  # 1000 users / concurrency=50
 ```
 
 Load test flags: `--verbose`, `--users N`, `--concurrency N`, `--wave-size N`, `--url URL`
 
+### Phase 2 QA Harness (PowerShell)
+```powershell
+# Real endpoints, no mocks. Covers scene, world, forge3d, orchestration.
+pwsh -File .\verification\Invoke-Phase2Verification.ps1
+pwsh -File .\verification\Invoke-Phase2Verification.ps1 -Strict       # fail-fast on first failure
+pwsh -File .\verification\Invoke-Phase2Verification.ps1 -StartBridge  # auto-start Python bridge
+
+# Output: verification/report.json, verification/<runId>/
+```
+
 ### Lint
 ```bash
+npm run lint:fix    # Auto-fix formatting
 npm run lint        # Check — must exit 0 with 0 warnings
-npm run lint:fix    # Auto-fix formatting issues
 ```
 
 ---
 
 ## Writing a Self-Test Block
 
+### Standard pattern (existing modules)
 ```javascript
 if (process.argv.includes('--test')) {
   console.log('[MODULE] Running self-test...');
-
-  // Test 1: Basic functionality
-  const result = instance.someMethod('input');
-  console.assert(result !== null, 'someMethod should return a value');
-  console.log('  [PASS] someMethod works');
-
-  // Test 2: Edge case
-  try {
-    instance.someMethod(null);
-    console.log('  [PASS] Handles null input');
-  } catch (e) {
-    console.error('  [FAIL] Null input threw:', e.message);
-    process.exit(1);
-  }
-
-  console.log('[MODULE] All tests passed!');
+  // tests
+  process.exit(failed > 0 ? 1 : 0);
 }
+```
+
+### Import-safe pattern (Phase 15-16 modules)
+Use this when your module is imported by other modules that also use `--test`:
+```javascript
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+
+if (process.argv.includes('--test') && process.argv[1] === __filename) {
+  // tests only run when THIS file is the entry point
+}
+```
+
+### Assert helper
+```javascript
+let passed = 0; let failed = 0;
+const assert = (label, condition) => {
+  if (condition) { console.log(`  ✓ ${label}`); passed++; }
+  else { console.error(`  ✗ ${label}`); failed++; }
+};
+// at end:
+process.exit(failed > 0 ? 1 : 0);
 ```
 
 ## Conventions
 
-- Print `[PASS]` or `[FAIL]` for each assertion
-- Exit code 1 on failure (`process.exit(1)`)
-- Tests must be self-contained — no external fixtures unless in `src/*/fixtures/`
-- Mock external services (LLM APIs, Python server) rather than calling them
-- Prefix unused mock parameters with underscore: `function mockFetch(_url, _opts) {}`
+- Print `✓` or `✗` for each assertion
+- Exit code 1 on any failure
+- Tests must be self-contained — fixtures in `src/*/fixtures/`
+- Mock external services (LLM APIs, Python bridge)
+- Prefix unused mock parameters with underscore: `(_url, _opts)`
+- `npm run lint` must pass with 0 errors and 0 warnings before any commit
+
+---
+
+## Security Test Assertions (Phase 15-16)
+
+The sandbox self-test (`npm run test-sandbox`) covers:
+1. Deny-all env: API keys excluded
+2. PATH and NODE_ENV forwarded
+3. Arbitrary keys excluded
+4. `confinePath` accepts safe paths
+5. `confinePath` blocks `../../etc/passwd` traversal
+6. Command resolved to absolute path via which/where
+7. `rm` blocked (not on allowlist)
+8. `cmd.exe` blocked (Windows)
+9. `node -e` executes correctly
+10. Shell injection in args is inert (semicolon treated as literal)
+11. Metrics: executions, commandsBlocked, pathViolations all increment
+
+---
+
+## Post-Feature Quality Gate (TASK.md)
+
+| Step | Command | Pass Criteria |
+|------|---------|---------------|
+| Lint | `npm run lint` | 0 errors, 0 warnings |
+| Security | `npm run test-sandbox && npm run test-failure-classifier && npm run test-healing` | All exit 0 |
+| Module self-tests | `npm run test-<module>` | All exit 0 |
+| Integration | `npm run test-integration` | All pass |
+| Load smoke | `node src/tests/user-load-test.js --scenario smoke` | VERDICT: PASS |
+| Stability quick | `npm run test-stability-quick` | ≥90% checkpoints |
+| QA Harness | `pwsh -File .\verification\Invoke-Phase2Verification.ps1` | Exit 0 |
+| Git push | `git pull && git push` | Clean, pushed |
+
+Do not commit until all steps pass.
 
 ---
 
 ## Frontend Testing Notes
 
 - Frontend JS files use `<script>` tags, NOT ES modules
-- Classes must be exposed via `window.ClassName = ClassName;` (LS-017)
-- Add `/* global ClassName */` declarations for ESLint
-- Test in browser via dashboard — no automated frontend tests yet
+- Classes must be exposed via `window.ClassName = ClassName;`
+- Add `/* global ClassName */` for ESLint
+- Test in browser — no automated frontend tests
 - Check `sessions/bridge-errors.log` for Python subprocess issues
-
----
-
-## Post-Feature Quality Gate (TASK.md)
-
-See `TASK.md` in the project root for the full 6-step gate:
-
-| Step | Command | Required |
-|------|---------|----------|
-| Lint | `npm run lint` | 0 errors, 0 warnings |
-| Module self-tests | `npm run test-<module>` | All exit 0 |
-| Integration suite | `npm run test-integration` | All pass |
-| Load test smoke | `node src/tests/user-load-test.js --scenario smoke` | VERDICT: PASS |
-| Stability quick | `npm run test-stability-quick` | ≥90% checkpoints |
-| Git push | `git pull && git push` | Clean, pushed |
-
-Do not commit until all 6 pass.
+- Check `logs/failures.json` for self-healing failure records

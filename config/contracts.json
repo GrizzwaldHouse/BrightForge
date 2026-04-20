@@ -1,0 +1,112 @@
+{
+  "version": "1.0.0",
+  "description": "API request/response contracts for BrightForge endpoints",
+  "endpoints": {
+    "POST /api/scene/generate": {
+      "request": {
+        "required": ["prompt"],
+        "fields": {
+          "prompt": { "type": "string", "minLength": 3, "maxLength": 2000 },
+          "style": { "type": "string" },
+          "maxAssets": { "type": "number", "min": 1, "max": 20 }
+        }
+      },
+      "response": {
+        "fields": {
+          "sceneId": { "type": "string" },
+          "status": { "type": "string", "enum": ["analyzing", "generating", "complete", "failed"] },
+          "statusUrl": { "type": "string" },
+          "streamUrl": { "type": "string" }
+        },
+        "required": ["sceneId", "status", "statusUrl"]
+      }
+    },
+    "POST /api/world/generate": {
+      "request": {
+        "required": ["prompt"],
+        "fields": {
+          "prompt": { "type": "string", "minLength": 3, "maxLength": 2000 },
+          "sizeKm": { "type": "number" },
+          "biomes": { "type": "array" },
+          "worldSize": { "type": "string", "enum": ["small", "medium", "large"] }
+        }
+      },
+      "response": {
+        "fields": {
+          "worldId": { "type": "string" },
+          "status": { "type": "string", "enum": ["generating", "complete", "failed"] },
+          "statusUrl": { "type": "string" },
+          "streamUrl": { "type": "string" }
+        },
+        "required": ["worldId", "status", "statusUrl"]
+      }
+    },
+    "POST /api/forge3d/generate": {
+      "request": {
+        "required": ["type"],
+        "fields": {
+          "type": { "type": "string", "enum": ["mesh", "image", "full"] },
+          "prompt": { "type": "string", "minLength": 3 },
+          "projectId": { "type": "string" },
+          "model": { "type": "string" }
+        }
+      },
+      "response": {
+        "fields": {
+          "sessionId": { "type": "string" },
+          "type": { "type": "string" },
+          "status": { "type": "string", "enum": ["processing", "complete", "failed"] },
+          "statusUrl": { "type": "string" }
+        },
+        "required": ["sessionId", "status", "statusUrl"]
+      }
+    },
+    "POST /api/orchestration/task": {
+      "request": {
+        "required": ["taskName", "agent"],
+        "fields": {
+          "taskName": { "type": "string" },
+          "agent": { "type": "string" },
+          "phase": { "type": "string" },
+          "nextAction": { "type": "string" }
+        }
+      },
+      "response": {
+        "fields": {
+          "taskId": { "type": "string" },
+          "status": { "type": "string" }
+        },
+        "required": ["taskId"]
+      }
+    },
+    "POST /api/pipelines/run": {
+      "request": {
+        "required": ["pipeline", "prompt"],
+        "fields": {
+          "pipeline": { "type": "string" },
+          "prompt": { "type": "string" },
+          "projectId": { "type": "string" },
+          "model": { "type": "string" }
+        }
+      },
+      "response": {
+        "fields": {
+          "pipelineId": { "type": "string" },
+          "pipeline": { "type": "string" },
+          "status": { "type": "string", "enum": ["running"] },
+          "statusUrl": { "type": "string" },
+          "streamUrl": { "type": "string" }
+        },
+        "required": ["pipelineId", "status", "statusUrl"]
+      }
+    }
+  },
+  "status_vocabulary": {
+    "generating": "Async job accepted and in progress (generation phase)",
+    "analyzing": "Async job accepted and in progress (analysis/planning phase)",
+    "processing": "Async job in active execution",
+    "complete": "Job finished successfully",
+    "failed": "Job finished with error",
+    "running": "Pipeline is executing steps"
+  }
+}

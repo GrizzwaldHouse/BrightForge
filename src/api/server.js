@@ -55,14 +55,24 @@ export function createServer(options = {}) {
   const app = express();
   const store = new SessionStore({ timeoutMs: options.sessionTimeout || 30 * 60 * 1000 });
 
-  // Initialize orchestration runtime
+  // Initialize orchestration runtime — synchronous but must complete before routes are hit.
+  // Wrapped in try/catch so a DB/config failure degrades gracefully (503 on orch routes)
+  // rather than crashing the whole server.
   try {
     if (!orchestrator.initialized) {
       console.log('[SERVER] Initializing orchestration runtime...');
-      orchestrator.init();
+      const result = orchestrator.init();
+      // Guard against a future async refactor: if init() ever returns a Promise, await it.
+      if (result && typeof result.catch === 'function') {
+        result.catch(err => {
+          console.warn('[SERVER] Async orchestration init failed:', err.message);
+          errorHandler.report('server_error', err, { source: 'orchestrator.init' });
+        });
+      }
     }
   } catch (err) {
     console.warn('[SERVER] Failed to initialize orchestration runtime:', err.message);
+    errorHandler.report('server_error', err, { source: 'orchestrator.init' });
   }
 
   // ModelBridge is NOT started here on purpose.

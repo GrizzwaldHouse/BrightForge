@@ -1,0 +1,76 @@
+{
+  "version": "1.0.0",
+  "description": "Self-healing rules for Phase 16 orchestration. Config-driven — no hardcoded values in code.",
+  "rules": {
+    "validation_error": {
+      "action": "fail_fast",
+      "maxRetries": 0,
+      "description": "Input validation failures are not recoverable — the caller must fix the request."
+    },
+    "contract_mismatch": {
+      "action": "halt_and_log",
+      "maxRetries": 0,
+      "description": "Response shape violations indicate a server-side bug. Halt and alert."
+    },
+    "dependency_failure": {
+      "action": "retry_or_fallback",
+      "maxRetries": 3,
+      "retryDelayMs": 2000,
+      "backoffMultiplier": 2.0,
+      "maxDelayMs": 30000,
+      "description": "Dependency (bridge/LLM) may recover. Retry with exponential backoff, then fallback."
+    },
+    "timeout": {
+      "action": "retry_with_backoff",
+      "maxRetries": 2,
+      "retryDelayMs": 5000,
+      "backoffMultiplier": 2.0,
+      "maxDelayMs": 20000,
+      "description": "Timeouts may be transient. Retry twice before giving up."
+    },
+    "rate_limited_expected": {
+      "action": "backoff_and_retry",
+      "maxRetries": 4,
+      "retryDelayMs": 500,
+      "backoffMultiplier": 2.0,
+      "maxDelayMs": 30000,
+      "description": "Rate limiting is expected; backoff with exponential delay."
+    },
+    "sse_race_condition": {
+      "action": "mark_non_blocking",
+      "maxRetries": 0,
+      "description": "SSE disconnects before first event are non-blocking — client reconnects."
+    },
+    "server_error": {
+      "action": "halt_and_log",
+      "maxRetries": 0,
+      "description": "Server 500s indicate a code bug. Do not retry — it will just fail again."
+    },
+    "not_found": {
+      "action": "fail_fast",
+      "maxRetries": 0,
+      "description": "Resource does not exist. No recovery possible."
+    },
+    "conflict": {
+      "action": "fail_fast",
+      "maxRetries": 0,
+      "description": "State conflict (e.g. duplicate pipeline). Caller must resolve."
+    },
+    "sandbox_violation": {
+      "action": "halt_and_log",
+      "maxRetries": 0,
+      "description": "Security policy violation. Always halt and log for audit."
+    },
+    "unknown": {
+      "action": "halt_and_log",
+      "maxRetries": 0,
+      "description": "Unclassified failure. Conservatively halt."
+    }
+  },
+  "global": {
+    "correlationIdHeader": "x-brightforge-correlation-id",
+    "failureLogPath": "logs/failures.json",
+    "maxGlobalRetries": 10,
+    "healingTimeoutMs": 60000
+  }
+}

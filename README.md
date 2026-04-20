@@ -4,12 +4,13 @@
 
 **Hybrid AI Creative Studio**
 
-*Coding Agent • Design Engine • 3D Mesh Generation*
+*Coding Agent • Design Engine • 3D Mesh Generation • Self-Healing Orchestration*
 
-[![Version](https://img.shields.io/badge/version-4.2.0-blue.svg)](https://github.com/GrizzwaldHouse/BrightForge)
+[![Version](https://img.shields.io/badge/version-4.2.0--alpha-blue.svg)](https://github.com/GrizzwaldHouse/BrightForge)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://python.org)
+[![Phase](https://img.shields.io/badge/phase-16-purple.svg)](#development-history)
 
 [Quick Start](#quick-start) • [Features](#features) • [Installation](INSTALL.md) • [Docker](DOCKER.md) • [Documentation](#documentation)
 
@@ -19,15 +20,16 @@
 
 ## Overview
 
-BrightForge is a **production-ready AI creative studio** that combines three powerful capabilities:
+BrightForge is a **production-hardened AI creative studio** that combines four integrated capabilities:
 
-1. **🤖 Coding Agent** - Plan-review-run workflow with automatic backup and rollback
-2. **🎨 Design Engine** - AI-powered image generation and semantic HTML layouts
-3. **🧊 Forge3D Pipeline** - GPU-accelerated 3D mesh generation (text → image → mesh)
+1. **Coding Agent** — Plan-review-run workflow with automatic backup, rollback, and git checkpoints
+2. **Design Engine** — AI-powered image generation and semantic HTML layout
+3. **Forge3D Pipeline** — GPU-accelerated 3D mesh generation (text → image → GLB/FBX)
+4. **Self-Healing Orchestration** — Typed failure classification, bounded retry, and auto-recovery
 
-All powered by a **free-first LLM provider chain** (Ollama → Groq → Cerebras → Together → Mistral → Gemini → Claude → OpenAI → OpenRouter) so you can work entirely offline or scale to cloud when needed.
+All powered by a **free-first LLM provider chain** (Ollama → Groq → Cerebras → Together → Mistral → Gemini → Claude → OpenAI → OpenRouter). Work entirely offline or scale to cloud as needed.
 
-**v4.2.0** | 110+ files | ~35,000 lines | Node.js 18+ ESM | MIT License
+**v4.2.0-alpha** | Phase 16 complete | Node.js 18+ ESM | MIT License
 
 ---
 
@@ -36,15 +38,11 @@ All powered by a **free-first LLM provider chain** (Ollama → Groq → Cerebras
 ### Local Installation
 
 ```bash
-# Clone repository
 git clone https://github.com/GrizzwaldHouse/BrightForge.git
 cd BrightForge
-
-# Install dependencies
 npm install
 
-# (Optional) Install Ollama for free local inference
-# Download from https://ollama.ai
+# Optional: free local inference
 ollama pull qwen2.5-coder:14b
 
 # Start web dashboard
@@ -52,130 +50,121 @@ npm run server
 # Open http://localhost:3847
 ```
 
-See [INSTALL.md](INSTALL.md) for detailed setup instructions (Windows/Linux/macOS).
+See [INSTALL.md](INSTALL.md) for platform-specific setup (Windows/Linux/macOS).
 
-### Docker Deployment
+### Docker
 
 ```bash
-# Clone repository
 git clone https://github.com/GrizzwaldHouse/BrightForge.git
 cd BrightForge
-
-# Copy environment template
 cp .env.docker.example .env.docker
-
-# Start all services (first run downloads ~15GB models)
 docker-compose up -d
-
-# Open dashboard
 # http://localhost:3847
 ```
 
-See [DOCKER.md](DOCKER.md) for GPU setup, troubleshooting, and production deployment.
+See [DOCKER.md](DOCKER.md) for GPU setup and production deployment.
 
-### CLI Usage
+### CLI
 
 ```bash
-# Run a coding task
-node bin/brightforge.js "add a loading spinner component"
-
-# Interactive chat mode
-node bin/brightforge.js --chat
-
-# Generate a design
-node bin/brightforge.js --design "landing page for a coffee shop" --style blue-glass
-
-# Rollback last changes
-node bin/brightforge.js --rollback
+node bin/brightforge.js "add a loading spinner component"   # coding task
+node bin/brightforge.js --chat                              # interactive mode
+node bin/brightforge.js --design "coffee shop landing page" --style blue-glass
+node bin/brightforge.js --rollback                          # undo last plan
 ```
 
 ---
 
 ## Features
 
-### 🤖 Coding Agent
+### Coding Agent
 
-**Plan-Review-Run Workflow with Automatic Backup**
+**Plan-Review-Run with Automatic Backup and Git Checkpoints**
 
-<details>
-<summary><b>How it works</b></summary>
+1. Submit a task via CLI, web dashboard, or Electron app
+2. Agent classifies complexity (simple → local LLM, complex → cloud)
+3. LLM generates a structured plan with file operations (create/modify/delete)
+4. Review colored diffs in terminal or web UI
+5. Approve to apply — `.brightforge-backup` files created automatically
+6. Full rollback: backup files or git revert via `POST /api/chat/revert/:hash`
 
-1. **Submit a task** via CLI, web dashboard, or Electron app
-2. **Agent classifies complexity** using keyword heuristics (simple → local LLM, complex → cloud)
-3. **LLM generates a structured plan** with file operations (create/modify/delete)
-4. **Review colored diffs** in terminal or web UI
-5. **Approve to apply** (creates `.brightforge-backup` files automatically)
-6. **Full rollback support** - restore any applied changes
+**Key capabilities:** multi-step decomposition · file context scanning · confidence scoring · conversation memory · project memory (per-repo `.brightforge/memory.json`)
 
-**Key Features:**
-- ✅ Automatic backup before every change
-- ✅ One-click rollback to previous state
-- ✅ Session history logged as JSON
-- ✅ Multi-step task decomposition
-- ✅ File context scanning (imports, dependencies)
-- ✅ Confidence scoring (provider reliability + task complexity)
+### Design Engine
 
-</details>
+**AI Image Generation + Semantic HTML Layouts**
 
-### 🎨 Design Engine
+Image providers (free-first): Pollinations (zero auth) → Together FLUX.1 Schnell → Gemini "Nano Banana" → Stability AI
 
-**AI-Powered Image Generation + Semantic HTML Layouts**
+Styles available: `default` · `blue-glass` · `dark-industrial`
 
-<details>
-<summary><b>How it works</b></summary>
+### Forge3D Pipeline
 
-1. **Describe a design** (e.g., "landing page for a coffee shop")
-2. **Select a style** (default, blue-glass, dark-industrial)
-3. **BrightForge generates images** via free-tier AI (Pollinations, Together, Gemini)
-4. **LLM creates semantic HTML** with inline CSS
-5. **Preview in browser** or export standalone HTML + images
+**GPU-Accelerated 3D Mesh Generation**
 
-**Image Providers (Free-First):**
-- **Pollinations** - Completely free, no API key required (FLUX model)
-- **Together AI** - Free FLUX.1 Schnell endpoint
-- **Gemini "Nano Banana"** - Gemini 2.0 Flash image generation
-- **Stability AI** - Premium fallback (disabled by default)
+| Mode | Input | Output |
+|------|-------|--------|
+| Text-to-Image | Prompt | PNG via SDXL |
+| Image-to-Mesh | PNG | GLB via Shap-E |
+| Full Pipeline | Prompt | GLB/FBX end-to-end |
 
-**Design Styles:**
-- `default` - Clean and minimalist
-- `blue-glass` - Glassmorphism with blue gradients
-- `dark-industrial` - Dark theme with tech aesthetics
+Capabilities: LOD chain generation · mesh optimization (quadric decimation) · FBX export · SQLite asset management · VRAM monitoring · crash recovery · SSE progress streaming
 
-</details>
+Requirements: Python 3.10+ · NVIDIA GPU 8GB+ VRAM · CUDA 12.4+
 
-### 🧊 Forge3D Pipeline
+### Self-Healing Orchestration (Phase 16)
 
-**GPU-Accelerated 3D Mesh Generation (Text → Image → Mesh)**
+Every async operation is wrapped with:
 
-<details>
-<summary><b>How it works</b></summary>
+- **Pre-execution guards** — precondition checks before start
+- **Failure classification** — 11 typed categories (validation error, dependency failure, timeout, rate limited, contract mismatch, sandbox violation, etc.)
+- **Config-driven healing rules** (`config/healing-rules.json`) — per-category `maxRetries`, `retryDelayMs`, `backoffMultiplier`
+- **Bounded retry with exponential backoff** — no infinite loops
+- **CorrelationId tracing** — every event tagged, persisted to `logs/failures.json`
 
-**Three Generation Modes:**
+```javascript
+const result = await selfHealingOrchestrator.execute({
+  name: 'generate-mesh',
+  guards: { bridge_ready: async () => modelBridge.state === 'running' },
+  operation: async (correlationId) => { /* ... */ }
+});
+// result.success, result.failure.category, result.timeline
+```
 
-1. **Image-to-Mesh** - Upload reference image → receive GLB/FBX mesh
-2. **Text-to-Image** - Text prompt → SDXL image generation
-3. **Full Pipeline** - Text prompt → SDXL → InstantMesh → 3D mesh
+---
 
-**Capabilities:**
+## Security (Phase 15-16 Hardened)
 
-- ✅ **Web-based 3D preview** with Three.js (orbit controls, wireframe, grid)
-- ✅ **Project and asset management** backed by SQLite
-- ✅ **Batch generation queue** (FIFO, single GPU, auto-retry)
-- ✅ **VRAM monitoring** with auto-warning and degradation thresholds
-- ✅ **GLB + FBX export** (via pyassimp or Blender CLI fallback)
-- ✅ **Model download manager** with progress tracking and resume support
-- ✅ **Crash recovery** for interrupted generations
-- ✅ **Session persistence** (hybrid in-memory + SQLite)
-- ✅ **Zero-code configuration** via `config/forge3d.yaml`
+### Sandbox
 
-**Requirements:**
-- Python 3.10+
-- NVIDIA GPU with 8GB+ VRAM
-- CUDA 12.4+
+All subprocess execution goes through `src/security/sandbox.js`:
 
-*Models are downloaded automatically on first run (~15GB).*
+- `spawnSync` with `shell: false` — no shell interpolation ever
+- `realpathSync` confinement — symlink/junction escape blocked
+- Command resolved via `which`/`where` to absolute path before exec
+- Deny-all env: only 26 allowlisted keys forwarded to child processes
+- 10MB `maxBuffer`, 30s timeout enforced
+- Metrics: `commandsBlocked`, `pathViolations`, `envKeysStripped`, `timeouts`
 
-</details>
+### Route Safety
+
+- All static agent routes (`/pipeline/status`, `/recorder/status`, `/stability/status`) declared before parameterized `/:name/status`
+- All async Forge3D handlers wrapped with `try/catch` → `errorHandler.report`
+- Pipeline preflight: `/api/pipelines/run` checks bridge state before returning 202
+
+### Validation Middleware
+
+```javascript
+import { validate } from './middleware/validate.js';
+router.post('/generate', validate({
+  required: ['prompt', 'type'],
+  types: { prompt: 'string', type: 'string' },
+  minLength: { prompt: 3 },
+  enum: { type: ['mesh', 'image', 'full'] }
+}), handler);
+```
+
+Returns `400 invalid_request` with machine-readable `reason` field.
 
 ---
 
@@ -185,93 +174,107 @@ Professional dark-themed dashboard at `http://localhost:3847`:
 
 | Tab | Purpose |
 |-----|---------|
-| **Chat** | Interactive coding assistant with plan preview and approval |
-| **Design** | AI design generation with style selection and live preview |
-| **Forge 3D** | Full 3D generation UI with viewport, GPU monitor, queue, asset gallery |
-| **Health** | System monitoring (provider stats, latency P50/P95/P99, error tracking) |
+| **Chat** | Coding assistant with plan preview, approval, SSE streaming |
+| **Design** | Image generation with style selection and live preview |
+| **Forge 3D** | 3D generation viewport, GPU monitor, queue, asset gallery |
+| **Health** | Provider stats, latency P50/P95/P99, error tracking |
 | **Sessions** | Session history and management |
-| **Status** | Real-time system status dashboard (/status.html) |
+
+WebSocket event bus: `ws://localhost:3847/ws/events`
 
 ---
 
 ## Provider Chain (Free-First)
 
-BrightForge automatically tries providers in priority order, falling back when a provider is unavailable:
+| Priority | Provider | Auth | Cost |
+|----------|----------|------|------|
+| 1 | Ollama | None | Free (local) |
+| 2 | Groq | API key | Free tier |
+| 3 | Cerebras | API key | Free tier |
+| 4 | Together | API key | Free $25 credit |
+| 5 | Mistral | API key | Free tier |
+| 5 | Gemini | API key | Free tier + image gen |
+| 6 | Claude | API key | Paid |
+| 7 | OpenAI | API key | Paid |
+| 99 | OpenRouter | API key | Aggregator |
 
-| Priority | Provider | Auth | Cost | Notes |
-|----------|----------|------|------|-------|
-| **1** | Ollama | None (local) | Free | Requires local install + model pull |
-| **2** | Groq | API key | Free tier | 14,000 tokens/min limit |
-| **3** | Cerebras | API key | Free tier | Ultra-fast inference |
-| **4** | Together | API key | Free ($25 credit) | FLUX image + LLM |
-| **5** | Mistral | API key | Free tier | Mixtral models |
-| **5** | Gemini | API key | Free tier | Gemini 2.0 + image gen |
-| **6** | Claude | API key | Paid | High-quality fallback |
-| **7** | OpenAI | API key | Paid | GPT-4 last resort |
-| **99** | OpenRouter | API key | Aggregator | Multiple providers |
-
-**Daily Budget:** $1.00 default (configurable in `config/llm-providers.yaml`)
-
-When budget is exceeded, only free providers are used.
+Daily budget: $1.00 default (configurable in `config/llm-providers.yaml`).
 
 ---
 
 ## Configuration
 
-All configuration is YAML-based with **zero-code-change tunability**:
+All values tunable via YAML — no code changes needed:
 
 | File | Purpose |
 |------|---------|
-| `config/llm-providers.yaml` | LLM provider chain, task routing, budget limits |
-| `config/agent-config.yaml` | Task classification keywords, file context limits |
-| `config/forge3d.yaml` | 3D pipeline settings (ports, timeouts, queue, viewer) |
-| `config/image-providers.yaml` | Image generation provider chain |
-| `config/styles/*.md` | Design style definitions (colors, typography) |
-| `python/config.yaml` | Python inference server settings (models, VRAM) |
+| `config/llm-providers.yaml` | LLM chain, task routing, budget |
+| `config/agent-config.yaml` | Task classification, context limits |
+| `config/forge3d.yaml` | 3D pipeline, ports, timeouts, queue |
+| `config/image-providers.yaml` | Image provider chain |
+| `config/orchestration.yaml` | Orchestration runtime, OBS, event bus |
+| `config/healing-rules.json` | Self-healing retry/backoff rules per failure category |
+| `config/contracts.json` | API request/response shape contracts |
+| `config/model-intelligence.yaml` | Local model scanner config |
+| `config/styles/*.md` | Design style templates |
 
 ---
 
 ## Testing
 
-Each module has a self-contained `--test` block. Run individual tests via npm scripts:
+Every module has a self-contained `--test` block. Run via npm scripts:
 
 ```bash
-# Core modules
-npm run test-llm              # LLM client provider chain
-npm run test-plan             # Plan engine parsing
-npm run test-context          # File context scanning
-npm run test-diff             # Diff applier + rollback
-npm run test-image            # Image generation
-npm run test-design           # Design engine
+# Core
+npm run test-llm && npm run test-plan && npm run test-diff && npm run test-image
 
-# Forge3D modules (requires Python)
-npm run test-bridge           # Python server bridge
-npm run test-forge-db         # SQLite database
-npm run test-forge-session    # Generation lifecycle
-npm run test-project-manager  # Project/asset CRUD
-npm run test-queue            # Batch queue
+# Security (Phase 15-16)
+npm run test-sandbox              # Sandbox injection/traversal/env tests (15 assertions)
+npm run test-failure-classifier   # Failure classification (20 assertions)
+npm run test-healing              # Self-healing retry/guard/correlation (17 assertions)
 
-# Code quality
-npm run lint
-npm run lint:fix
+# Forge3D
+npm run test-bridge && npm run test-forge-session && npm run test-queue
+
+# Multi-Agent Pipeline (Phase 11)
+npm run test-agents               # All 6 pipeline agents
+npm run test-ws-bus               # WebSocket event bus
+
+# Idea Intelligence (Phase 12)
+npm run test-idea                 # All 7 idea tests
+
+# Model Intelligence (Phase 13)
+npm run test-model-intel          # Full model scanner suite
+
+# Integration & Stability
+npm run test-integration
+npm run test-stability-quick      # 60-second CI run
+
+# Load Test
+node src/tests/user-load-test.js --scenario smoke  # Required after every feature
+
+# Lint
+npm run lint:fix && npm run lint
 ```
+
+See `.claude/skills/testing-guide.md` for the full post-feature quality gate.
 
 ---
 
 ## System Requirements
 
-| Component | Requirement | Optional? |
-|-----------|-------------|-----------|
-| **Node.js** | 18+ (ES Modules, native fetch) | ❌ Required |
-| **npm** | 9+ (included with Node.js) | ❌ Required |
-| **Ollama** | Latest version | ✅ Recommended (free local LLM) |
-| **Python** | 3.10+ | ✅ Only for Forge3D |
-| **CUDA** | 12.4+ | ✅ Only for Forge3D |
-| **GPU** | NVIDIA 8GB+ VRAM | ✅ Only for Forge3D |
-| **SQLite** | via better-sqlite3 (auto-installed) | ❌ Required |
+| Component | Requirement | Notes |
+|-----------|-------------|-------|
+| Node.js | 18+ | ES Modules, native fetch |
+| npm | 9+ | Included with Node |
+| Ollama | Latest | Recommended for free local LLM |
+| Python | 3.10+ | Only for Forge3D |
+| CUDA | 12.4+ | Only for Forge3D |
+| GPU | NVIDIA 8GB+ VRAM | RTX 5080 supported (CPU fallback available) |
+| SQLite | via better-sqlite3 | Auto-installed |
 
-**Minimal Setup (Coding + Design only):** Node.js 18+ + Ollama
-**Full Setup (with 3D generation):** Add Python 3.10+ + NVIDIA GPU
+**Minimal (Coding + Design):** Node.js 18+ + Ollama
+**Full (with 3D):** Add Python 3.10+ + NVIDIA GPU
 
 ---
 
@@ -281,78 +284,49 @@ npm run lint:fix
 bin/
   brightforge.js              CLI entry point
   brightforge-server.js       Express HTTP server
-  brightforge-desktop.js      Electron desktop launcher
+  brightforge-desktop.js      Electron launcher
 
 src/
-  agents/                     LLM agent routing (master, local, cloud)
-  core/                       Core engine (LLM client, plan engine, diff applier)
-  forge3d/                    3D generation pipeline
-  api/                        Express HTTP API + routes
-  ui/                         Terminal ANSI UI
+  agents/                     Pipeline agents (Planner, Builder, Tester, Reviewer, Survey, Recorder)
+  core/                       Core engine (LLM, plan, diff, git, healing, failure classifier)
+  forge3d/                    3D generation pipeline + universal mesh client
+  api/
+    routes/                   Express route files (chat, forge3d, scene, world, pipelines, agents, ...)
+    middleware/                auth.js · rate-limit.js · validate.js
+  security/                   sandbox.js (hardened subprocess execution)
+  orchestration/              Multi-agent orchestration runtime
+  idea/                       Idea Intelligence System (Phase 12)
+  model-intelligence/         Local model scanner (Phase 13)
+  tests/                      Integration, load, stability, visual verification
 
 python/
-  inference_server.py         FastAPI server (InstantMesh + SDXL)
-  model_manager.py            Model loading + VRAM management
-  fbx_converter.py            GLB-to-FBX conversion
-  requirements.txt            Python dependencies
+  inference_server.py         FastAPI server (SDXL + Shap-E)
+  model_scanner.py            Standalone Python model scanner
 
 public/                       Web dashboard frontend
-  index.html                  Main dashboard
-  status.html                 Real-time status page
-  css/                        Stylesheets
-  js/                         Frontend modules
-
-desktop/                      Electron wrapper
-  main.js                     Electron main process
-  preload.js                  Preload script
-
-config/                       YAML configuration
-  llm-providers.yaml          LLM provider chain
-  agent-config.yaml           Task classification
-  forge3d.yaml                3D pipeline config
-  image-providers.yaml        Image providers
-  styles/                     Design styles
+config/                       YAML + JSON configuration
+verification/                 Phase 2 PowerShell QA harness + historical reports
+logs/                         Failure log (failures.json), bridge errors
 ```
 
-See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed system design.
-
 ---
 
-## Documentation
+## Observability
 
-| Document | Description |
-|----------|-------------|
-| [INSTALL.md](INSTALL.md) | Installation guide (Windows/Linux/macOS) |
-| [DOCKER.md](DOCKER.md) | Docker deployment and GPU setup |
-| [API.md](docs/API.md) | REST API reference (40+ endpoints) |
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design and architecture |
-| [CLAUDE.md](CLAUDE.md) | Development guide for contributors |
+### TelemetryBus (`src/core/telemetry-bus.js`)
+Ring-buffered event tracking · per-provider stats (requests, tokens, cost, failures) · latency P50/P95/P99 · `startTimer()` / `endTimer()`
 
----
+### ErrorHandler (`src/core/error-handler.js`)
+Observer-pattern error broadcasting · 20+ typed categories · JSONL log at `sessions/errors.jsonl` · crash reports with memory snapshots
 
-## Observability & Monitoring
-
-### TelemetryBus
-
-Ring-buffered event tracking for LLM requests, operations, and sessions:
-- Per-provider stats (requests, tokens, cost, failures)
-- Latency percentiles (P50/P95/P99)
-- Success rate tracking
-- Timer utilities (`startTimer` → `endTimer`)
-
-### ErrorHandler
-
-Observer-pattern error broadcasting with persistent JSONL log:
-- Error categorization (provider, plan, apply, session, server, fatal, forge3d, bridge, GPU)
-- Crash reports with memory + telemetry snapshots
-- Exponential backoff retry tracking
+### Failure Log (`logs/failures.json`)
+Newline-delimited JSON written by `SelfHealingOrchestrator` · every record includes `correlationId`, `category`, `reason`, `attempts`, `timeline`
 
 ### Health Endpoints
-
-- `GET /api/health` - Provider availability and budget status
-- `GET /api/ready` - Kubernetes-style readiness probe
-- `GET /api/metrics` - Prometheus-compatible metrics
-- `GET /status.html` - Real-time status dashboard (auto-refresh every 10s)
+- `GET /api/health` — Provider availability + budget
+- `GET /api/ready` — Kubernetes readiness probe
+- `GET /api/metrics` — Telemetry dashboard
+- `GET /api/debug/routes` — Route registry with shadowing conflict detection
 
 ---
 
@@ -360,105 +334,69 @@ Observer-pattern error broadcasting with persistent JSONL log:
 
 | Version | Phase | Description |
 |---------|-------|-------------|
-| v1.0.0 | Phase 1 | MVP - Hybrid coding agent with plan-review-run |
-| v2.0.0-alpha | Phase 2A | Conversation mode, multi-step plans |
-| v2.1.0-alpha | Phase 2B | Express HTTP API + web dashboard |
-| v2.2.0-alpha | Phase 4 | ChatGPT + Gemini provider backends |
-| v2.3.0-alpha | Phase 3 | Electron desktop application |
-| v3.0.0-alpha | Phase 5 | Observability + crash intelligence |
-| v3.1.0-alpha | Phase 6 | BrightForge rename + design engine |
-| v4.0.0-alpha | Phase 7 | Quality assurance + telemetry |
-| v4.1.0-alpha | Phase 8 | Forge3D 3D generation pipeline |
-| **v4.2.0** | **Phase 9** | **Production readiness (Docker, docs, monitoring)** |
+| v1.0.0 | 1 | MVP coding agent, plan-review-run |
+| v2.0.0-alpha | 2A-2B | Conversation mode, Express API, web dashboard |
+| v2.2.0-alpha | 4 | ChatGPT + Gemini backends |
+| v2.3.0-alpha | 3 | Electron desktop app |
+| v3.0.0-alpha | 5 | Observability + crash intelligence |
+| v3.1.0-alpha | 6 | Design engine, BrightForge rename |
+| v4.0.0-alpha | 7 | Telemetry, quality assurance |
+| v4.1.0-alpha | 8 | Forge3D pipeline |
+| v4.1.1-alpha | 9 | Production readiness (Docker, monitoring) |
+| v4.1.2-alpha | 10 | SSE streaming, creative pipeline, git rollback, project memory |
+| v4.1.3-alpha | 11 | Multi-agent pipeline (Planner→Builder→Tester→Reviewer) |
+| v4.1.4-alpha | 12 | Idea Intelligence System |
+| v4.1.5-alpha | 13 | Model Intelligence System (local model scanner) |
+| v4.1.6-alpha | 14 | Universal mesh client, advanced Forge3D |
+| v4.2.0-alpha | 15 | Sandbox hardening, route fixes, async safety |
+| **v4.2.0-alpha** | **16** | **Self-healing orchestration, failure classifier, validate middleware** |
 
 ---
 
-## Dependencies
+## API Contracts
 
-**Production:**
-- `dotenv` - Environment variable loading
-- `yaml` - YAML configuration parsing
-- `express` - HTTP server framework
-- `better-sqlite3` - SQLite database driver
+Core endpoint shapes defined in `config/contracts.json`. All async operations return:
 
-**Development:**
-- `eslint` - Code quality enforcement
-- `electron` - Desktop app wrapper
-- `electron-builder` - Desktop app packaging
+```json
+{ "sessionId|worldId|sceneId|pipelineId": "uuid", "status": "generating|processing|running", "statusUrl": "/api/*/id", "streamUrl": "/api/*/stream/id" }
+```
 
-**Python (Forge3D only):**
-- `torch` - PyTorch with CUDA 12.4
-- `diffusers` - SDXL image generation
-- `transformers` - Model loading
-- `fastapi` - Inference server
-- `trimesh` - 3D mesh processing
-- `pyassimp` - FBX export
-
-No other npm dependencies. Uses native `fetch` (Node 18+), native `crypto`, and native `fs`/`path` modules.
+Errors always include `error` (machine-readable code) and `reason` (human-readable string). Non-retryable failures return 4xx; recoverable infrastructure failures return 503 with `dependency_unavailable`.
 
 ---
 
 ## Environment Variables
 
-Create `.env.local` with any of these API keys (all optional - Ollama works without keys):
+Create `.env.local` (all optional — Ollama works without any keys):
 
 ```env
-# LLM Providers (free-first chain)
-GROQ_API_KEY=gsk_...           # Free tier: 14,000 tokens/min
-CEREBRAS_API_KEY=csk-...       # Free tier
-TOGETHER_API_KEY=...           # Free $25 credit
-MISTRAL_API_KEY=...            # Free tier
-GEMINI_API_KEY=...             # Free tier + image gen
-CLAUDE_API_KEY=sk-ant-...      # Paid fallback
-OPENAI_API_KEY=sk-...          # Paid last resort
-OPENROUTER_API_KEY=sk-or-...   # Aggregator
-
-# Server configuration
+GROQ_API_KEY=gsk_...
+CEREBRAS_API_KEY=csk-...
+TOGETHER_API_KEY=...
+MISTRAL_API_KEY=...
+GEMINI_API_KEY=...
+CLAUDE_API_KEY=sk-ant-...
+OPENAI_API_KEY=sk-...
+OPENROUTER_API_KEY=sk-or-...
 PORT=3847
 NODE_ENV=development
+BRIGHTFORGE_API_KEY=...   # Optional: enables API bearer token auth
 ```
-
-See [INSTALL.md](INSTALL.md) for API key signup links and configuration details.
-
----
-
-## Contributing
-
-Contributions are welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Run tests (`npm run lint` and relevant `npm run test-*` scripts)
-4. Commit your changes (`git commit -m 'Add amazing feature'`)
-5. Push to the branch (`git push origin feature/amazing-feature`)
-6. Open a Pull Request
-
-See [CLAUDE.md](CLAUDE.md) for development patterns and architecture.
 
 ---
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+MIT — see [LICENSE](LICENSE) for details.
 
----
+**Author:** Marcus Daley ([@GrizzwaldHouse](https://github.com/GrizzwaldHouse))
 
-## Author
-
-**Marcus Daley** ([@GrizzwaldHouse](https://github.com/GrizzwaldHouse))
-
----
-
-## Support
-
-- **Issues:** [GitHub Issues](https://github.com/GrizzwaldHouse/BrightForge/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/GrizzwaldHouse/BrightForge/discussions)
-- **Documentation:** See links above
+**Issues / Discussions:** [GitHub](https://github.com/GrizzwaldHouse/BrightForge/issues)
 
 ---
 
 <div align="center">
 
-**⭐ Star this repo if you find it useful!**
+**Star this repo if you find it useful.**
 
 </div>

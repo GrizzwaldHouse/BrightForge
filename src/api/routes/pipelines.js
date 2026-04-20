@@ -16,6 +16,7 @@ import express from 'express';
 import assetPipelineRunner from '../../forge3d/pipeline/asset-pipeline-runner.js';
 import errorHandler from '../../core/error-handler.js';
 import telemetryBus from '../../core/telemetry-bus.js';
+import modelBridge from '../../forge3d/model-bridge.js';
 
 const router = express.Router();
 
@@ -61,11 +62,24 @@ router.post('/run', (req, res) => {
   const { pipeline, prompt, projectId, model } = req.body;
 
   if (!pipeline) {
-    return res.status(400).json({ error: 'Missing required field: pipeline' });
+    return res.status(400).json({ error: 'invalid_request', reason: '"pipeline" is required' });
   }
 
   if (!prompt) {
-    return res.status(400).json({ error: 'Missing required field: prompt' });
+    return res.status(400).json({ error: 'invalid_request', reason: '"prompt" is required' });
+  }
+
+  // Preflight: check if Forge3D bridge is available when pipeline requires it
+  const templates = assetPipelineRunner.listTemplates ? assetPipelineRunner.listTemplates() : [];
+  const template = templates.find(t => t.name === pipeline || t.id === pipeline);
+  const needsBridge = !template || template.requires_bridge !== false;
+
+  if (needsBridge && modelBridge.state !== 'running') {
+    const reason = modelBridge.unavailableReason || modelBridge.state || 'not started';
+    return res.status(503).json({
+      error: 'dependency_unavailable',
+      reason: `Forge3D Python bridge is not running (state: ${reason})`
+    });
   }
 
   console.log(`[ROUTE:PIPELINE] POST /api/pipelines/run pipeline=${pipeline}`);
