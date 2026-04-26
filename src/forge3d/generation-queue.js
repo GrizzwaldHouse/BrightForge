@@ -234,12 +234,17 @@ class GenerationQueue extends EventEmitter {
     const queued = forge3dDb.listHistory({ status: 'queued' });
     const processing = forge3dDb.listHistory({ status: 'processing' });
 
+    const deadLetterCount = forge3dDb.db
+      ? forge3dDb.db.prepare('SELECT COUNT(*) as c FROM generation_history WHERE status = ?').get('dead_letter')?.c || 0
+      : 0;
+
     return {
       paused: this.paused,
       processing: this.processing,
       currentJobId: this.currentJobId,
       queuedCount: queued.length,
       processingCount: processing.length,
+      deadLetterCount,
       jobs: [...processing, ...queued],
       initialized: true
     };
@@ -389,14 +394,17 @@ class GenerationQueue extends EventEmitter {
           error: err.message
         });
       } else {
+        // Exhausted retries — promote to dead_letter for audit visibility
         forge3dDb.updateHistoryEntry(job.id, {
-          status: 'failed',
+          status: 'dead_letter',
           errorMessage: retryCount > 0
-            ? `Failed after ${retryCount} retries: ${err.message}`
-            : err.message
+            ? `Dead-lettered after ${retryCount} retries: ${err.message}`
+            : `Dead-lettered: ${err.message}`
         });
 
-        telemetryBus.emit('forge3d_job_failed', {
+        console.warn(`[QUEUE] Job ${job.id} promoted to dead_letter after ${retryCount} retries`);
+
+        telemetryBus.emit('forge3d_job_dead_letter', {
           jobId: job.id,
           type: job.type,
           error: err.message,
@@ -404,7 +412,7 @@ class GenerationQueue extends EventEmitter {
           priority: job.priority
         });
 
-        this.emit('failed', { jobId: job.id, error: err.message });
+        this.emit('dead_letter', { jobId: job.id, error: err.message, retries: retryCount });
       }
     }
 

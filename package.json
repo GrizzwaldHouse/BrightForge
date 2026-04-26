@@ -85,6 +85,7 @@
     "test-integration": "node src/tests/integration-suite.js",
     "test-stability": "node src/tests/stability-run.js",
     "test-stability-quick": "node src/tests/stability-run.js --quick",
+    "test-forge3d-e2e": "node src/tests/forge3d-e2e.js",
     "test-visual": "python src/tests/visual-runtime-verify.py",
     "test-visual-headed": "python src/tests/visual-runtime-verify.py --headed",
     "test-load-smoke": "node src/tests/user-load-test.js --scenario smoke",

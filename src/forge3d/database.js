@@ -21,7 +21,7 @@
 import Database from 'better-sqlite3';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { mkdirSync, existsSync, copyFileSync, readdirSync, unlinkSync, statSync } from 'fs';
+import { mkdirSync, existsSync, copyFileSync, readdirSync, unlinkSync, statSync, writeFileSync, readFileSync } from 'fs';
 import { randomUUID } from 'crypto';
 import forge3dConfig from './config-loader.js';
 
@@ -366,6 +366,46 @@ const MIGRATIONS = [
     description: 'Add priority column and index to generation_history',
     sql: `
       ALTER TABLE generation_history ADD COLUMN priority INTEGER DEFAULT 1;
+      CREATE INDEX IF NOT EXISTS idx_history_priority ON generation_history(priority, status, created_at);
+    `
+  },
+  {
+    version: 11,
+    description: 'Add dead_letter status to generation_history CHECK constraint',
+    sql: `
+      CREATE TABLE IF NOT EXISTS generation_history_new (
+        id TEXT PRIMARY KEY,
+        asset_id TEXT,
+        project_id TEXT,
+        type TEXT NOT NULL CHECK (type IN ('mesh', 'image', 'full')),
+        prompt TEXT,
+        status TEXT NOT NULL DEFAULT 'queued'
+          CHECK (status IN ('queued', 'processing', 'complete', 'failed', 'dead_letter')),
+        generation_time REAL,
+        vram_usage_mb REAL,
+        error_message TEXT,
+        metadata TEXT DEFAULT '{}',
+        created_at TEXT DEFAULT (datetime('now')),
+        completed_at TEXT,
+        retry_count INTEGER DEFAULT 0,
+        model TEXT,
+        priority INTEGER DEFAULT 1,
+        FOREIGN KEY (asset_id) REFERENCES assets(id) ON DELETE SET NULL,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+      );
+
+      INSERT INTO generation_history_new
+        SELECT id, asset_id, project_id, type, prompt, status, generation_time,
+               vram_usage_mb, error_message, metadata, created_at, completed_at,
+               retry_count, model, priority
+        FROM generation_history;
+
+      DROP TABLE generation_history;
+      ALTER TABLE generation_history_new RENAME TO generation_history;
+
+      CREATE INDEX IF NOT EXISTS idx_history_project ON generation_history(project_id);
+      CREATE INDEX IF NOT EXISTS idx_history_status ON generation_history(status);
+      CREATE INDEX IF NOT EXISTS idx_history_created ON generation_history(created_at);
       CREATE INDEX IF NOT EXISTS idx_history_priority ON generation_history(priority, status, created_at);
     `
   }
@@ -1435,6 +1475,93 @@ class Forge3DDatabase {
     try { report.report_json = JSON.parse(report.report_json); } catch (_e) { /* keep */ }
     try { report.suggestions_json = JSON.parse(report.suggestions_json); } catch (_e) { /* keep */ }
     return report;
+  }
+
+  // --- Export / Import ---
+
+  /**
+   * Export all tables to a portable JSON snapshot.
+   * Suitable for cross-machine migration or long-term archiving.
+   * @param {string} [outPath] - Optional file path to write JSON to. If omitted, returns object.
+   * @returns {Object} The dump object { version, exportedAt, tables: { tableName: rows[] } }
+   */
+  exportDump(outPath = null) {
+    if (!this.db) throw new Error('Database not open');
+
+    const EXPORT_TABLES = [
+      'projects', 'assets', 'generation_history', 'sessions',
+      'scenes', 'scene_assets', 'worlds', 'world_regions',
+      'prototypes', 'npcs', 'quests', 'interactions',
+      'playtest_runs', 'playtest_reports', 'schema_version'
+    ];
+
+    const tables = {};
+    for (const table of EXPORT_TABLES) {
+      try {
+        tables[table] = this.db.prepare(`SELECT * FROM ${table}`).all();
+      } catch (_e) {
+        tables[table] = [];
+      }
+    }
+
+    const dump = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      schemaVersion: this.db.prepare('SELECT MAX(version) as v FROM schema_version').get()?.v || 0,
+      tables
+    };
+
+    if (outPath) {
+      writeFileSync(outPath, JSON.stringify(dump, null, 2), 'utf8');
+      console.log(`[FORGE3D-DB] Exported ${EXPORT_TABLES.length} tables to ${outPath}`);
+    }
+
+    return dump;
+  }
+
+  /**
+   * Import a JSON dump produced by exportDump().
+   * Runs the entire import inside a single SQLite transaction — atomic or nothing.
+   * Uses INSERT OR REPLACE so it is safe to re-import over an existing DB.
+   * @param {string|Object} source - File path (string) or parsed dump object
+   * @returns {{ tablesImported: number, rowsImported: number }}
+   */
+  importDump(source) {
+    if (!this.db) throw new Error('Database not open');
+
+    const dump = typeof source === 'string'
+      ? JSON.parse(readFileSync(source, 'utf8'))
+      : source;
+
+    if (!dump || dump.version !== 1 || !dump.tables) {
+      throw new Error('Invalid dump format — expected { version: 1, tables: {...} }');
+    }
+
+    let tablesImported = 0;
+    let rowsImported = 0;
+
+    const doImport = this.db.transaction(() => {
+      for (const [tableName, rows] of Object.entries(dump.tables)) {
+        if (!Array.isArray(rows) || rows.length === 0) continue;
+        if (tableName === 'schema_version') continue; // never overwrite migrations
+
+        const cols = Object.keys(rows[0]);
+        const placeholders = cols.map(() => '?').join(', ');
+        const stmt = this.db.prepare(
+          `INSERT OR REPLACE INTO ${tableName} (${cols.join(', ')}) VALUES (${placeholders})`
+        );
+
+        for (const row of rows) {
+          stmt.run(...cols.map((c) => row[c]));
+          rowsImported++;
+        }
+        tablesImported++;
+      }
+    });
+
+    doImport();
+    console.log(`[FORGE3D-DB] Import complete: ${tablesImported} tables, ${rowsImported} rows`);
+    return { tablesImported, rowsImported };
   }
 }
 

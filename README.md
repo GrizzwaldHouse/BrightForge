@@ -10,7 +10,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://python.org)
-[![Phase](https://img.shields.io/badge/phase-16-purple.svg)](#development-history)
+[![Phase](https://img.shields.io/badge/phase-18-purple.svg)](#development-history)
 
 [Quick Start](#quick-start) • [Features](#features) • [Installation](INSTALL.md) • [Docker](DOCKER.md) • [Documentation](#documentation)
 
@@ -29,7 +29,7 @@ BrightForge is a **production-hardened AI creative studio** that combines four i
 
 All powered by a **free-first LLM provider chain** (Ollama → Groq → Cerebras → Together → Mistral → Gemini → Claude → OpenAI → OpenRouter). Work entirely offline or scale to cloud as needed.
 
-**v4.2.0-alpha** | Phase 16 complete | Node.js 18+ ESM | MIT License
+**v4.2.0-alpha** | Phase 18 complete | Node.js 18+ ESM | MIT License
 
 ---
 
@@ -109,6 +109,12 @@ Styles available: `default` · `blue-glass` · `dark-industrial`
 | Full Pipeline | Prompt | GLB/FBX end-to-end |
 
 Capabilities: LOD chain generation · mesh optimization (quadric decimation) · FBX export · SQLite asset management · VRAM monitoring · crash recovery · SSE progress streaming
+
+**Phase 18 production hardening:**
+- **Bounded queue** — `max_size` enforced on `enqueue()`; jobs that exhaust retries are promoted to `dead_letter` status (not silently left as `failed`) with a TelemetryBus event
+- **DB portability** — `GET /api/forge3d/export` downloads a JSON snapshot of all tables; `POST /api/forge3d/import` re-imports atomically in a single SQLite transaction; `POST /api/forge3d/history/prune` deletes entries older than N days
+- **SSE terminal-state fix** — `/stream/:id` immediately flushes a terminal frame if the session is already complete/failed when the client connects (no more silent hangs on reconnect)
+- **End-to-end test** — `npm run test-forge3d-e2e` exercises the full generate→poll→download path; skips cleanly when Python is offline
 
 Requirements: Python 3.10+ · NVIDIA GPU 8GB+ VRAM · CUDA 12.4+
 
@@ -250,6 +256,9 @@ npm run test-model-intel          # Full model scanner suite
 npm run test-integration
 npm run test-stability-quick      # 60-second CI run
 
+# Forge3D end-to-end (Phase 18 — requires server running)
+npm run test-forge3d-e2e          # skips gracefully when Python is offline
+
 # Load Test
 node src/tests/user-load-test.js --scenario smoke  # Required after every feature
 
@@ -349,7 +358,9 @@ Newline-delimited JSON written by `SelfHealingOrchestrator` · every record incl
 | v4.1.5-alpha | 13 | Model Intelligence System (local model scanner) |
 | v4.1.6-alpha | 14 | Universal mesh client, advanced Forge3D |
 | v4.2.0-alpha | 15 | Sandbox hardening, route fixes, async safety |
-| **v4.2.0-alpha** | **16** | **Self-healing orchestration, failure classifier, validate middleware** |
+| v4.2.0-alpha | 16 | Self-healing orchestration, failure classifier, validate middleware |
+| v4.2.0-alpha | 17 | SelfHealingOrchestrator wired to LLM, Forge3D, and pipeline |
+| **v4.2.0-alpha** | **18** | **Forge3D production hardening: bounded queue, dead-letter, DB export/import, SSE fix, e2e test** |
 
 ---
 
