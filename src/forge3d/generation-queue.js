@@ -234,17 +234,12 @@ class GenerationQueue extends EventEmitter {
     const queued = forge3dDb.listHistory({ status: 'queued' });
     const processing = forge3dDb.listHistory({ status: 'processing' });
 
-    const deadLetterCount = forge3dDb.db
-      ? forge3dDb.db.prepare('SELECT COUNT(*) as c FROM generation_history WHERE status = ?').get('dead_letter')?.c || 0
-      : 0;
-
     return {
       paused: this.paused,
       processing: this.processing,
       currentJobId: this.currentJobId,
       queuedCount: queued.length,
       processingCount: processing.length,
-      deadLetterCount,
       jobs: [...processing, ...queued],
       initialized: true
     };
@@ -394,17 +389,14 @@ class GenerationQueue extends EventEmitter {
           error: err.message
         });
       } else {
-        // Exhausted retries — promote to dead_letter for audit visibility
         forge3dDb.updateHistoryEntry(job.id, {
-          status: 'dead_letter',
+          status: 'failed',
           errorMessage: retryCount > 0
-            ? `Dead-lettered after ${retryCount} retries: ${err.message}`
-            : `Dead-lettered: ${err.message}`
+            ? `Failed after ${retryCount} retries: ${err.message}`
+            : err.message
         });
 
-        console.warn(`[QUEUE] Job ${job.id} promoted to dead_letter after ${retryCount} retries`);
-
-        telemetryBus.emit('forge3d_job_dead_letter', {
+        telemetryBus.emit('forge3d_job_failed', {
           jobId: job.id,
           type: job.type,
           error: err.message,
@@ -412,7 +404,7 @@ class GenerationQueue extends EventEmitter {
           priority: job.priority
         });
 
-        this.emit('dead_letter', { jobId: job.id, error: err.message, retries: retryCount });
+        this.emit('failed', { jobId: job.id, error: err.message });
       }
     }
 
@@ -435,6 +427,42 @@ class GenerationQueue extends EventEmitter {
       normal: rows.find(r => r.priority === 1)?.count || 0,
       background: rows.find(r => r.priority === 2)?.count || 0
     };
+  }
+
+  /**
+   * Requeue a single dead-letter job for one manual override attempt.
+   * retry_count is intentionally NOT reset — one more failure re-dead-letters it.
+   * Returns true if the job was found and requeued, false if not found or wrong status.
+   */
+  retryDeadLetter(jobId) {
+    if (!forge3dDb.db) return false;
+    const entry = forge3dDb.getHistoryEntry(jobId);
+    if (!entry || entry.status !== 'dead_letter') return false;
+
+    forge3dDb.updateHistoryEntry(jobId, { status: 'queued', errorMessage: null });
+    // retry_count intentionally NOT reset — one more failure re-dead-letters it
+
+    console.log(`[QUEUE] Dead-letter job ${jobId} requeued (manual override)`);
+    telemetryBus.emit('forge3d_job_manual_retry', { jobId, type: entry.type });
+    this.emit('enqueued', { jobId, position: 0 });
+    this._scheduleProcess();
+    return true;
+  }
+
+  /**
+   * Requeue all dead-letter jobs. Returns count requeued.
+   */
+  retryAllDeadLetters() {
+    if (!forge3dDb.db) return 0;
+    const rows = forge3dDb.db.prepare(
+      'SELECT id FROM generation_history WHERE status = ?'
+    ).all('dead_letter');
+
+    let count = 0;
+    for (const row of rows) {
+      if (this.retryDeadLetter(row.id)) count++;
+    }
+    return count;
   }
 
   /**

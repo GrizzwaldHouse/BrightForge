@@ -15,6 +15,7 @@ import { DiffApplier } from '../core/diff-applier.js';
 import { SessionLog } from '../core/session-log.js';
 import { MessageHistory } from '../core/message-history.js';
 import { MultiStepPlanner } from '../core/multi-step-planner.js';
+import { resolve, join as pathJoin, sep } from 'path';
 import errorHandler from '../core/error-handler.js';
 import telemetryBus from '../core/telemetry-bus.js';
 import planEngine from '../core/plan-engine.js';
@@ -323,14 +324,18 @@ export class WebSession extends EventEmitter {
 
       // direct mode — parse ## FILE: blocks, write via fs
       const { writeFile } = await import('fs/promises');
-      const { join } = await import('path');
-      const fileBlocks = this._parseDirectBlocks(planText);
+      const { blocks, skipped } = this._parseDirectBlocks(planText);
       const filesChanged = [];
-      const errors = [];
+      const errors = [...skipped];
+      const root = resolve(this.projectRoot);
 
-      for (const block of fileBlocks) {
+      for (const block of blocks) {
         try {
-          const abs = join(this.projectRoot, block.path);
+          const abs = resolve(pathJoin(this.projectRoot, block.path));
+          if (!abs.startsWith(root + sep)) {
+            errors.push(`${block.path}: path traversal rejected`);
+            continue;
+          }
           await writeFile(abs, block.content, 'utf8');
           filesChanged.push(block.path);
         } catch (err) {
@@ -349,10 +354,11 @@ export class WebSession extends EventEmitter {
   /**
    * Parse ## FILE: blocks from plan text for direct-mode writes.
    * @param {string} planText
-   * @returns {{ path: string, content: string }[]}
+   * @returns {{ blocks: { path: string, content: string }[], skipped: string[] }}
    */
   _parseDirectBlocks(planText) {
     const blocks = [];
+    const skipped = [];
     const parts = planText.split(/^## FILE:/m).slice(1);
     for (const part of parts) {
       const lines = part.split('\n');
@@ -360,9 +366,11 @@ export class WebSession extends EventEmitter {
       const codeMatch = part.match(/```(?:\w+)?\n([\s\S]*?)```/);
       if (filePath && codeMatch) {
         blocks.push({ path: filePath, content: codeMatch[1] });
+      } else if (filePath) {
+        skipped.push(`${filePath}: no code block found — skipped`);
       }
     }
-    return blocks;
+    return { blocks, skipped };
   }
 
   async rejectPlan(planId) {

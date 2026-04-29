@@ -21,7 +21,7 @@
 
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { dirname, extname, join } from 'path';
 import { createWriteStream, statSync } from 'fs';
 import { EventEmitter } from 'events';
 import forge3dConfig from './config-loader.js';
@@ -407,8 +407,12 @@ class ModelBridge extends EventEmitter {
 
     console.log(`[BRIDGE] Requesting mesh generation (${imageBuffer.length} bytes)...`);
 
+    const ext = extname(filename).slice(1).toLowerCase();
+    const mimeMap = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp' };
+    const mimeType = mimeMap[ext] || 'image/png';
+
     const formData = new FormData();
-    formData.append('image', new Blob([imageBuffer]), filename);
+    formData.append('image', new Blob([imageBuffer], { type: mimeType }), filename);
     if (jobId) formData.append('job_id', jobId);
     if (model) formData.append('model', model);
 

@@ -1409,3 +1409,25 @@
   0%, 100% { opacity: 0.6; }
   50% { opacity: 1; }
 }
+
+/* Dead-letter queue badge */
+.forge3d-dead-letter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.forge3d-dead-letter-bar.hidden {
+  display: none !important;
+}
+
+.forge3d-dead-letter-badge {
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  background: rgba(255, 82, 82, 0.15);
+  color: var(--error);
+  border: 1px solid rgba(255, 82, 82, 0.25);
+}

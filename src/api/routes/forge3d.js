@@ -1009,6 +1009,36 @@ router.post('/queue/resume', (_req, res) => {
 });
 
 /**
+ * POST /api/forge3d/queue/dead-letter/retry
+ * Requeue one or all dead-letter jobs (resets status to 'queued', retry_count to 0).
+ * Body: { jobId } for single job, or { all: true } for all dead-letter jobs.
+ */
+router.post('/queue/dead-letter/retry', (req, res) => {
+  ensureInit();
+  try {
+    const { jobId, all } = req.body || {};
+
+    if (all === true) {
+      const requeued = generationQueue.retryAllDeadLetters();
+      return res.json({ requeued });
+    }
+
+    if (!jobId) {
+      return res.status(400).json({ error: 'Provide jobId or all: true' });
+    }
+
+    const ok = generationQueue.retryDeadLetter(jobId);
+    if (!ok) {
+      return res.status(400).json({ error: 'Job not found or not in dead_letter state' });
+    }
+    res.json({ requeued: 1 });
+  } catch (err) {
+    errorHandler.report('forge3d_error', err, { endpoint: 'dead_letter_retry' });
+    res.status(500).json({ error: sanitizeError(err) });
+  }
+});
+
+/**
  * DELETE /api/forge3d/queue/:id
  * Cancel a queued job.
  */
