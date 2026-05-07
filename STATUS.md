@@ -4,7 +4,7 @@
 <!-- Do NOT edit manually — overwritten on each audit run -->
 
 **Repo:** BrightForge
-**Last Audit:** 2026-05-07T16:00:15.402605+00:00
+**Last Audit:** 2026-05-07T16:03:07.390179+00:00
 **AgentForge Role:** MUSCLES + UI
 **Integration Status:** STANDALONE
 **AgentForge Readiness:** PARTIAL
@@ -16,42 +16,21 @@
 
 | Check | Result |
 |---|---|
-| No polling loops | FAIL |
-| No hardcoded values | FAIL (35 found) |
+| No polling loops | PASS |
+| No hardcoded values | PASS |
 | Config file present | PASS |
 | Observer/event pattern | FAIL |
 | VRAM watchdog | N/A |
-| No EM dashes | FAIL (2 found) |
+| No EM dashes | PASS |
 | .env.example present | PASS |
 
 ## OPEN TODOs
-Found 52 open TODO/FIXME items.
-
-- Add OpenAPI/Swagger spec generation from route definitions
-- Add /api/forge3d/models/delete endpoint for model cleanup
-- Implement SQLite persistence
-- Implement SQLite persistence
-- Add daily automated backup of forge3d.db (e.g. on server start)
-- Add database export/import (JSON) for migration between machines
-- Add generation_history pruning (auto-delete entries older than N days)
-- Add full-text search index on generation prompts
+Found 0 open TODO/FIXME items.
 
 ## AGENTFORGE GAP REPORT
 
 ### Missing Components (must build)
 - [ ] **OwlWatcher integration** [NERVOUS_SYSTEM] — No event bus or observer pattern detected. Required by PRD v2.
-
-### PRD Violations
-- [ ] **POLLING_LOOP** in `C` — Fix: Replace with event listener on OwlWatcher event bus
-- [ ] **POLLING_LOOP** in `C` — Fix: Replace with event listener on OwlWatcher event bus
-- [ ] **POLLING_LOOP** in `C` — Fix: Replace with event listener on OwlWatcher event bus
-- [ ] **POLLING_LOOP** in `C` — Fix: Replace with event listener on OwlWatcher event bus
-- [ ] **POLLING_LOOP** in `C` — Fix: Replace with event listener on OwlWatcher event bus
-- [ ] **HARDCODED_VALUE** in `C` — Fix: Move to config file or .env
-- [ ] **HARDCODED_VALUE** in `C` — Fix: Move to config file or .env
-- [ ] **HARDCODED_VALUE** in `C` — Fix: Move to config file or .env
-- [ ] **HARDCODED_VALUE** in `C` — Fix: Move to config file or .env
-- [ ] **HARDCODED_VALUE** in `C` — Fix: Move to config file or .env
 
 ### Event Contracts Needed
 - [ ] `REPO_SPECIFIC_EVENT` — Need to define what events this repo emits/consumes

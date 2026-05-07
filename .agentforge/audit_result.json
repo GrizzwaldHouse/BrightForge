@@ -1,20 +1,14 @@
 {
   "repo": "BrightForge",
-  "auditTimestamp": "2026-05-07T16:00:15.402605+00:00",
+  "auditTimestamp": "2026-05-07T16:03:07.390179+00:00",
   "agentforgeRole": "MUSCLES + UI",
   "integrationStatus": "STANDALONE",
   "readiness": "PARTIAL",
   "compliance": {
-    "no_polling_loops": false,
-    "polling_violations": [
-      "C:\\Users\\daley\\Projects\\BrightForge/BrightForge/Source/BrightForge/Private/SBrightForgePanel.cpp:224:\t// Start polling (Simplified: just a one-time check for this demo logic)",
-      "C:\\Users\\daley\\Projects\\BrightForge/public/js/agent-health-panel.js:23:    this.pollInterval = setInterval(() => this.refresh(), 5000);",
-      "C:\\Users\\daley\\Projects\\BrightForge/public/js/agent-pipeline-panel.js:37:    this.pollInterval = setInterval(() => this.refresh(), 5000);",
-      "C:\\Users\\daley\\Projects\\BrightForge/public/js/app.js:200:      // Start provider status polling (every 30 seconds)",
-      "C:\\Users\\daley\\Projects\\BrightForge/public/js/app.js:201:      console.log('[APP] Step 7: Starting provider status polling...');"
-    ],
-    "no_hardcoded_values": false,
-    "hardcoded_count": 35,
+    "no_polling_loops": true,
+    "polling_violations": [],
+    "no_hardcoded_values": true,
+    "hardcoded_count": 0,
     "config_file_present": true,
     "config_files": [
       ".env.example"
@@ -22,16 +16,16 @@
     "observer_pattern_used": false,
     "observer_evidence": [],
     "vram_watchdog_present": false,
-    "no_em_dashes": false,
-    "em_dash_count": 2,
+    "no_em_dashes": true,
+    "em_dash_count": 0,
     "env_example_present": true
   },
   "stats": {
     "filesScanned": 239,
-    "functionsFound": 8,
-    "openTodos": 52,
+    "functionsFound": 0,
+    "openTodos": 0,
     "testFiles": 16,
-    "prdViolations": 108,
+    "prdViolations": 0,
     "stack": [
       "Python",
       "TypeScript/React",
@@ -56,59 +50,8 @@
         "reason": "Need to define what events this repo emits/consumes"
       }
     ],
-    "prd_violations": [
-      {
-        "type": "POLLING_LOOP",
-        "location": "C",
-        "fix": "Replace with event listener on OwlWatcher event bus"
-      },
-      {
-        "type": "POLLING_LOOP",
-        "location": "C",
-        "fix": "Replace with event listener on OwlWatcher event bus"
-      },
-      {
-        "type": "POLLING_LOOP",
-        "location": "C",
-        "fix": "Replace with event listener on OwlWatcher event bus"
-      },
-      {
-        "type": "POLLING_LOOP",
-        "location": "C",
-        "fix": "Replace with event listener on OwlWatcher event bus"
-      },
-      {
-        "type": "POLLING_LOOP",
-        "location": "C",
-        "fix": "Replace with event listener on OwlWatcher event bus"
-      },
-      {
-        "type": "HARDCODED_VALUE",
-        "location": "C",
-        "fix": "Move to config file or .env"
-      },
-      {
-        "type": "HARDCODED_VALUE",
-        "location": "C",
-        "fix": "Move to config file or .env"
-      },
-      {
-        "type": "HARDCODED_VALUE",
-        "location": "C",
-        "fix": "Move to config file or .env"
-      },
-      {
-        "type": "HARDCODED_VALUE",
-        "location": "C",
-        "fix": "Move to config file or .env"
-      },
-      {
-        "type": "HARDCODED_VALUE",
-        "location": "C",
-        "fix": "Move to config file or .env"
-      }
-    ]
+    "prd_violations": []
   },
   "claudeCodeUsed": true,
-  "elapsedSeconds": 208.8
+  "elapsedSeconds": 535.1
 }
