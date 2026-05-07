@@ -1,0 +1,21 @@
+// PORT FROM: https://github.com/GrizzwaldHouse/Vulkan-Renderer/blob/main/renderer.h
+//
+// This file should contain the Vulkan hardware rendering pipeline.
+// Key functions to port:
+//   - GetHandlesFromSurface()
+//   - CreateDescriptorSetLayout()
+//   - CompileVertexShader() / CompileFragmentShader()  (merge into one)
+//   - CreatePipelineLayout()
+//   - CreateViewportFromWindowDimensions()  (apply reversed-Z: minDepth=1, maxDepth=0)
+//   - CreateVkPipelineDepthStencilStateCreateInfo()  (apply reversed-Z: GREATER compare)
+//   - InitializeProjectionMatrix()  (nearPlane=0.00001f, farPlane=10000.0f)
+//   - Render()  (add rotating light direction per Z_DEPTH_FIX.md Task Z5)
+//
+// Dependencies needed:
+//   - GateWare library (GWindow, GVulkanSurface, GMath, GInput)
+//   - shaderc (runtime HLSL->SPIR-V compilation)
+//   - tinygltf (GLTF model loading)
+//
+// After porting, implement IRenderService interface from IRenderService.h
+// See: engine/tasks/Z_DEPTH_FIX.md for the 4-point reversed-Z fix to apply
+// See: engine/docs/RENDERING_PIPELINE_BLUEPRINT.md for target architecture

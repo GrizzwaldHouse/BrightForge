@@ -1,0 +1,14 @@
+// PORT FROM: https://github.com/GrizzwaldHouse/Vulkan-Renderer/blob/main/Camera.h
+//
+// This file should contain the FreeLookCamera function.
+// Key notes:
+//   - Uses static locals which makes it non-reentrant
+//   - For the refactor, extract input reading and matrix math into a
+//     CameraController class that can be instanced
+//   - Uses GateWare GInput for keyboard/mouse/controller input
+//   - Camera speed should come from RenderConfig (not hardcoded 0.3f)
+//
+// Dependencies needed:
+//   - GateWare library (GInput, GMath)
+//
+// See: engine/docs/RENDERING_PIPELINE_BLUEPRINT.md for target architecture

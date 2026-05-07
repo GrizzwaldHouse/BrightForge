@@ -1,0 +1,2 @@
+// PORT FROM: https://github.com/GrizzwaldHouse/Vulkan-Renderer/blob/main/FragmentShader.hlsl
+// Basic fragment shader: solid color / texture

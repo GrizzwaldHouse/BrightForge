@@ -21,3 +21,7 @@ StructuredLogging/
 __pycache__/
 *.pyc
 .claude/worktrees/
+
+# C++ Engine build artifacts
+engine/build/
+engine/*.spv
