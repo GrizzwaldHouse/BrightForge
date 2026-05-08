@@ -1,7 +1,7 @@
 /**
  * Image Client - AI Image Generation Provider Chain
  *
- * Supports: Pollinations.ai, Together AI, Gemini, Stability AI
+ * Supports: Pollinations.ai, Together AI, Gemini, Stability AI, OpenAI gpt-image-1
  * Free-first provider chain with fallback support
  *
  * @author Marcus Daley (GrizzwaldHouse)
@@ -180,6 +180,8 @@ class ImageClient {
       return await this._callGemini(prompt, options);
     case 'stability':
       return await this._callStability(prompt, options);
+    case 'openai':
+      return await this._callOpenAI(prompt, options);
     default:
       throw new Error(`Unknown provider: ${providerName}`);
     }
@@ -396,6 +398,63 @@ class ImageClient {
       path: outputPath,
       provider: 'stability',
       cost: provider.cost_per_image || 0.03
+    };
+  }
+
+  /**
+   * OpenAI gpt-image-1 — replaces deprecated DALL-E 2/3
+   * Returns b64_json inline to avoid a second download fetch.
+   */
+  async _callOpenAI(prompt, options) {
+    const provider = this.providers.openai;
+    const apiKey = this.getApiKey('openai');
+    if (!apiKey) throw new Error('OPENAI_API_KEY not found');
+
+    const model = options.model || provider.models?.default || 'gpt-image-1';
+    const width = options.width || provider.default_width || 1024;
+    const height = options.height || provider.default_height || 1024;
+    const size = `${width}x${height}`;
+
+    const requestBody = {
+      model,
+      prompt,
+      n: 1,
+      size,
+      response_format: 'b64_json'
+    };
+
+    if (options.background === 'transparent') {
+      requestBody.background = 'transparent';
+    }
+
+    const response = await fetch(provider.base_url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody),
+      signal: AbortSignal.timeout(60000)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`OpenAI API error: ${response.status} ${errorText}`);
+    }
+
+    const data = await response.json();
+    const b64 = data.data?.[0]?.b64_json;
+    if (!b64) throw new Error('No image data in OpenAI response');
+
+    const imageBuffer = Buffer.from(b64, 'base64');
+    const outputPath = await this.saveImage(imageBuffer, 'openai', options);
+
+    return {
+      url: null,
+      path: outputPath,
+      provider: 'openai',
+      model,
+      cost: provider.cost_per_image || 0.04
     };
   }
 
