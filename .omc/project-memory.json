@@ -1,0 +1,786 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1778168722372,
+  "projectRoot": "C:\\Users\\daley\\Projects\\BrightForge",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": ">=18.0.0",
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "express",
+        "version": "4.21.0",
+        "category": "backend"
+      }
+    ],
+    "packageManager": "npm",
+    "runtime": "Node.js 18.0.0"
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": "npm test",
+    "lintCommand": "npm run lint",
+    "devCommand": "npm run dev",
+    "scripts": {
+      "start": "node bin/brightforge.js",
+      "test-llm": "node src/core/llm-client.js --test",
+      "test-plan": "node src/core/plan-engine.js --test",
+      "test-context": "node src/core/file-context.js --test",
+      "test-diff": "node src/core/diff-applier.js --test",
+      "test-session": "node src/core/session-log.js --test",
+      "test-terminal": "node src/ui/terminal.js --test",
+      "test-image": "node src/core/image-client.js --test",
+      "test-design": "node src/core/design-engine.js --test",
+      "test": "npm run test-all-core && npm run test-multi-model",
+      "test-all-core": "npm run test-llm && npm run test-plan && npm run test-context && npm run test-diff && npm run test-session && npm run test-image && npm run test-design",
+      "lint": "eslint src/ public/js/ bin/ --ext .js",
+      "lint:fix": "eslint src/ public/js/ bin/ --ext .js --fix",
+      "chat": "node bin/brightforge.js --chat",
+      "test-history": "node src/core/message-history.js --test",
+      "test-conversation": "node src/core/conversation-session.js --test",
+      "test-multi-step": "node src/core/multi-step-planner.js --test",
+      "server": "node bin/brightforge-server.js",
+      "test-api": "node src/api/web-session.js --test",
+      "dev": "node bin/brightforge-server.js",
+      "desktop": "node bin/brightforge-desktop.js",
+      "build-desktop": "cd desktop && electron-builder",
+      "test-bridge": "node src/forge3d/model-bridge.js --test",
+      "test-forge-session": "node src/forge3d/forge-session.js --test",
+      "test-forge-db": "node src/forge3d/database.js --test",
+      "test-project-manager": "node src/forge3d/project-manager.js --test",
+      "test-queue": "node src/forge3d/generation-queue.js --test",
+      "test-downloader": "node src/forge3d/model-downloader.js --test",
+      "test-config": "node src/forge3d/config-loader.js --test",
+      "test-monitor": "node src/forge3d/monitor.js --test",
+      "test-fbx-converter": "python python/fbx_converter.py --test",
+      "test-orch-db": "node src/orchestration/storage.js --test",
+      "test-event-bus": "node src/orchestration/event-bus.js --test",
+      "test-task-state": "node src/orchestration/task-state.js --test",
+      "test-supervisor": "node src/orchestration/supervisor.js --test",
+      "test-handoff": "node src/orchestration/handoff.js --test",
+      "test-orchestrator": "node src/orchestration/index.js --test",
+      "test-multi-model": "node src/forge3d/test-multi-model.js --test",
+      "test-pipeline": "node src/forge3d/pipeline/test-pipeline.js --test",
+      "test-scene-graph": "node src/forge3d/scene/scene-graph.js --test",
+      "test-scene-analyzer": "node src/forge3d/scene/scene-analyzer.js --test",
+      "test-scene-routes": "node src/api/routes/scene.js --test",
+      "test-world-graph": "node src/forge3d/world/world-graph.js --test",
+      "test-world-analyzer": "node src/forge3d/world/world-analyzer.js --test",
+      "test-npc-generator": "node src/forge3d/gameplay/npc-generator.js --test",
+      "test-interaction-generator": "node src/forge3d/gameplay/interaction-generator.js --test",
+      "test-quest-generator": "node src/forge3d/gameplay/quest-generator.js --test",
+      "test-logic-builder": "node src/forge3d/gameplay/game-logic-builder.js --test",
+      "test-biome-generator": "node src/forge3d/world/biome-generator.js --test",
+      "test-streaming-layout": "node src/forge3d/world/streaming-layout.js --test",
+      "test-world-routes": "node src/api/routes/world.js --test",
+      "test-prototype-routes": "node src/api/routes/prototype.js --test",
+      "test-quest-solver": "node src/forge3d/playtest/quest-solver.js --test",
+      "test-path-analyzer": "node src/forge3d/playtest/path-analyzer.js --test",
+      "test-agent-simulator": "node src/forge3d/playtest/agent-simulator.js --test",
+      "test-balance-analyzer": "node src/forge3d/playtest/balance-analyzer.js --test",
+      "test-playtest-routes": "node src/api/routes/playtest.js --test",
+      "test-skills": "node src/core/skill-orchestrator.js --test",
+      "test-ws-bus": "node src/api/ws-event-bus.js --test",
+      "test-planner": "node src/agents/planner-agent.js --test",
+      "test-builder": "node src/agents/builder-agent.js --test",
+      "test-sandbox": "node src/security/sandbox.js --test",
+      "test-failure-classifier": "node src/core/failure-classifier.js --test",
+      "test-healing": "node src/core/self-healing-orchestrator.js --test",
+      "test-tester": "node src/agents/tester-agent.js --test",
+      "test-reviewer": "node src/agents/reviewer-agent.js --test",
+      "test-survey": "node src/agents/survey-agent.js --test",
+      "test-recorder": "node src/agents/recorder-agent.js --test",
+      "test-agents": "npm run test-planner && npm run test-builder && npm run test-tester && npm run test-reviewer && npm run test-survey && npm run test-recorder",
+      "test-integration": "node src/tests/integration-suite.js",
+      "test-stability": "node src/tests/stability-run.js",
+      "test-stability-quick": "node src/tests/stability-run.js --quick",
+      "test-visual": "python src/tests/visual-runtime-verify.py",
+      "test-visual-headed": "python src/tests/visual-runtime-verify.py --headed",
+      "test-load-smoke": "node src/tests/user-load-test.js --scenario smoke",
+      "test-load": "node src/tests/user-load-test.js --scenario load",
+      "test-load-stress": "node src/tests/user-load-test.js --scenario stress",
+      "test-load-soak": "node src/tests/user-load-test.js --scenario soak",
+      "test-idea-ingestion": "node src/idea/idea-ingestion.js --test",
+      "test-idea-classifier": "node src/idea/idea-classifier.js --test",
+      "test-idea-scoring": "node src/idea/idea-scoring.js --test",
+      "test-idea-research": "node src/idea/research-agent.js --test",
+      "test-idea-indexer": "node src/idea/idea-indexer.js --test",
+      "test-idea-facade": "node src/idea/index.js --test",
+      "test-idea-pipeline": "node src/idea/test-pipeline.js",
+      "test-idea": "npm run test-idea-ingestion && npm run test-idea-classifier && npm run test-idea-scoring && npm run test-idea-research && npm run test-idea-indexer && npm run test-idea-facade && npm run test-idea-pipeline",
+      "test-model-config": "node src/model-intelligence/config-loader.js --test",
+      "test-model-db": "node src/model-intelligence/database.js --test",
+      "test-model-events": "node src/model-intelligence/event-types.js --test",
+      "test-model-scanner": "node src/model-intelligence/scanner.js --test",
+      "test-model-writer": "node src/model-intelligence/inventory-writer.js --test",
+      "test-model-intel": "node src/model-intelligence/index.js --test",
+      "test-model-router": "node src/model-intelligence/model-router.js --test",
+      "test-model-scanner-py": "py -3 python/model_scanner.py --test"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "bin",
+      "docs",
+      "examples",
+      "public",
+      "src",
+      "test"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "analysis": {
+      "path": "analysis",
+      "purpose": null,
+      "fileCount": 6,
+      "lastAccessed": 1778168722341,
+      "keyFiles": [
+        "coupling_report.md",
+        "pipeline_flow.md",
+        "reuse_inventory.md",
+        "roadmap.md",
+        "structure_map.md"
+      ]
+    },
+    "bin": {
+      "path": "bin",
+      "purpose": "Executable scripts",
+      "fileCount": 6,
+      "lastAccessed": 1778168722341,
+      "keyFiles": [
+        "brightforge-desktop.js",
+        "brightforge-server.js",
+        "brightforge.js",
+        "llcapp-desktop.js",
+        "llcapp-server.js"
+      ]
+    },
+    "BrightForge": {
+      "path": "BrightForge",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1778168722347,
+      "keyFiles": [
+        "BrightForge.uplugin"
+      ]
+    },
+    "config": {
+      "path": "config",
+      "purpose": "Configuration files",
+      "fileCount": 16,
+      "lastAccessed": 1778168722348,
+      "keyFiles": [
+        "agent-config.yaml",
+        "asset-pipelines.yaml",
+        "contracts.json",
+        "forge3d.yaml",
+        "gameplay-defaults.yaml"
+      ]
+    },
+    "CUsersdaleyProjectsBrightForge.githubworkflows": {
+      "path": "CUsersdaleyProjectsBrightForge.githubworkflows",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1778168722348,
+      "keyFiles": []
+    },
+    "CUsersdaleyProjectsBrightForgedocs": {
+      "path": "CUsersdaleyProjectsBrightForgedocs",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1778168722348,
+      "keyFiles": []
+    },
+    "CUsersdaleyProjectsBrightForgesrcapimiddleware": {
+      "path": "CUsersdaleyProjectsBrightForgesrcapimiddleware",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1778168722348,
+      "keyFiles": []
+    },
+    "CUsersdaleyProjectsBrightForgesrctests": {
+      "path": "CUsersdaleyProjectsBrightForgesrctests",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1778168722349,
+      "keyFiles": []
+    },
+    "CUsersdaleyProjectsLLCApppython": {
+      "path": "CUsersdaleyProjectsLLCApppython",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1778168722349,
+      "keyFiles": []
+    },
+    "CUsersdaleyProjectsLLCAppsrcforge3d": {
+      "path": "CUsersdaleyProjectsLLCAppsrcforge3d",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1778168722349,
+      "keyFiles": []
+    },
+    "data": {
+      "path": "data",
+      "purpose": "Data files",
+      "fileCount": 13,
+      "lastAccessed": 1778168722350,
+      "keyFiles": [
+        "forge3d.db",
+        "ideas.db",
+        "load-test-report.json",
+        "model-intelligence.db",
+        "orchestration.db"
+      ]
+    },
+    "desktop": {
+      "path": "desktop",
+      "purpose": null,
+      "fileCount": 5,
+      "lastAccessed": 1778168722350,
+      "keyFiles": [
+        "IMPLEMENTATION.md",
+        "main.js",
+        "package.json",
+        "preload.js",
+        "QUICKSTART.md"
+      ]
+    },
+    "DeveloperProductivityTracker": {
+      "path": "DeveloperProductivityTracker",
+      "purpose": null,
+      "fileCount": 4,
+      "lastAccessed": 1778168722351,
+      "keyFiles": [
+        "DeveloperProductivityTracker.uplugin",
+        "PRIVACY.md",
+        "README.md",
+        "SECURITY.md"
+      ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 20,
+      "lastAccessed": 1778168722351,
+      "keyFiles": [
+        "30_DAY_PLAN.md",
+        "API.md",
+        "ARCHITECTURE.md",
+        "CODEBASE_AUDIT.md",
+        "competitive-analysis-2026.md"
+      ]
+    },
+    "examples": {
+      "path": "examples",
+      "purpose": "Example code",
+      "fileCount": 1,
+      "lastAccessed": 1778168722351,
+      "keyFiles": [
+        "README.md"
+      ]
+    },
+    "integration": {
+      "path": "integration",
+      "purpose": null,
+      "fileCount": 3,
+      "lastAccessed": 1778168722352,
+      "keyFiles": [
+        "smoke_tests.md",
+        "validation_checklist.md",
+        "wiring_manifest.md"
+      ]
+    },
+    "MarcusDaleyComputer Graphics_lab4": {
+      "path": "MarcusDaleyComputer Graphics_lab4",
+      "purpose": null,
+      "fileCount": 16,
+      "lastAccessed": 1778168722352,
+      "keyFiles": [
+        "Camera.h",
+        "Constrants.cpp",
+        "Constrants.h",
+        "GraphicsHelper.hpp",
+        "LineDrawing.h"
+      ]
+    },
+    "MarcusDaley_Lab3": {
+      "path": "MarcusDaley_Lab3",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1778168722352,
+      "keyFiles": []
+    },
+    "public": {
+      "path": "public",
+      "purpose": "Public files",
+      "fileCount": 4,
+      "lastAccessed": 1778168722353,
+      "keyFiles": [
+        "debug.html",
+        "index.html",
+        "status.html",
+        "ws-test.html"
+      ]
+    },
+    "python": {
+      "path": "python",
+      "purpose": null,
+      "fileCount": 13,
+      "lastAccessed": 1778168722353,
+      "keyFiles": [
+        "config.yaml",
+        "fbx_converter.py",
+        "inference_server.py",
+        "material_builder.py",
+        "material_extractor.py"
+      ]
+    },
+    "sessions": {
+      "path": "sessions",
+      "purpose": null,
+      "fileCount": 508,
+      "lastAccessed": 1778168722355,
+      "keyFiles": [
+        "bridge-errors.log",
+        "crash-report-2026-02-11T11-43-11-900Z.json",
+        "crash-report-2026-02-11T14-35-43-829Z.json",
+        "crash-report-2026-02-11T19-11-53-028Z.json",
+        "crash-report-2026-02-12T02-23-35-302Z.json"
+      ]
+    },
+    "Shaders": {
+      "path": "Shaders",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1778168722355,
+      "keyFiles": []
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 0,
+      "lastAccessed": 1778168722355,
+      "keyFiles": []
+    },
+    "StructuredLogging": {
+      "path": "StructuredLogging",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1778168722356,
+      "keyFiles": [
+        "StructuredLogging.uplugin"
+      ]
+    },
+    "test": {
+      "path": "test",
+      "purpose": "Test files",
+      "fileCount": 1,
+      "lastAccessed": 1778168722356,
+      "keyFiles": [
+        "sample-llm-output.txt"
+      ]
+    },
+    "ue5-plugin": {
+      "path": "ue5-plugin",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1778168722356,
+      "keyFiles": [
+        "README.md"
+      ]
+    },
+    "ui": {
+      "path": "ui",
+      "purpose": null,
+      "fileCount": 7,
+      "lastAccessed": 1778168722357,
+      "keyFiles": [
+        "component_definitions.md",
+        "default_layout.json",
+        "design_tokens.json",
+        "interaction_map.md",
+        "layout_tree.md"
+      ]
+    },
+    "verification": {
+      "path": "verification",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1778168722357,
+      "keyFiles": [
+        "Invoke-Phase2Verification.ps1",
+        "README.md"
+      ]
+    },
+    "data\\models": {
+      "path": "data\\models",
+      "purpose": "Data models",
+      "fileCount": 1,
+      "lastAccessed": 1778168722362,
+      "keyFiles": []
+    },
+    "DeveloperProductivityTracker\\Scripts": {
+      "path": "DeveloperProductivityTracker\\Scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 3,
+      "lastAccessed": 1778168722363,
+      "keyFiles": [
+        "ProtectFiles.ps1",
+        "SetupPermissions.ps1",
+        "UnprotectFiles.ps1"
+      ]
+    },
+    "src\\api": {
+      "path": "src\\api",
+      "purpose": "API routes",
+      "fileCount": 5,
+      "lastAccessed": 1778168722369,
+      "keyFiles": [
+        "server.js",
+        "server.js.backup",
+        "session-store.js"
+      ]
+    },
+    "StructuredLogging\\Config": {
+      "path": "StructuredLogging\\Config",
+      "purpose": "Configuration files",
+      "fileCount": 1,
+      "lastAccessed": 1778168722371,
+      "keyFiles": [
+        "DefaultStructuredLogging.ini"
+      ]
+    },
+    "ue5-plugin\\Scripts": {
+      "path": "ue5-plugin\\Scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 1,
+      "lastAccessed": 1778168722372,
+      "keyFiles": [
+        "brightforge_import.py"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "",
+      "accessCount": 41,
+      "lastAccessed": 1778169499449,
+      "type": "directory"
+    },
+    {
+      "path": "src",
+      "accessCount": 27,
+      "lastAccessed": 1778169490384,
+      "type": "directory"
+    },
+    {
+      "path": "STATUS.md",
+      "accessCount": 5,
+      "lastAccessed": 1778169636256,
+      "type": "file"
+    },
+    {
+      "path": "src\\agents\\master-agent.js",
+      "accessCount": 4,
+      "lastAccessed": 1778169490567,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\llm-client.js",
+      "accessCount": 3,
+      "lastAccessed": 1778169369451,
+      "type": "file"
+    },
+    {
+      "path": "src\\orchestration\\index.js",
+      "accessCount": 3,
+      "lastAccessed": 1778169465175,
+      "type": "file"
+    },
+    {
+      "path": "src\\orchestration\\event-bus.js",
+      "accessCount": 3,
+      "lastAccessed": 1778169466042,
+      "type": "file"
+    },
+    {
+      "path": "src\\api\\routes\\agents.js",
+      "accessCount": 3,
+      "lastAccessed": 1778169488620,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\self-healing-orchestrator.js",
+      "accessCount": 3,
+      "lastAccessed": 1778169491310,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\agent-monitor.js",
+      "accessCount": 3,
+      "lastAccessed": 1778169491656,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\plan-engine.js",
+      "accessCount": 2,
+      "lastAccessed": 1778169328868,
+      "type": "file"
+    },
+    {
+      "path": "src\\agents",
+      "accessCount": 2,
+      "lastAccessed": 1778169349344,
+      "type": "directory"
+    },
+    {
+      "path": ".env.example",
+      "accessCount": 2,
+      "lastAccessed": 1778169349744,
+      "type": "file"
+    },
+    {
+      "path": "python",
+      "accessCount": 2,
+      "lastAccessed": 1778169368188,
+      "type": "directory"
+    },
+    {
+      "path": "src\\api\\routes",
+      "accessCount": 2,
+      "lastAccessed": 1778169368785,
+      "type": "directory"
+    },
+    {
+      "path": "src\\core\\creative-pipeline.js",
+      "accessCount": 2,
+      "lastAccessed": 1778169373009,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\telemetry-bus.js",
+      "accessCount": 2,
+      "lastAccessed": 1778169465936,
+      "type": "file"
+    },
+    {
+      "path": ".agentforge\\audit_result.json",
+      "accessCount": 2,
+      "lastAccessed": 1778169499126,
+      "type": "file"
+    },
+    {
+      "path": "src\\forge3d\\monitor.js",
+      "accessCount": 1,
+      "lastAccessed": 1778168822145,
+      "type": "file"
+    },
+    {
+      "path": "CLAUDE.md",
+      "accessCount": 1,
+      "lastAccessed": 1778169312692,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\design-engine.js",
+      "accessCount": 1,
+      "lastAccessed": 1778169328440,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\message-history.js",
+      "accessCount": 1,
+      "lastAccessed": 1778169328553,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\session-log.js",
+      "accessCount": 1,
+      "lastAccessed": 1778169329167,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\predictive-engine.js",
+      "accessCount": 1,
+      "lastAccessed": 1778169329499,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\context-optimizer.js",
+      "accessCount": 1,
+      "lastAccessed": 1778169329698,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\confidence-scorer.js",
+      "accessCount": 1,
+      "lastAccessed": 1778169330058,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\multi-step-planner.js",
+      "accessCount": 1,
+      "lastAccessed": 1778169330258,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\conversation-session.js",
+      "accessCount": 1,
+      "lastAccessed": 1778169334766,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\file-context.js",
+      "accessCount": 1,
+      "lastAccessed": 1778169334954,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\project-memory.js",
+      "accessCount": 1,
+      "lastAccessed": 1778169335273,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\git-checkpointer.js",
+      "accessCount": 1,
+      "lastAccessed": 1778169335740,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\diff-applier.js",
+      "accessCount": 1,
+      "lastAccessed": 1778169335941,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\pipeline-detector.js",
+      "accessCount": 1,
+      "lastAccessed": 1778169336091,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\context-adapter.js",
+      "accessCount": 1,
+      "lastAccessed": 1778169336722,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\error-handler.js",
+      "accessCount": 1,
+      "lastAccessed": 1778169341327,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\skill-orchestrator.js",
+      "accessCount": 1,
+      "lastAccessed": 1778169341405,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\failure-classifier.js",
+      "accessCount": 1,
+      "lastAccessed": 1778169341526,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\image-client.js",
+      "accessCount": 1,
+      "lastAccessed": 1778169342564,
+      "type": "file"
+    },
+    {
+      "path": "package.json",
+      "accessCount": 1,
+      "lastAccessed": 1778169354297,
+      "type": "file"
+    },
+    {
+      "path": "src\\model-intelligence\\event-types.js",
+      "accessCount": 1,
+      "lastAccessed": 1778169380611,
+      "type": "file"
+    },
+    {
+      "path": "src\\orchestration\\supervisor.js",
+      "accessCount": 1,
+      "lastAccessed": 1778169415191,
+      "type": "file"
+    },
+    {
+      "path": "src\\orchestration\\task-state.js",
+      "accessCount": 1,
+      "lastAccessed": 1778169415629,
+      "type": "file"
+    },
+    {
+      "path": "src\\orchestration\\handoff.js",
+      "accessCount": 1,
+      "lastAccessed": 1778169415676,
+      "type": "file"
+    },
+    {
+      "path": "src\\orchestration\\storage.js",
+      "accessCount": 1,
+      "lastAccessed": 1778169416270,
+      "type": "file"
+    },
+    {
+      "path": "src\\agents\\base-agent.js",
+      "accessCount": 1,
+      "lastAccessed": 1778169420849,
+      "type": "file"
+    },
+    {
+      "path": "src\\agents\\cloud-agent.js",
+      "accessCount": 1,
+      "lastAccessed": 1778169421154,
+      "type": "file"
+    },
+    {
+      "path": "src\\agents\\local-agent.js",
+      "accessCount": 1,
+      "lastAccessed": 1778169421458,
+      "type": "file"
+    },
+    {
+      "path": "src\\agents\\planner-agent.js",
+      "accessCount": 1,
+      "lastAccessed": 1778169424969,
+      "type": "file"
+    },
+    {
+      "path": "src\\agents\\tester-agent.js",
+      "accessCount": 1,
+      "lastAccessed": 1778169425400,
+      "type": "file"
+    },
+    {
+      "path": "src\\agents\\reviewer-agent.js",
+      "accessCount": 1,
+      "lastAccessed": 1778169425562,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}
