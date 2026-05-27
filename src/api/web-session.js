@@ -15,8 +15,10 @@ import { DiffApplier } from '../core/diff-applier.js';
 import { SessionLog } from '../core/session-log.js';
 import { MessageHistory } from '../core/message-history.js';
 import { MultiStepPlanner } from '../core/multi-step-planner.js';
+import { resolve, join as pathJoin, sep } from 'path';
 import errorHandler from '../core/error-handler.js';
 import telemetryBus from '../core/telemetry-bus.js';
+import planEngine from '../core/plan-engine.js';
 
 export class WebSession extends EventEmitter {
   constructor({ projectRoot, sessionsDir }) {
@@ -291,6 +293,84 @@ export class WebSession extends EventEmitter {
         errors: [error.message]
       };
     }
+  }
+
+  /**
+   * Apply a plan in agent mode — skips human approval gate.
+   * @param {string} planText - Raw LLM plan text (## FILE / ## ACTION format)
+   * @param {'plan'|'direct'} mode - 'plan' uses PlanEngine+DiffApplier with backups;
+   *   'direct' parses FILE blocks and writes via fs (no backups, faster)
+   * @param {string} [taskId] - Optional task ID for telemetry
+   * @returns {{ applied: number, failed: number, errors: string[], filesChanged: string[] }}
+   */
+  async agentApply(planText, mode = 'plan', taskId = null) {
+    this.touch();
+    const context = { sessionId: this.id, taskId, mode };
+
+    try {
+      if (mode === 'plan') {
+        const parsed = planEngine.parse(planText);
+        planEngine.validate(parsed);
+        const result = await this.diffApplier.apply(parsed, this.projectRoot);
+        const filesChanged = (parsed.operations || []).map(op => op.filePath).filter(Boolean);
+        telemetryBus.emit('plan_approved', { sessionId: this.id, taskId, mode, filesChanged });
+        return {
+          applied: result.applied || 0,
+          failed: result.failed || 0,
+          errors: result.errors || [],
+          filesChanged
+        };
+      }
+
+      // direct mode — parse ## FILE: blocks, write via fs
+      const { writeFile } = await import('fs/promises');
+      const { blocks, skipped } = this._parseDirectBlocks(planText);
+      const filesChanged = [];
+      const errors = [...skipped];
+      const root = resolve(this.projectRoot);
+
+      for (const block of blocks) {
+        try {
+          const abs = resolve(pathJoin(this.projectRoot, block.path));
+          if (!abs.startsWith(root + sep)) {
+            errors.push(`${block.path}: path traversal rejected`);
+            continue;
+          }
+          await writeFile(abs, block.content, 'utf8');
+          filesChanged.push(block.path);
+        } catch (err) {
+          errors.push(`${block.path}: ${err.message}`);
+        }
+      }
+
+      telemetryBus.emit('plan_approved', { sessionId: this.id, taskId, mode, filesChanged });
+      return { applied: filesChanged.length, failed: errors.length, errors, filesChanged };
+    } catch (error) {
+      errorHandler.report('apply_error', error, context);
+      throw error;
+    }
+  }
+
+  /**
+   * Parse ## FILE: blocks from plan text for direct-mode writes.
+   * @param {string} planText
+   * @returns {{ blocks: { path: string, content: string }[], skipped: string[] }}
+   */
+  _parseDirectBlocks(planText) {
+    const blocks = [];
+    const skipped = [];
+    const parts = planText.split(/^## FILE:/m).slice(1);
+    for (const part of parts) {
+      const lines = part.split('\n');
+      const filePath = lines[0].trim();
+      const codeMatch = part.match(/```(?:\w+)?\n([\s\S]*?)```/);
+      if (filePath && codeMatch) {
+        blocks.push({ path: filePath, content: codeMatch[1] });
+      } else if (filePath) {
+        skipped.push(`${filePath}: no code block found — skipped`);
+      }
+    }
+    return { blocks, skipped };
   }
 
   async rejectPlan(planId) {

@@ -430,6 +430,42 @@ class GenerationQueue extends EventEmitter {
   }
 
   /**
+   * Requeue a single dead-letter job for one manual override attempt.
+   * retry_count is intentionally NOT reset — one more failure re-dead-letters it.
+   * Returns true if the job was found and requeued, false if not found or wrong status.
+   */
+  retryDeadLetter(jobId) {
+    if (!forge3dDb.db) return false;
+    const entry = forge3dDb.getHistoryEntry(jobId);
+    if (!entry || entry.status !== 'dead_letter') return false;
+
+    forge3dDb.updateHistoryEntry(jobId, { status: 'queued', errorMessage: null });
+    // retry_count intentionally NOT reset — one more failure re-dead-letters it
+
+    console.log(`[QUEUE] Dead-letter job ${jobId} requeued (manual override)`);
+    telemetryBus.emit('forge3d_job_manual_retry', { jobId, type: entry.type });
+    this.emit('enqueued', { jobId, position: 0 });
+    this._scheduleProcess();
+    return true;
+  }
+
+  /**
+   * Requeue all dead-letter jobs. Returns count requeued.
+   */
+  retryAllDeadLetters() {
+    if (!forge3dDb.db) return 0;
+    const rows = forge3dDb.db.prepare(
+      'SELECT id FROM generation_history WHERE status = ?'
+    ).all('dead_letter');
+
+    let count = 0;
+    for (const row of rows) {
+      if (this.retryDeadLetter(row.id)) count++;
+    }
+    return count;
+  }
+
+  /**
    * Shutdown queue gracefully.
    */
   shutdown() {

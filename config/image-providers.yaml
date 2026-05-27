@@ -92,6 +92,33 @@ providers:
       - image-to-image
       - upscaling
 
+  # Priority 5: OpenAI gpt-image-1 — high-quality paid option
+  # Replaces deprecated DALL-E 2 / DALL-E 3 (deprecated 2026-05-12)
+  openai:
+    enabled: false  # Disabled by default - requires OPENAI_API_KEY
+    base_url: "https://api.openai.com/v1/images/generations"
+    api_key_env: "OPENAI_API_KEY"
+    priority: 5
+    cost_per_image: 0.04  # gpt-image-1 standard 1024x1024
+    rate_limit: 60  # requests per minute
+    models:
+      default: "gpt-image-1"
+      quality: "gpt-image-1"
+    size_map:
+      "1024x1024": "1024x1024"
+      "landscape": "1536x1024"
+      "portrait": "1024x1536"
+    supported_formats:
+      - png
+      - jpg
+      - webp
+    max_dimensions: 1536
+    default_width: 1024
+    default_height: 1024
+    features:
+      - text-to-image
+      - transparent-background
+
 # Task routing preferences
 task_routing:
   image_generation:
@@ -99,11 +126,13 @@ task_routing:
       - pollinations
       - together
       - gemini   # aka nano-banana
+      - openai   # gpt-image-1 (paid, enabled: false by default)
     fallback: stability
   image_editing:
     prefer:
       - pollinations
       - gemini   # aka nano-banana
+      - openai   # gpt-image-1 supports transparent background
     fallback: stability
 
 # Global defaults

@@ -1094,27 +1094,44 @@ class Forge3DPanel {
   }
 
   /**
-   * Load queue status.
+   * Load queue status and render dead-letter badge.
    */
   async _loadQueue() {
     try {
-      const res = await fetch('/api/forge3d/sessions');
-      if (!res.ok) return;
-      const data = await res.json();
+      const [sessionsRes, queueRes] = await Promise.all([
+        fetch('/api/forge3d/sessions'),
+        fetch('/api/forge3d/queue')
+      ]);
 
       const queueEl = document.getElementById('forge3d-queue-list');
       if (!queueEl) return;
 
+      if (queueRes.ok) {
+        const queueStatus = await queueRes.json();
+        this._renderDeadLetterBadge(queueEl, queueStatus.deadLetterCount || 0);
+      }
+
+      if (!sessionsRes.ok) return;
+      const data = await sessionsRes.json();
+
       if (data.sessions.length === 0) {
-        queueEl.innerHTML = '<div class="queue-empty">No recent jobs</div>';
+        if (!queueEl.querySelector('.queue-empty')) {
+          const empty = document.createElement('div');
+          empty.className = 'queue-empty';
+          empty.textContent = 'No recent jobs';
+          queueEl.appendChild(empty);
+        }
         return;
       }
 
-      queueEl.innerHTML = '';
+      // Remove previous session items (keep dead-letter bar)
+      queueEl.querySelectorAll('.queue-item').forEach(el => el.remove());
+      queueEl.querySelector('.queue-empty')?.remove();
+
       data.sessions.slice(0, 10).forEach((s) => {
         const queueItem = document.createElement('div');
         // Validate state to prevent class injection
-        const safeState = ['idle', 'generating', 'complete', 'failed', 'queued'].includes(s.state) ? s.state : 'unknown';
+        const safeState = ['idle', 'generating', 'complete', 'failed', 'queued', 'dead_letter'].includes(s.state) ? s.state : 'unknown';
         queueItem.className = `queue-item queue-${safeState}`;
 
         const typeSpan = document.createElement('span');
@@ -1136,6 +1153,57 @@ class Forge3DPanel {
       });
     } catch (err) {
       console.warn('[FORGE3D-PANEL] Failed to load queue:', err.message);
+    }
+  }
+
+  /**
+   * Render (or update) the dead-letter count badge and retry button.
+   * Inserts a bar at the top of queueEl; hides it when count is 0.
+   */
+  _renderDeadLetterBadge(queueEl, count) {
+    let bar = queueEl.querySelector('.forge3d-dead-letter-bar');
+
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.className = 'forge3d-dead-letter-bar';
+
+      const badge = document.createElement('span');
+      badge.className = 'forge3d-dead-letter-badge';
+
+      const retryBtn = document.createElement('button');
+      retryBtn.className = 'btn-small';
+      retryBtn.textContent = 'Retry All';
+      retryBtn.addEventListener('click', () => this._retryAllDeadLetters());
+
+      bar.appendChild(badge);
+      bar.appendChild(retryBtn);
+      queueEl.prepend(bar);
+    }
+
+    const badge = bar.querySelector('.forge3d-dead-letter-badge');
+    if (badge) badge.textContent = `${count} dead-letter`;
+    bar.classList.toggle('hidden', count === 0);
+  }
+
+  /**
+   * Retry all dead-letter jobs via POST /api/forge3d/queue/dead-letter/retry.
+   */
+  async _retryAllDeadLetters() {
+    try {
+      const res = await fetch('/api/forge3d/queue/dead-letter/retry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ all: true })
+      });
+      if (!res.ok) {
+        console.warn('[FORGE3D-PANEL] Dead-letter retry failed:', res.status);
+        return;
+      }
+      const { requeued } = await res.json();
+      console.log(`[FORGE3D-PANEL] Requeued ${requeued} dead-letter job(s)`);
+      await this._loadQueue();
+    } catch (err) {
+      console.warn('[FORGE3D-PANEL] Dead-letter retry error:', err.message);
     }
   }
 

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-**BrightForge** (v4.2.0-alpha). A hybrid AI coding + design + 3D generation agent that uses local LLMs (Ollama) with cloud fallback via a free-first provider chain. Plan-review-run workflow: LLM generates a plan, user reviews colored diffs, approves or rejects, changes are applied with backup/rollback support. Includes AI-powered image generation via "Nano Banana" (Gemini) + multi-provider chain (Design Engine) and GPU-accelerated 3D mesh generation (ForgePipeline).
+**BrightForge** (v4.2.0-alpha, Phase 18). A hybrid AI coding + design + 3D generation agent that uses local LLMs (Ollama) with cloud fallback via a free-first provider chain. Plan-review-run workflow: LLM generates a plan, user reviews colored diffs, approves or rejects, changes are applied with backup/rollback support. Includes AI-powered image generation via "Nano Banana" (Gemini) + multi-provider chain (Design Engine), GPU-accelerated 3D mesh generation (ForgePipeline), and a production-hardened queue with dead-letter promotion, DB portability (JSON export/import), and self-healing orchestration.
 
 ## Commands
 
@@ -66,6 +66,9 @@ npm run test-ws-bus        # src/api/ws-event-bus.js --test
 # Stability Testing
 npm run test-stability       # 13-minute full-stack stability run
 npm run test-stability-quick # 60-second quick stability run (CI)
+
+# Forge3D end-to-end test (Phase 18 — requires server running on port 3847)
+npm run test-forge3d-e2e     # src/tests/forge3d-e2e.js — skips when Python offline
 
 # Idea Intelligence System self-tests
 npm run test-idea-ingestion # src/idea/idea-ingestion.js --test
@@ -253,6 +256,11 @@ Five modules in `src/forge3d/`:
 - `POST /lod/:id` — Generate LOD chain (high/mid/low GLB files)
 - `GET /report/:id` — Mesh quality report (vertex/face count, VRAM estimate, platform recommendations)
 - `GET /presets` — Optimization presets (Mobile: 2000, Web: 5000, Desktop: 10000, Unreal: 50000)
+- `GET /export` — Download full DB as JSON attachment (all 15 tables, schema v1 envelope)
+- `POST /import` — Import JSON dump atomically (INSERT OR REPLACE in single transaction, max 50 MB)
+- `POST /history/prune` — Delete `generation_history` rows older than N days (body: `{ daysToKeep }`)
+
+**Dead-letter queue**: Jobs that exhaust `max_retries` are promoted to `status = 'dead_letter'` (not `failed`) — auditable in history, counted in `GET /queue` as `deadLetterCount`, emits `forge3d_job_dead_letter` to TelemetryBus.
 
 **Data Storage**: SQLite at `data/forge3d.db`, output files at `data/output/{projectId}/`.
 

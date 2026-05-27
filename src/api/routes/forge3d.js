@@ -292,6 +292,26 @@ router.get('/stream/:id', (req, res) => {
 
     const sessionId = req.params.id;
 
+    // Flush terminal state immediately if the session already finished before the client connected.
+    // Without this, the client would hang waiting for events that will never fire.
+    const existingStatus = forgeSession.getStatus(sessionId);
+    if (existingStatus) {
+      const terminalStates = ['complete', 'failed'];
+      if (terminalStates.includes(existingStatus.state)) {
+        const isDone = existingStatus.state === 'complete';
+        res.write(`data: ${JSON.stringify({
+          sessionId,
+          state: existingStatus.state,
+          progress: existingStatus.progress,
+          error: existingStatus.error || null,
+          done: isDone,
+          failed: !isDone
+        })}\n\n`);
+        res.end();
+        return;
+      }
+    }
+
     // Heartbeat keepalive every 15s
     const heartbeat = setInterval(() => {
       res.write(':keepalive\n\n');
@@ -851,6 +871,59 @@ router.get('/stats', (_req, res) => {
 });
 
 /**
+ * GET /api/forge3d/export
+ * Export entire database to a JSON attachment download.
+ * Uses Content-Disposition: attachment so the browser saves the file.
+ */
+router.get('/export', (_req, res) => {
+  ensureInit();
+  try {
+    const dump = forge3dDb.exportDump();
+    const filename = `forge3d-export-${new Date().toISOString().slice(0, 10)}.json`;
+    res.set('Content-Type', 'application/json');
+    res.set('Content-Disposition', `attachment; filename="${filename}"`);
+    res.json(dump);
+  } catch (err) {
+    errorHandler.report('forge3d_error', err, { endpoint: 'export' });
+    res.status(500).json({ error: sanitizeError(err) });
+  }
+});
+
+/**
+ * POST /api/forge3d/import
+ * Import a JSON dump from exportDump() into the live database.
+ * Body: the JSON dump object (application/json, max 50 MB).
+ */
+router.post('/import', express.json({ limit: '50mb' }), (req, res) => {
+  ensureInit();
+  try {
+    const result = forge3dDb.importDump(req.body);
+    res.json({ imported: true, ...result });
+  } catch (err) {
+    console.error(`[ROUTE] DB import error: ${err.message}`);
+    errorHandler.report('forge3d_error', err, { endpoint: 'import' });
+    res.status(400).json({ error: sanitizeError(err) });
+  }
+});
+
+/**
+ * POST /api/forge3d/history/prune
+ * Delete generation_history entries older than N days.
+ * Body: { daysToKeep: number } (defaults to 30)
+ */
+router.post('/history/prune', (req, res) => {
+  ensureInit();
+  try {
+    const days = Math.max(1, parseInt(req.body?.daysToKeep) || 30);
+    const deleted = forge3dDb.pruneHistory(days);
+    res.json({ pruned: deleted, daysToKeep: days });
+  } catch (err) {
+    errorHandler.report('forge3d_error', err, { endpoint: 'prune_history' });
+    res.status(500).json({ error: sanitizeError(err) });
+  }
+});
+
+/**
  * GET /api/forge3d/bridge
  * Get Python bridge status.
  */
@@ -931,6 +1004,36 @@ router.post('/queue/resume', (_req, res) => {
     res.json({ paused: false });
   } catch (err) {
     errorHandler.report('forge3d_error', err, { endpoint: 'queue_resume' });
+    res.status(500).json({ error: sanitizeError(err) });
+  }
+});
+
+/**
+ * POST /api/forge3d/queue/dead-letter/retry
+ * Requeue one or all dead-letter jobs (resets status to 'queued', retry_count to 0).
+ * Body: { jobId } for single job, or { all: true } for all dead-letter jobs.
+ */
+router.post('/queue/dead-letter/retry', (req, res) => {
+  ensureInit();
+  try {
+    const { jobId, all } = req.body || {};
+
+    if (all === true) {
+      const requeued = generationQueue.retryAllDeadLetters();
+      return res.json({ requeued });
+    }
+
+    if (!jobId) {
+      return res.status(400).json({ error: 'Provide jobId or all: true' });
+    }
+
+    const ok = generationQueue.retryDeadLetter(jobId);
+    if (!ok) {
+      return res.status(400).json({ error: 'Job not found or not in dead_letter state' });
+    }
+    res.json({ requeued: 1 });
+  } catch (err) {
+    errorHandler.report('forge3d_error', err, { endpoint: 'dead_letter_retry' });
     res.status(500).json({ error: sanitizeError(err) });
   }
 });
