@@ -1289,20 +1289,33 @@ Returns up to 20 sessions. Sessions are kept in memory and cleared on server res
 
 #### GET /api/forge3d/queue
 
-Get the generation queue status including queued and processing jobs.
+Get the generation queue status including queued, processing, and dead-letter job counts.
 
 **Response (200):**
 
 ```json
 {
   "paused": false,
-  "queued": 2,
-  "processing": 1,
-  "completed": 15,
-  "failed": 2,
-  "jobs": []
+  "processing": false,
+  "currentJobId": null,
+  "queuedCount": 2,
+  "processingCount": 1,
+  "deadLetterCount": 0,
+  "jobs": [],
+  "initialized": true
 }
 ```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `paused` | boolean | Whether the queue is paused |
+| `processing` | boolean | Whether a job is actively running |
+| `currentJobId` | string \| null | ID of the currently-processing job, or null |
+| `queuedCount` | number | Count of jobs with status `queued` |
+| `processingCount` | number | Count of jobs with status `processing` |
+| `deadLetterCount` | number | Count of jobs that exhausted all retries (status `dead_letter`) |
+| `jobs` | array | Full row objects for processing and queued jobs |
+| `initialized` | boolean | Whether the queue DB is open and ready |
 
 **Status Codes:**
 
@@ -1384,6 +1397,160 @@ Cancel a queued job. Jobs that are already processing or completed cannot be can
 
 ---
 
+#### POST /api/forge3d/queue/dead-letter/retry
+
+Requeue one or all dead-letter jobs. Resets `status` to `queued` and `retry_count` to `0`, giving the job a fresh set of retries.
+
+**Request Body:**
+
+```json
+{ "jobId": "job-uuid" }
+```
+
+Or to retry all dead-letter jobs at once:
+
+```json
+{ "all": true }
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `jobId` | string | conditional | ID of the specific dead-letter job to requeue |
+| `all` | boolean | conditional | If `true`, requeue every dead-letter job |
+
+One of `jobId` or `all` must be provided.
+
+**Response (200):**
+
+```json
+{
+  "requeued": 1
+}
+```
+
+**Status Codes:**
+
+| Code | Condition |
+|------|-----------|
+| 200 | Jobs requeued (count in `requeued` field) |
+| 400 | Neither `jobId` nor `all` provided, or job not found / not in dead_letter state |
+| 500 | Internal server error |
+
+---
+
+### Data Management
+
+#### GET /api/forge3d/export
+
+Export the entire Forge3D database as a JSON file download. The response is sent with `Content-Disposition: attachment` so browsers save it directly. The dump includes all 15 tables.
+
+**Request Body:** None.
+
+**Response (200):** JSON file attachment (`forge3d-export-YYYY-MM-DD.json`)
+
+```json
+{
+  "version": 1,
+  "exportedAt": "2026-04-26T00:00:00.000Z",
+  "schemaVersion": 11,
+  "tables": {
+    "projects": [],
+    "assets": [],
+    "generation_history": [],
+    "sessions": [],
+    "scenes": [],
+    "scene_assets": [],
+    "worlds": [],
+    "world_regions": [],
+    "prototypes": [],
+    "npcs": [],
+    "quests": [],
+    "interactions": [],
+    "playtest_runs": [],
+    "playtest_reports": [],
+    "schema_version": []
+  }
+}
+```
+
+**Status Codes:**
+
+| Code | Condition |
+|------|-----------|
+| 200 | Export file returned |
+| 500 | Database error |
+
+---
+
+#### POST /api/forge3d/import
+
+Import a JSON dump produced by `GET /api/forge3d/export` into the live database. All inserts run in a single atomic transaction using `INSERT OR REPLACE` — safe to re-import over an existing database. Maximum body size: 50 MB.
+
+**Request Body:** The full dump object from `GET /export`.
+
+```json
+{
+  "version": 1,
+  "tables": { "...": [] }
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `version` | number | Yes | Must be `1` |
+| `tables` | object | Yes | Table name → array of row objects |
+
+**Response (200):**
+
+```json
+{
+  "imported": true,
+  "tablesImported": 14,
+  "rowsImported": 312
+}
+```
+
+**Status Codes:**
+
+| Code | Condition |
+|------|-----------|
+| 200 | Import successful |
+| 400 | Invalid dump format or database error |
+
+---
+
+#### POST /api/forge3d/history/prune
+
+Delete `generation_history` rows older than N days. Applies to all statuses including `dead_letter`.
+
+**Request Body:**
+
+```json
+{ "daysToKeep": 30 }
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `daysToKeep` | number | No | Rows older than this many days are deleted. Defaults to `30`. Minimum `1`. |
+
+**Response (200):**
+
+```json
+{
+  "pruned": 17,
+  "daysToKeep": 30
+}
+```
+
+**Status Codes:**
+
+| Code | Condition |
+|------|-----------|
+| 200 | Prune complete (`pruned` = rows deleted) |
+| 500 | Database error |
+
+---
+
 ## Global Error Response Format
 
 All endpoints use a consistent error response format:
@@ -1417,8 +1584,8 @@ Unhandled errors caught by the Express error middleware also include an `errorId
 | `routes/errors.js` | `/api/errors` | 3 endpoints |
 | `routes/metrics.js` | `/api/metrics` | 3 endpoints |
 | `routes/design.js` | `/api/design` | 5 endpoints |
-| `routes/forge3d.js` | `/api/forge3d` | 16 endpoints |
+| `routes/forge3d.js` | `/api/forge3d` | 20 endpoints |
 | Static files | `/` | Serves `public/` directory |
 | SPA fallback | `*` | Non-API GET routes serve `index.html` |
 
-**Total: 35 API endpoints**
+**Total: 39 API endpoints**

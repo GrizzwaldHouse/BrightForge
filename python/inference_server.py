@@ -218,7 +218,11 @@ async def generate_mesh(
 
     try:
         from PIL import Image as PILImage
-        img = PILImage.open(temp_image)
+        # Load into RAM and copy to a new in-memory image, then close the file
+        # handle. On Windows, an open handle prevents unlink() in the finally block.
+        with PILImage.open(temp_image) as _f:
+            _f.load()
+            img = _f.copy()  # Detached from the file — fully usable, no handle
 
         # Validate dimensions
         max_dim = _cfg('generation', 'max_image_dimension', 4096)

@@ -1,0 +1,55 @@
+firecrawl:
+  enabled: true
+  base_url: "http://localhost:3002"
+  managed_url: "https://api.firecrawl.dev"
+  # Set FIRECRAWL_API_KEY in .env.local to use managed service
+  # Leave empty to use self-hosted at base_url
+  api_key: ""
+  timeout_ms: 30000
+  max_retries: 2
+
+model_providers:
+  - name: ollama_library
+    url: "https://ollama.com/library"
+    description: "Ollama model library"
+    category: llm
+  - name: huggingface_trending
+    url: "https://huggingface.co/models?sort=trending&pipeline_tag=text-generation"
+    description: "HuggingFace trending LLMs"
+    category: llm
+  - name: groq_models
+    url: "https://console.groq.com/docs/models"
+    description: "Groq available models"
+    category: llm
+  - name: together_models
+    url: "https://docs.together.ai/docs/inference-models"
+    description: "Together AI inference models"
+    category: llm
+  - name: openrouter_models
+    url: "https://openrouter.ai/models"
+    description: "OpenRouter model directory"
+    category: llm
+
+image_providers:
+  - name: together_flux
+    url: "https://docs.together.ai/docs/flux-overview"
+    description: "Together FLUX image models"
+    category: image
+  - name: stability_models
+    url: "https://platform.stability.ai/docs/api-reference"
+    description: "Stability AI model endpoints"
+    category: image
+  - name: pollinations_docs
+    url: "https://github.com/pollinations/pollinations/blob/master/README.md"
+    description: "Pollinations available models"
+    category: image
+  - name: replicate_trending
+    url: "https://replicate.com/explore"
+    description: "Replicate trending image models"
+    category: image
+
+sync:
+  # How many days before a cached page is considered stale
+  cache_ttl_days: 3
+  # Max pages to crawl per provider (safety limit)
+  max_pages_per_provider: 5

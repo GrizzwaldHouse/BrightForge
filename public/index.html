@@ -168,6 +168,12 @@
           <button class="tab" data-tab="orchestration">
             <i data-lucide="cpu"></i> Orchestration
           </button>
+          <button class="tab" data-tab="pipeline-tasks">
+            <i data-lucide="list-checks"></i> Tasks
+          </button>
+          <button class="tab" data-tab="integrations">
+            <i data-lucide="link"></i> Integrations
+          </button>
           <button class="tab" data-tab="models">
             <i data-lucide="database"></i> Models
           </button>
@@ -464,12 +470,13 @@
               <!-- Asset Pipeline -->
               <div id="forge3d-pipeline-container"></div>
 
-              <!-- History / Assets / Queue subtabs -->
+              <!-- History / Assets / Queue / Data Management subtabs -->
               <div class="forge3d-section">
                 <div class="forge3d-subtabs">
                   <button class="forge3d-subtab active" data-subtab="history">History</button>
                   <button class="forge3d-subtab" data-subtab="assets">Assets</button>
                   <button class="forge3d-subtab" data-subtab="queue">Queue</button>
+                  <button class="forge3d-subtab" data-subtab="data">Data Management</button>
                 </div>
 
                 <div id="forge3d-subtab-history" class="forge3d-subpanel">
@@ -489,6 +496,13 @@
                     <div class="queue-empty">No recent jobs</div>
                   </div>
                   <button id="forge3d-queue-pause" class="btn-small" style="margin-top: 6px;">Pause Queue</button>
+                </div>
+
+                <!-- Phase 20E1 — Data Management subtab.
+                     Renders Export / Import / History Prune sections at runtime
+                     via Forge3DPanel._renderDataManagement(). -->
+                <div id="forge3d-subtab-data" class="forge3d-subpanel hidden">
+                  <div id="forge3d-data-management"></div>
                 </div>
               </div>
             </div>
@@ -564,6 +578,14 @@
 
         <div class="tab-panel" data-panel="orchestration">
           <div id="orchestration-panel"></div>
+        </div>
+
+        <div class="tab-panel" data-panel="pipeline-tasks">
+          <div id="pipeline-tasks-panel"></div>
+        </div>
+
+        <div class="tab-panel" data-panel="integrations">
+          <div id="integrations-panel"></div>
         </div>
 
         <div class="tab-panel" data-panel="models">

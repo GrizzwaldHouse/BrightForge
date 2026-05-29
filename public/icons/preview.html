@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BrightForge Icon Preview</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:       oklch(9.5% 0.008 52);
+      --surface:  oklch(11.5% 0.009 52);
+      --rule:     oklch(20% 0.007 52);
+      --amber:    oklch(76% 0.20 74);
+      --amber-dim: oklch(46% 0.10 74);
+      --text:     oklch(88% 0.008 58);
+      --muted:    oklch(52% 0.008 55);
+      --mono:     'JetBrains Mono', monospace;
+      --sans:     'Inter', sans-serif;
+    }
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 40px 32px;
+    }
+    h1 {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--amber);
+      margin-bottom: 6px;
+    }
+    .subtitle {
+      font-size: 12px;
+      color: var(--muted);
+      font-family: var(--mono);
+      margin-bottom: 40px;
+    }
+
+    /* Icon size grid */
+    .size-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      margin-bottom: 48px;
+      align-items: flex-end;
+    }
+    .icon-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    .icon-cell img, .icon-cell svg {
+      border-radius: calc(var(--s) * 0.214);
+      display: block;
+    }
+    .icon-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    /* Section headers */
+    .section-head {
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.10em;
+      text-transform: uppercase;
+      color: var(--amber-dim);
+      border-bottom: 1px solid var(--rule);
+      padding-bottom: 8px;
+      margin-bottom: 24px;
+      margin-top: 40px;
+    }
+
+    /* Desktop mockup */
+    .desktop-mock {
+      width: 480px;
+      height: 300px;
+      background: linear-gradient(135deg, #1a3a6a 0%, #2a5a9a 60%, #1a4a8a 100%);
+      border-radius: 8px;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--rule);
+    }
+    .desktop-mock::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 40px;
+      background: rgba(0,0,0,0.3);
+    }
+    .desktop-icon-group {
+      position: absolute;
+      top: 24px;
+      left: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    .desktop-icon-label {
+      font-size: 11px;
+      color: white;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+      font-family: var(--sans);
+    }
+
+    /* Taskbar mockup */
+    .taskbar-mock {
+      width: 480px;
+      height: 48px;
+      background: oklch(12% 0.008 220 / 0.85);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 4px;
+      border: 1px solid oklch(25% 0.01 220);
+      backdrop-filter: blur(12px);
+    }
+    .taskbar-icon-slot {
+      width: 36px;
+      height: 36px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: oklch(18% 0.04 74 / 0.5);
+      border: 1px solid oklch(30% 0.05 74 / 0.4);
+    }
+    .taskbar-sep {
+      width: 1px;
+      height: 24px;
+      background: oklch(30% 0.01 220);
+      margin: 0 8px;
+    }
+    .taskbar-sys { display: flex; align-items: center; gap: 8px; margin-left: auto; font-size: 11px; color: oklch(70% 0.005 220); font-family: var(--mono); }
+
+    /* Wordmark row */
+    .wordmark-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 20px 24px;
+      background: var(--surface);
+      border: 1px solid var(--rule);
+      border-radius: 6px;
+      margin-bottom: 16px;
+    }
+    .wordmark-text {
+      font-family: var(--mono);
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--amber);
+    }
+    .wordmark-tag {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+    }
+
+    .prompt-link {
+      display: inline-block;
+      margin-top: 32px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--amber-dim);
+      border: 1px solid var(--rule);
+      padding: 8px 16px;
+      border-radius: 3px;
+      text-decoration: none;
+    }
+    .prompt-link:hover { border-color: var(--amber-dim); color: var(--amber); }
+  </style>
+</head>
+<body>
+
+<h1>BrightForge — Icon System Preview</h1>
+<div class="subtitle">Viking Forge Theme · Amber accent · Generated SVG mark</div>
+
+<!-- Size Grid -->
+<div class="section-head">App Icon Sizes</div>
+<div class="size-grid">
+  <div class="icon-cell" style="--s:128px">
+    <img src="brightforge-icon.svg" width="128" height="128" alt="128px icon">
+    <span class="icon-label">1024×1024<br>master</span>
+  </div>
+  <div class="icon-cell" style="--s:96px">
+    <img src="brightforge-icon.svg" width="96" height="96" alt="96px icon">
+    <span class="icon-label">512×512</span>
+  </div>
+  <div class="icon-cell" style="--s:64px">
+    <img src="brightforge-icon.svg" width="64" height="64" alt="64px icon">
+    <span class="icon-label">256×256</span>
+  </div>
+  <div class="icon-cell" style="--s:48px">
+    <img src="brightforge-icon.svg" width="48" height="48" alt="48px icon">
+    <span class="icon-label">128×128</span>
+  </div>
+  <div class="icon-cell" style="--s:32px">
+    <img src="brightforge-icon.svg" width="32" height="32" alt="32px icon">
+    <span class="icon-label">64×64</span>
+  </div>
+  <div class="icon-cell" style="--s:24px">
+    <img src="brightforge-icon.svg" width="24" height="24" alt="24px icon">
+    <span class="icon-label">32×32</span>
+  </div>
+  <div class="icon-cell" style="--s:16px">
+    <img src="brightforge-icon.svg" width="16" height="16" alt="16px icon">
+    <span class="icon-label">16×16</span>
+  </div>
+</div>
+
+<!-- Wordmark -->
+<div class="section-head">Wordmark + Icon</div>
+<div class="wordmark-row">
+  <img src="brightforge-icon.svg" width="40" height="40" alt="BF icon">
+  <div>
+    <div class="wordmark-text">BRIGHTFORGE</div>
+    <div class="wordmark-tag">FORGE · REFINE · SHIP</div>
+  </div>
+</div>
+<div class="wordmark-row" style="background:oklch(96% 0.004 58);border-color:#ddd">
+  <img src="brightforge-icon.svg" width="40" height="40" alt="BF icon">
+  <div>
+    <div class="wordmark-text" style="color:#1a1208">BRIGHTFORGE</div>
+    <div class="wordmark-tag" style="color:#6a4a18">FORGE · REFINE · SHIP</div>
+  </div>
+</div>
+
+<!-- Desktop mockup -->
+<div class="section-head">Desktop Icon Mockup</div>
+<div class="desktop-mock">
+  <div class="desktop-icon-group">
+    <img src="brightforge-icon.svg" width="72" height="72" alt="desktop icon">
+    <span class="desktop-icon-label">Brightforge</span>
+  </div>
+</div>
+
+<!-- Taskbar mockup -->
+<div class="section-head">Taskbar Icon Mockup</div>
+<div class="taskbar-mock">
+  <div class="taskbar-icon-slot">
+    <img src="brightforge-icon.svg" width="24" height="24" alt="taskbar icon">
+  </div>
+  <div class="taskbar-sep"></div>
+  <div class="taskbar-sys">∧&nbsp;&nbsp;((wifi))&nbsp;&nbsp;◻&nbsp;&nbsp;18:42</div>
+</div>
+
+<a class="prompt-link" href="image-prompts.md">View image generation prompts →</a>
+
+</body>
+</html>

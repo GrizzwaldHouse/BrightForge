@@ -488,21 +488,64 @@ class Forge3DDatabase {
   }
 
   /**
-   * Delete generation_history rows older than daysToKeep days.
-   * @param {number} daysToKeep - Number of days to retain (default 30)
-   * @returns {number} Count of deleted rows
+   * Delete generation_history rows older than the given retention.
+   *
+   * Phase 20C1 — accepts either a number (legacy: prune ALL rows older than N days)
+   * or an object { daysToKeep, daysToKeepDeadLetter } so dead-letter rows can be
+   * retained on a different cadence than regular rows. When the object form is
+   * used and `daysToKeepDeadLetter` is omitted, dead-letter rows fall through to
+   * the same `daysToKeep` threshold.
+   *
+   * @param {number | { daysToKeep: number, daysToKeepDeadLetter?: number }} arg
+   * @returns {number} Total count of deleted rows
    */
-  pruneHistory(daysToKeep = 30) {
+  pruneHistory(arg = 30) {
     if (!this.db) return 0;
-    const result = this.db.prepare(
-      'DELETE FROM generation_history WHERE created_at < datetime(\'now\', \'-\' || ? || \' days\')'
-    ).run(daysToKeep);
-    const deleted = result.changes;
-    if (deleted > 0) {
-      console.log(`[FORGE3D-DB] Pruned ${deleted} history entries older than ${daysToKeep} days`);
+
+    // Normalize input. Numbers and missing args go through the legacy single-cutoff path.
+    let daysToKeep;
+    let daysToKeepDeadLetter;
+    if (typeof arg === 'object' && arg !== null) {
+      daysToKeep = Number.isFinite(arg.daysToKeep) ? arg.daysToKeep : 30;
+      if (Number.isFinite(arg.daysToKeepDeadLetter)) {
+        daysToKeepDeadLetter = arg.daysToKeepDeadLetter;
+      }
     } else {
-      console.log(`[FORGE3D-DB] No history entries to prune (retention: ${daysToKeep} days)`);
+      daysToKeep = Number.isFinite(arg) ? arg : 30;
     }
+
+    let deleted = 0;
+
+    if (typeof daysToKeepDeadLetter === 'number') {
+      // Two-cadence prune: regular rows on daysToKeep, dead-letter rows on daysToKeepDeadLetter.
+      // The two queries use the same cutoff column (created_at) but different `status`
+      // filters so a row is only matched by one of them.
+      const reg = this.db.prepare(
+        'DELETE FROM generation_history WHERE status != ? AND created_at < datetime(\'now\', \'-\' || ? || \' days\')'
+      ).run('dead_letter', daysToKeep);
+      const dl = this.db.prepare(
+        'DELETE FROM generation_history WHERE status = ? AND created_at < datetime(\'now\', \'-\' || ? || \' days\')'
+      ).run('dead_letter', daysToKeepDeadLetter);
+      deleted = (reg.changes || 0) + (dl.changes || 0);
+      if (deleted > 0) {
+        console.log(`[FORGE3D-DB] Pruned ${reg.changes} regular + ${dl.changes} dead-letter (regular: ${daysToKeep}d, dead-letter: ${daysToKeepDeadLetter}d)`);
+      } else {
+        console.log(`[FORGE3D-DB] No history entries to prune (regular: ${daysToKeep}d, dead-letter: ${daysToKeepDeadLetter}d)`);
+      }
+    } else {
+      // Legacy single-cutoff path. Preserves the original behavior so existing
+      // callers and self-tests do not need to change.
+      const result = this.db.prepare(
+        'DELETE FROM generation_history WHERE created_at < datetime(\'now\', \'-\' || ? || \' days\')'
+      ).run(daysToKeep);
+      deleted = result.changes;
+      if (deleted > 0) {
+        console.log(`[FORGE3D-DB] Pruned ${deleted} history entries older than ${daysToKeep} days`);
+      } else {
+        console.log(`[FORGE3D-DB] No history entries to prune (retention: ${daysToKeep} days)`);
+      }
+    }
+
     return deleted;
   }
 

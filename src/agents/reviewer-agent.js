@@ -13,6 +13,10 @@ import { existsSync } from 'fs';
 import { randomUUID } from 'crypto';
 import telemetryBus from '../core/telemetry-bus.js';
 import errorHandler from '../core/error-handler.js';
+// Phase 20B2 — typed pipeline rejection event. Imported at module top so
+// the dependency is explicit; emit is wrapped in try/catch so reviewer
+// self-tests do not require a live orchestrator.
+import orchestrator from '../orchestration/index.js';
 
 class ReviewerAgent extends EventEmitter {
   constructor() {
@@ -85,6 +89,28 @@ class ReviewerAgent extends EventEmitter {
 
       this.emit('review_complete', review);
       console.log(`[REVIEWER] Review ${reviewId} complete: ${review.summary}`);
+
+      // Phase 20B2 — when the score drops below the pilot reject threshold (60)
+      // emit a typed orchestration event so PipelineTasksPanel can render a red
+      // card with feedback. Wrapped in try/catch so reviewer self-tests never
+      // fail just because the orchestrator event bus is offline.
+      if (verdict === 'rejected' && orchestrator && orchestrator.eventBus) {
+        try {
+          orchestrator.eventBus.emit('pipeline_review_rejected', {
+            agent: this.name,
+            taskId: options.taskId || reviewId,
+            payload: {
+              taskId: options.taskId || reviewId,
+              verdict: 'REJECTED',
+              score,
+              feedback: review.summary,
+              findings
+            }
+          });
+        } catch (emitErr) {
+          console.warn(`[REVIEWER] orchestrator emit skipped: ${emitErr.message}`);
+        }
+      }
 
       return review;
     } catch (err) {

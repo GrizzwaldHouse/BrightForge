@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BrightForge — Command Surface</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-root:      oklch(11% 0.012 198);
+      --bg-surface:   oklch(13.5% 0.014 198);
+      --bg-raised:    oklch(16% 0.015 198);
+      --bg-input:     oklch(18.5% 0.014 198);
+      --rule:         oklch(20% 0.011 198);
+      --rule-mid:     oklch(26% 0.012 198);
+      --text-primary: oklch(93% 0.007 200);
+      --text-secondary: oklch(72% 0.009 200);
+      --text-muted:   oklch(50% 0.009 200);
+      --text-dim:     oklch(33% 0.008 198);
+      /* Teal: committed — owns 35-40% of interactive surface */
+      --teal:         oklch(73% 0.23 193);
+      --teal-mid:     oklch(56% 0.17 193);
+      --teal-dim:     oklch(38% 0.11 193);
+      --teal-bg:      oklch(17% 0.055 193);
+      --teal-bg2:     oklch(21% 0.075 193);
+      --teal-glow:    oklch(73% 0.23 193 / 0.3);
+      --amber:        oklch(76% 0.19 74);
+      --amber-dim:    oklch(52% 0.12 74);
+      --amber-bg:     oklch(17% 0.05 74);
+      --green:        oklch(71% 0.18 148);
+      --red:          oklch(63% 0.19 22);
+      --violet:       oklch(68% 0.22 290);
+      --sans:         'Inter', sans-serif;
+      --mono:         'JetBrains Mono', monospace;
+      --cmd-h:        46px;
+      --col-tree:     214px;
+      --col-log:      252px;
+    }
+
+    body {
+      font-family: var(--sans);
+      background: var(--bg-root);
+      color: var(--text-primary);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      font-size: 13px;
+    }
+
+    /* ── Command Bar ── */
+    .cmd-bar {
+      height: var(--cmd-h);
+      background: var(--bg-surface);
+      border-bottom: 2px solid var(--teal);
+      display: flex;
+      align-items: stretch;
+      flex-shrink: 0;
+      box-shadow: 0 2px 20px oklch(73% 0.23 193 / 0.12);
+    }
+    .logo-mark {
+      display: flex;
+      align-items: center;
+      padding: 0 18px;
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--teal);
+      letter-spacing: 0.01em;
+      border-right: 1px solid var(--rule);
+      flex-shrink: 0;
+      background: var(--teal-bg);
+    }
+    .cmd-tabs-wrap {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      position: relative;
+    }
+    .cmd-tabs-wrap::after {
+      content: '';
+      position: absolute;
+      right: 0; top: 0; bottom: 0;
+      width: 48px;
+      background: linear-gradient(to right, transparent, var(--bg-surface));
+      pointer-events: none;
+    }
+    .cmd-tabs {
+      display: flex;
+      height: 100%;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .cmd-tabs::-webkit-scrollbar { display: none; }
+    .cmd-tab {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 0 14px;
+      height: 100%;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-dim);
+      cursor: pointer;
+      border-right: 1px solid var(--rule);
+      position: relative;
+      transition: color 0.1s, background 0.1s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .cmd-tab:hover { color: var(--text-muted); background: var(--bg-raised); }
+    .cmd-tab.active {
+      color: var(--teal);
+      background: var(--teal-bg);
+      font-weight: 600;
+    }
+    .cmd-tab.active::after {
+      content: '';
+      position: absolute;
+      bottom: -2px;
+      left: 0; right: 0;
+      height: 2px;
+      background: var(--teal);
+    }
+    .kbd {
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--text-dim);
+      border: 1px solid var(--rule-mid);
+      padding: 1px 4px;
+      border-radius: 2px;
+      line-height: 1.4;
+    }
+    .cmd-tab.active .kbd { color: var(--teal-dim); border-color: var(--teal-dim); }
+    .tab-badge {
+      background: var(--teal-bg2);
+      color: var(--teal);
+      font-size: 9px;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 10px;
+      min-width: 16px;
+      text-align: center;
+    }
+    .tab-badge.running { background: oklch(16% 0.05 148); color: var(--green); }
+    .cmd-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 0 16px;
+      flex-shrink: 0;
+    }
+    .sys-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .sys-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--teal);
+      box-shadow: 0 0 0 2px var(--teal-bg2), 0 0 10px var(--teal-glow);
+    }
+    .cost-display {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .cost-display .v { color: var(--amber); font-weight: 600; }
+
+    /* ── Workspace ── */
+    .workspace {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ── Tree Column ── */
+    .tree-col {
+      width: var(--col-tree);
+      background: var(--bg-surface);
+      border-right: 1px solid var(--rule);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .col-header {
+      height: 32px;
+      border-bottom: 1px solid var(--rule);
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      background: var(--bg-raised);
+      flex-shrink: 0;
+    }
+    .col-header .hint {
+      margin-left: auto;
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--text-dim);
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: 0;
+      border: 1px solid var(--rule-mid);
+      padding: 1px 5px;
+      border-radius: 2px;
+    }
+    .tree-scroll { flex: 1; overflow-y: auto; padding: 6px 0; }
+    .tree-scroll::-webkit-scrollbar { width: 3px; }
+    .tree-scroll::-webkit-scrollbar-thumb { background: var(--rule-mid); }
+    .tree-item {
+      padding: 5px 12px;
+      font-size: 12px;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.08s, color 0.08s;
+      font-weight: 400;
+    }
+    .tree-item:hover { background: var(--bg-raised); color: var(--text-secondary); }
+    .tree-item.active { color: var(--teal); background: var(--teal-bg); font-weight: 500; }
+    .tree-item.dir { font-weight: 600; color: var(--text-secondary); }
+    .tree-item .indent { display: inline-block; width: 14px; flex-shrink: 0; }
+    .tree-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
+    .tree-item.active .tree-dot { background: var(--teal); }
+    .tree-item.modified .tree-dot { background: var(--amber); }
+
+    /* ── Center Column ── */
+    .center-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .center-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .center-scroll::-webkit-scrollbar { width: 4px; }
+    .center-scroll::-webkit-scrollbar-thumb { background: var(--rule-mid); border-radius: 2px; }
+
+    /* Live status strip — replaces stat cards */
+    .status-strip {
+      background: var(--bg-surface);
+      border: 1px solid var(--rule-mid);
+      border-radius: 4px;
+      display: flex;
+      overflow: hidden;
+    }
+    .strip-item {
+      flex: 1;
+      padding: 10px 14px;
+      border-right: 1px solid var(--rule);
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .strip-item:last-child { border-right: none; }
+    .strip-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+    .strip-value {
+      font-family: var(--mono);
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--teal);
+      line-height: 1.2;
+    }
+    .strip-value.amber { color: var(--amber); }
+    .strip-value.green { color: var(--green); }
+    .strip-sub { font-size: 11px; color: var(--text-muted); }
+
+    /* Activity list */
+    .section-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--rule);
+    }
+    .activity-list { display: flex; flex-direction: column; gap: 1px; }
+    .activity-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      background: var(--bg-surface);
+      cursor: pointer;
+      transition: background 0.08s;
+      border-radius: 3px;
+    }
+    .activity-item:hover { background: var(--bg-raised); }
+    .activity-item.active-row { background: var(--teal-bg); }
+    .act-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .act-dot.done { background: var(--green); }
+    .act-dot.running { background: var(--teal); box-shadow: 0 0 0 2px var(--teal-bg2), 0 0 8px var(--teal-glow); }
+    .act-dot.pending { background: var(--text-dim); }
+    .act-body { flex: 1; min-width: 0; }
+    .act-title { font-size: 12px; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .act-meta { font-size: 11px; color: var(--text-dim); margin-top: 1px; font-family: var(--mono); }
+    .act-time { font-family: var(--mono); font-size: 10px; color: var(--text-dim); flex-shrink: 0; }
+    .act-tag {
+      font-size: 9px; font-weight: 700;
+      letter-spacing: 0.07em; text-transform: uppercase;
+      padding: 2px 6px; border-radius: 2px; flex-shrink: 0;
+    }
+    .act-tag.chat { background: var(--teal-bg2); color: var(--teal); }
+    .act-tag.forge { background: oklch(18% 0.06 290); color: var(--violet); }
+    .act-tag.pipeline { background: oklch(20% 0.05 74); color: var(--amber-dim); }
+    .act-tag.design { background: oklch(18% 0.05 74); color: var(--amber); }
+
+    /* Keyboard hint bar */
+    .hint-bar {
+      height: 24px;
+      background: var(--bg-raised);
+      border-top: 1px solid var(--rule);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 18px;
+      flex-shrink: 0;
+    }
+    .hint-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+    .hint-item .kbd { color: var(--teal-dim); border-color: var(--teal-dim); }
+
+    /* Input bar */
+    .center-input-row {
+      padding: 10px 16px;
+      border-top: 1px solid var(--rule);
+      background: var(--bg-surface);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .cmd-input {
+      flex: 1;
+      background: var(--bg-input);
+      border: 1px solid var(--rule-mid);
+      border-radius: 3px;
+      padding: 9px 14px;
+      font-size: 13px;
+      font-family: var(--sans);
+      color: var(--text-primary);
+      outline: none;
+      transition: border-color 0.12s, box-shadow 0.12s;
+    }
+    .cmd-input:focus {
+      border-color: var(--teal-dim);
+      box-shadow: 0 0 0 2px var(--teal-bg);
+    }
+    .cmd-input::placeholder { color: var(--text-dim); }
+    .send-btn {
+      background: var(--teal);
+      color: var(--bg-root);
+      border: none;
+      border-radius: 3px;
+      padding: 9px 20px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      transition: opacity 0.1s;
+      text-transform: uppercase;
+    }
+    .send-btn:hover { opacity: 0.85; }
+
+    /* ── Log Column ── */
+    .log-col {
+      width: var(--col-log);
+      background: var(--bg-surface);
+      border-left: 1px solid var(--rule);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .log-scroll { flex: 1; overflow-y: auto; }
+    .log-scroll::-webkit-scrollbar { width: 3px; }
+    .log-scroll::-webkit-scrollbar-thumb { background: var(--rule-mid); }
+    .log-entry {
+      padding: 5px 12px 4px;
+      font-family: var(--mono);
+      font-size: 10px;
+      line-height: 1.5;
+      border-bottom: 1px solid var(--rule);
+    }
+    .log-entry:hover { background: var(--bg-raised); }
+    .log-ts { color: var(--text-dim); font-size: 9px; }
+    .log-tag { font-weight: 700; font-size: 10px; }
+    .log-tag.forge { color: var(--violet); }
+    .log-tag.queue { color: var(--teal); }
+    .log-tag.llm { color: var(--amber); }
+    .log-tag.ok { color: var(--green); }
+    .log-tag.error { color: var(--red); }
+    .log-msg { color: var(--text-muted); margin-top: 1px; }
+  </style>
+</head>
+<body>
+
+<header class="cmd-bar">
+  <div class="logo-mark">BrightForge</div>
+  <div class="cmd-tabs-wrap"><nav class="cmd-tabs">
+    <div class="cmd-tab active">Overview <span class="kbd">⌘1</span></div>
+    <div class="cmd-tab">Chat <span class="kbd">⌘2</span></div>
+    <div class="cmd-tab">Forge 3D <span class="kbd">⌘3</span> <span class="tab-badge">2</span></div>
+    <div class="cmd-tab">Design <span class="kbd">⌘4</span></div>
+    <div class="cmd-tab">Pipeline <span class="tab-badge running">▶</span></div>
+    <div class="cmd-tab">Scene</div>
+    <div class="cmd-tab">World</div>
+    <div class="cmd-tab">Gameplay</div>
+    <div class="cmd-tab">Playtest</div>
+    <div class="cmd-tab">Debug</div>
+    <div class="cmd-tab">Security</div>
+    <div class="cmd-tab">Agents</div>
+    <div class="cmd-tab">Health</div>
+    <div class="cmd-tab">Orchestration</div>
+    <div class="cmd-tab">Models</div>
+    <div class="cmd-tab">Recorder</div>
+    <div class="cmd-tab">Stability</div>
+    <div class="cmd-tab">Sessions</div>
+  </nav></div>
+  <div class="cmd-right">
+    <div class="sys-status"><span class="sys-dot"></span>ollama online</div>
+    <div class="cost-display">$<span class="v">0.03</span> / $1.00</div>
+  </div>
+</header>
+
+<div class="workspace">
+
+  <div class="tree-col">
+    <div class="col-header">Project <span class="hint">⌘P</span></div>
+    <div class="tree-scroll">
+      <div class="tree-item dir">▾ src/</div>
+      <div class="tree-item"><span class="indent"></span><span class="tree-dot"></span>app.js</div>
+      <div class="tree-item active"><span class="indent"></span><span class="tree-dot"></span>entities/</div>
+      <div class="tree-item"><span class="indent"></span><span class="indent"></span><span class="tree-dot"></span>player.js</div>
+      <div class="tree-item modified"><span class="indent"></span><span class="indent"></span><span class="tree-dot"></span>enemy.js</div>
+      <div class="tree-item"><span class="indent"></span><span class="tree-dot"></span>systems/</div>
+      <div class="tree-item"><span class="indent"></span><span class="indent"></span><span class="tree-dot"></span>physics.js</div>
+      <div class="tree-item"><span class="indent"></span><span class="indent"></span><span class="tree-dot"></span>render.js</div>
+      <div class="tree-item"><span class="indent"></span><span class="tree-dot"></span>ui/</div>
+      <div class="tree-item modified"><span class="indent"></span><span class="indent"></span><span class="tree-dot"></span>hud.js</div>
+      <div class="tree-item dir" style="margin-top:4px">▾ assets/</div>
+      <div class="tree-item"><span class="indent"></span><span class="tree-dot"></span>models/</div>
+      <div class="tree-item"><span class="indent"></span><span class="tree-dot"></span>textures/</div>
+      <div class="tree-item dir" style="margin-top:4px">▾ generated/</div>
+      <div class="tree-item active"><span class="indent"></span><span class="tree-dot"></span>warrior.glb</div>
+      <div class="tree-item"><span class="indent"></span><span class="tree-dot"></span>terrain.glb</div>
+    </div>
+  </div>
+
+  <div class="center-col">
+    <div class="center-scroll">
+
+      <div class="status-strip">
+        <div class="strip-item">
+          <div class="strip-label">Sessions</div>
+          <div class="strip-value">14</div>
+          <div class="strip-sub">4 plans applied today</div>
+        </div>
+        <div class="strip-item">
+          <div class="strip-label">Queue</div>
+          <div class="strip-value amber">2</div>
+          <div class="strip-sub">1 running · 1 pending</div>
+        </div>
+        <div class="strip-item">
+          <div class="strip-label">Pipeline</div>
+          <div class="strip-value green">step 3/4</div>
+          <div class="strip-sub">tester running</div>
+        </div>
+        <div class="strip-item">
+          <div class="strip-label">Spend</div>
+          <div class="strip-value" style="font-size:13px">$0.03 / $1.00</div>
+          <div class="strip-sub">ollama primary</div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div class="section-label">Recent Activity</div>
+        <div class="activity-list">
+
+          <div class="activity-item active-row">
+            <span class="act-dot running"></span>
+            <div class="act-body">
+              <div class="act-title">Generate warrior mesh from concept art</div>
+              <div class="act-meta">forge3d · shap-e · ~4 min remaining</div>
+            </div>
+            <span class="act-tag forge">forge</span>
+            <span class="act-time">14:20</span>
+          </div>
+
+          <div class="activity-item">
+            <span class="act-dot done"></span>
+            <div class="act-body">
+              <div class="act-title">Add health component to player entity</div>
+              <div class="act-meta">3 files · llama3.1:8b · 2,841 tok</div>
+            </div>
+            <span class="act-tag chat">chat</span>
+            <span class="act-time">14:18</span>
+          </div>
+
+          <div class="activity-item">
+            <span class="act-dot running"></span>
+            <div class="act-body">
+              <div class="act-title">Build pipeline — tester step</div>
+              <div class="act-meta">npm test · 12 passed · 2 running</div>
+            </div>
+            <span class="act-tag pipeline">pipeline</span>
+            <span class="act-time">14:15</span>
+          </div>
+
+          <div class="activity-item">
+            <span class="act-dot done"></span>
+            <div class="act-body">
+              <div class="act-title">Generate rocky terrain texture pack</div>
+              <div class="act-meta">4 PNG outputs · SDXL · pollinations</div>
+            </div>
+            <span class="act-tag design">design</span>
+            <span class="act-time">13:54</span>
+          </div>
+
+          <div class="activity-item">
+            <span class="act-dot done"></span>
+            <div class="act-body">
+              <div class="act-title">Refactor collision system to AABB</div>
+              <div class="act-meta">2 files · plan approved at 13:41</div>
+            </div>
+            <span class="act-tag chat">chat</span>
+            <span class="act-time">13:41</span>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+    <div class="hint-bar">
+      <span class="hint-item"><span class="kbd">⌘K</span> command palette</span>
+      <span class="hint-item"><span class="kbd">⌘↑</span> prev session</span>
+      <span class="hint-item"><span class="kbd">⌘/</span> approve plan</span>
+      <span class="hint-item"><span class="kbd">Esc</span> cancel</span>
+    </div>
+    <div class="center-input-row">
+      <input class="cmd-input" type="text" placeholder="describe a change, or press ⌘K for command palette…">
+      <button class="send-btn">Run</button>
+    </div>
+  </div>
+
+  <div class="log-col">
+    <div class="col-header">Live Log <span class="hint">⌘L</span></div>
+    <div class="log-scroll">
+      <div class="log-entry"><div class="log-ts">14:22:07</div><span class="log-tag queue">[QUEUE]</span><div class="log-msg">warrior-mesh enqueued</div></div>
+      <div class="log-entry"><div class="log-ts">14:22:05</div><span class="log-tag ok">[APPLY]</span><div class="log-msg">health component: clean</div></div>
+      <div class="log-entry"><div class="log-ts">14:22:03</div><span class="log-tag llm">[LLM]</span><div class="log-msg">ollama · 2,841 tok · 1.4s</div></div>
+      <div class="log-entry"><div class="log-ts">14:21:58</div><span class="log-tag forge">[BRIDGE]</span><div class="log-msg">python server healthy</div></div>
+      <div class="log-entry"><div class="log-ts">14:20:44</div><span class="log-tag ok">[TEST]</span><div class="log-msg">12/14 passed · running</div></div>
+      <div class="log-entry"><div class="log-ts">14:20:31</div><span class="log-tag llm">[LLM]</span><div class="log-msg">groq fallback · rate limit</div></div>
+      <div class="log-entry"><div class="log-ts">14:18:02</div><span class="log-tag ok">[PLAN]</span><div class="log-msg">3 ops approved</div></div>
+      <div class="log-entry"><div class="log-ts">14:15:10</div><span class="log-tag queue">[QUEUE]</span><div class="log-msg">terrain-mesh done · 8m22s</div></div>
+      <div class="log-entry"><div class="log-ts">14:14:01</div><span class="log-tag forge">[FORGE]</span><div class="log-msg">shap-e loaded · GPU ok</div></div>
+      <div class="log-entry"><div class="log-ts">14:10:22</div><span class="log-tag ok">[SERVER]</span><div class="log-msg">started · port 3847</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  document.querySelectorAll('.cmd-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.cmd-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+    });
+  });
+  document.querySelectorAll('.tree-item').forEach(item => {
+    item.addEventListener('click', () => {
+      document.querySelectorAll('.tree-item').forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+    });
+  });
+</script>
+</body>
+</html>

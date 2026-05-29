@@ -1108,7 +1108,17 @@ class Forge3DPanel {
 
       if (queueRes.ok) {
         const queueStatus = await queueRes.json();
-        this._renderDeadLetterBadge(queueEl, queueStatus.deadLetterCount || 0);
+        const dlCount = queueStatus.deadLetterCount || 0;
+        this._renderDeadLetterBadge(queueEl, dlCount);
+        // Phase 20D2 — refresh the expandable list whenever the queue refreshes.
+        // _loadDeadLetters() bails out cheaply when the count is 0.
+        if (dlCount > 0) {
+          this._loadDeadLetters();
+        } else {
+          // Hide the list container when no dead letters remain
+          const list = queueEl.querySelector('.forge3d-dead-letter-list');
+          if (list) list.classList.add('hidden');
+        }
       }
 
       if (!sessionsRes.ok) return;
@@ -1159,6 +1169,9 @@ class Forge3DPanel {
   /**
    * Render (or update) the dead-letter count badge and retry button.
    * Inserts a bar at the top of queueEl; hides it when count is 0.
+   *
+   * Phase 20D2 — clicking the bar (outside the Retry All button) toggles
+   * the expandable list rendered just below the bar.
    */
   _renderDeadLetterBadge(queueEl, count) {
     let bar = queueEl.querySelector('.forge3d-dead-letter-bar');
@@ -1166,6 +1179,9 @@ class Forge3DPanel {
     if (!bar) {
       bar = document.createElement('div');
       bar.className = 'forge3d-dead-letter-bar';
+      // Visual affordance for the click-to-expand behavior.
+      bar.style.cursor = 'pointer';
+      bar.title = 'Click to expand dead-letter jobs';
 
       const badge = document.createElement('span');
       badge.className = 'forge3d-dead-letter-badge';
@@ -1173,16 +1189,166 @@ class Forge3DPanel {
       const retryBtn = document.createElement('button');
       retryBtn.className = 'btn-small';
       retryBtn.textContent = 'Retry All';
-      retryBtn.addEventListener('click', () => this._retryAllDeadLetters());
+      // Stop propagation so clicking Retry All does not also toggle the list.
+      retryBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this._retryAllDeadLetters();
+      });
 
       bar.appendChild(badge);
       bar.appendChild(retryBtn);
+      bar.addEventListener('click', () => this._toggleDeadLetterList());
       queueEl.prepend(bar);
     }
 
     const badge = bar.querySelector('.forge3d-dead-letter-badge');
     if (badge) badge.textContent = `${count} dead-letter`;
     bar.classList.toggle('hidden', count === 0);
+  }
+
+  /**
+   * Phase 20D2 — fetch dead-letter rows and render the expandable list.
+   * Called from _loadQueue() whenever the count is > 0.
+   */
+  async _loadDeadLetters() {
+    try {
+      const res = await fetch('/api/forge3d/queue/dead-letters');
+      if (!res.ok) {
+        console.warn('[FORGE3D-PANEL] Dead-letter list fetch failed:', res.status);
+        return;
+      }
+      const data = await res.json();
+      const queueEl = document.getElementById('forge3d-queue-list');
+      if (!queueEl) return;
+      this._renderDeadLetterList(queueEl, Array.isArray(data.items) ? data.items : []);
+    } catch (err) {
+      console.warn('[FORGE3D-PANEL] Dead-letter list error:', err.message);
+    }
+  }
+
+  /**
+   * Phase 20D2 — render the dead-letter rows beneath the badge bar.
+   * Uses createElement + textContent (no innerHTML on user-supplied data)
+   * to avoid XSS from prompt or error strings that originate from the model.
+   *
+   * @param {HTMLElement} queueEl - Queue subpanel root
+   * @param {Array<{id, prompt, error, retry_count, updated_at}>} items
+   */
+  _renderDeadLetterList(queueEl, items) {
+    let list = queueEl.querySelector('.forge3d-dead-letter-list');
+    if (!list) {
+      list = document.createElement('div');
+      list.className = 'forge3d-dead-letter-list hidden';
+      // Inline styles match the existing _renderDeadLetterBadge() palette
+      // so we do not need a CSS edit for the new section.
+      list.style.background = 'rgba(255,82,82,0.08)';
+      list.style.border = '1px solid rgba(255,82,82,0.3)';
+      list.style.borderRadius = '6px';
+      list.style.padding = '6px';
+      list.style.marginTop = '4px';
+      list.style.marginBottom = '6px';
+      list.style.display = 'flex';
+      list.style.flexDirection = 'column';
+      list.style.gap = '4px';
+
+      // Insert directly after the badge bar so the visual grouping is obvious.
+      const bar = queueEl.querySelector('.forge3d-dead-letter-bar');
+      if (bar && bar.nextSibling) {
+        queueEl.insertBefore(list, bar.nextSibling);
+      } else {
+        queueEl.appendChild(list);
+      }
+    }
+
+    // Repaint contents
+    list.innerHTML = '';
+
+    if (items.length === 0) {
+      const empty = document.createElement('div');
+      empty.style.fontSize = '12px';
+      empty.style.opacity = '0.7';
+      empty.textContent = 'No dead-letter jobs.';
+      list.appendChild(empty);
+      return;
+    }
+
+    for (const item of items) {
+      const row = document.createElement('div');
+      row.className = 'forge3d-dead-letter-row';
+      row.style.display = 'flex';
+      row.style.alignItems = 'center';
+      row.style.gap = '8px';
+      row.style.fontSize = '12px';
+
+      const idSpan = document.createElement('span');
+      idSpan.className = 'forge3d-dead-letter-id';
+      idSpan.style.fontFamily = 'monospace';
+      idSpan.style.opacity = '0.85';
+      idSpan.textContent = String(item.id || '').slice(0, 12);
+
+      const errSpan = document.createElement('span');
+      errSpan.className = 'forge3d-dead-letter-error';
+      errSpan.style.flex = '1';
+      errSpan.style.overflow = 'hidden';
+      errSpan.style.textOverflow = 'ellipsis';
+      errSpan.style.whiteSpace = 'nowrap';
+      const errText = String(item.error || 'Unknown error').slice(0, 80);
+      errSpan.textContent = errText;
+      errSpan.title = String(item.error || '');
+
+      const retryBtn = document.createElement('button');
+      retryBtn.className = 'btn-small';
+      retryBtn.textContent = 'Retry';
+      retryBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this._retryJob(item.id);
+      });
+
+      row.appendChild(idSpan);
+      row.appendChild(errSpan);
+      row.appendChild(retryBtn);
+      list.appendChild(row);
+    }
+  }
+
+  /**
+   * Phase 20D2 — toggle the expandable list visibility.
+   * Triggered by clicks on the badge bar (excluding the Retry All button).
+   */
+  _toggleDeadLetterList() {
+    const queueEl = document.getElementById('forge3d-queue-list');
+    if (!queueEl) return;
+    const list = queueEl.querySelector('.forge3d-dead-letter-list');
+    if (!list) {
+      // First click before _loadDeadLetters has populated — fetch and show.
+      this._loadDeadLetters();
+      return;
+    }
+    list.classList.toggle('hidden');
+  }
+
+  /**
+   * Phase 20D3 — per-row retry. Posts the single jobId to the existing
+   * Phase 19 retry endpoint, then refreshes the queue panel.
+   * @param {string} jobId
+   */
+  async _retryJob(jobId) {
+    if (!jobId) return;
+    try {
+      const res = await fetch('/api/forge3d/queue/dead-letter/retry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId })
+      });
+      if (!res.ok) {
+        console.warn(`[FORGE3D-PANEL] Retry job ${jobId} failed:`, res.status);
+        return;
+      }
+      console.log(`[FORGE3D-PANEL] Requeued dead-letter job ${jobId}`);
+      await this._loadQueue();
+    } catch (err) {
+      console.warn('[FORGE3D-PANEL] Retry job error:', err.message);
+    }
   }
 
   /**
@@ -1477,7 +1643,8 @@ class Forge3DPanel {
         tab.classList.add('active');
 
         // Toggle panels
-        const panels = ['history', 'assets', 'queue'];
+        // Phase 20E1 — 'data' is the new Data Management subtab.
+        const panels = ['history', 'assets', 'queue', 'data'];
         panels.forEach((p) => {
           const panel = document.getElementById(`forge3d-subtab-${p}`);
           if (panel) {
@@ -1489,8 +1656,237 @@ class Forge3DPanel {
         if (target === 'history') this._loadHistory();
         if (target === 'assets') this._loadAssets();
         if (target === 'queue') this._loadQueue();
+        if (target === 'data') this._renderDataManagement();
       });
     });
+  }
+
+  /**
+   * Phase 20E1 — render the Data Management subtab (Export, Import, Prune).
+   * Idempotent: only paints once, then updates inputs in place.
+   * Calls existing routes only — POST /import, GET /export,
+   * POST /history/prune (all live since Phase 18 / Phase 20C).
+   */
+  _renderDataManagement() {
+    const container = document.getElementById('forge3d-data-management');
+    if (!container) return;
+
+    // Guard against re-paint on every tab click — keep the user's
+    // typed values intact when they tab away and back.
+    if (container.dataset.rendered === '1') return;
+    container.dataset.rendered = '1';
+
+    container.innerHTML = '';
+
+    // Toast message area shared by all three sections.
+    const toast = document.createElement('div');
+    toast.className = 'forge3d-data-toast';
+    toast.style.minHeight = '20px';
+    toast.style.fontSize = '12px';
+    toast.style.marginBottom = '8px';
+    toast.style.opacity = '0.9';
+    container.appendChild(toast);
+
+    const showToast = (msg, isError = false) => {
+      toast.textContent = msg;
+      toast.style.color = isError ? 'var(--error, #ff5252)' : 'var(--success, #4caf50)';
+      // Auto-clear after 6 seconds so stale toasts do not mislead.
+      clearTimeout(this._dataToastTimer);
+      this._dataToastTimer = setTimeout(() => {
+        if (toast.textContent === msg) toast.textContent = '';
+      }, 6000);
+    };
+
+    // --- Export section ---
+    const exportSection = document.createElement('div');
+    exportSection.className = 'forge3d-data-section';
+    exportSection.style.marginBottom = '16px';
+
+    const exportH = document.createElement('h4');
+    exportH.textContent = 'Export';
+    exportSection.appendChild(exportH);
+
+    const exportP = document.createElement('p');
+    exportP.style.fontSize = '12px';
+    exportP.style.opacity = '0.8';
+    exportP.textContent = 'Download the full Forge3D database (projects, assets, history) as JSON.';
+    exportSection.appendChild(exportP);
+
+    const exportBtn = document.createElement('button');
+    exportBtn.className = 'btn-small';
+    exportBtn.textContent = 'Download DB Export';
+    exportBtn.addEventListener('click', () => {
+      // Anchor-driven download avoids whole-page navigation and lets the
+      // server's Content-Disposition: attachment header kick in cleanly.
+      const a = document.createElement('a');
+      a.href = '/api/forge3d/export';
+      a.download = '';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      showToast('Export download started.');
+    });
+    exportSection.appendChild(exportBtn);
+    container.appendChild(exportSection);
+
+    // --- Import section ---
+    const importSection = document.createElement('div');
+    importSection.className = 'forge3d-data-section';
+    importSection.style.marginBottom = '16px';
+
+    const importH = document.createElement('h4');
+    importH.textContent = 'Import';
+    importSection.appendChild(importH);
+
+    const importP = document.createElement('p');
+    importP.style.fontSize = '12px';
+    importP.style.opacity = '0.8';
+    importP.textContent = 'Restore the database from a previous export. INSERT OR REPLACE — existing rows with the same IDs will be overwritten.';
+    importSection.appendChild(importP);
+
+    const importInput = document.createElement('input');
+    importInput.type = 'file';
+    importInput.accept = '.json,application/json';
+    importInput.style.fontSize = '12px';
+    importInput.style.marginRight = '8px';
+    importSection.appendChild(importInput);
+
+    const importBtn = document.createElement('button');
+    importBtn.className = 'btn-small';
+    importBtn.textContent = 'Import';
+    importBtn.addEventListener('click', async () => {
+      const file = importInput.files && importInput.files[0];
+      if (!file) {
+        showToast('Choose a JSON file first.', true);
+        return;
+      }
+      try {
+        const text = await file.text();
+        // Parse client-side first so we surface bad JSON before the round-trip.
+        const dump = JSON.parse(text);
+        const res = await fetch('/api/forge3d/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(dump)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          showToast(`Import failed: ${data.error || res.status}`, true);
+          return;
+        }
+        showToast('Import succeeded.');
+        // Refresh known-affected views. History+queue both pull from the DB.
+        this._loadHistory();
+        this._loadQueue();
+      } catch (err) {
+        showToast(`Import failed: ${err.message}`, true);
+      }
+    });
+    importSection.appendChild(importBtn);
+    container.appendChild(importSection);
+
+    // --- History Prune section ---
+    const pruneSection = document.createElement('div');
+    pruneSection.className = 'forge3d-data-section';
+    pruneSection.style.marginBottom = '8px';
+
+    const pruneH = document.createElement('h4');
+    pruneH.textContent = 'History Prune';
+    pruneSection.appendChild(pruneH);
+
+    const pruneP = document.createElement('p');
+    pruneP.style.fontSize = '12px';
+    pruneP.style.opacity = '0.8';
+    pruneP.textContent = 'Delete generation history rows older than the threshold. Optionally keep dead-letter rows on a separate cadence. This is irreversible.';
+    pruneSection.appendChild(pruneP);
+
+    const grid = document.createElement('div');
+    grid.style.display = 'grid';
+    grid.style.gridTemplateColumns = 'auto 100px';
+    grid.style.gap = '4px 8px';
+    grid.style.alignItems = 'center';
+    grid.style.maxWidth = '320px';
+    grid.style.marginBottom = '8px';
+
+    const daysLabel = document.createElement('label');
+    daysLabel.style.fontSize = '12px';
+    daysLabel.textContent = 'Days to keep:';
+    daysLabel.htmlFor = 'forge3d-prune-days';
+    const daysInput = document.createElement('input');
+    daysInput.type = 'number';
+    daysInput.id = 'forge3d-prune-days';
+    daysInput.min = '1';
+    daysInput.value = '30';
+    daysInput.style.fontSize = '12px';
+
+    const dlLabel = document.createElement('label');
+    dlLabel.style.fontSize = '12px';
+    dlLabel.textContent = 'Days for dead-letter (optional):';
+    dlLabel.htmlFor = 'forge3d-prune-dl-days';
+    const dlInput = document.createElement('input');
+    dlInput.type = 'number';
+    dlInput.id = 'forge3d-prune-dl-days';
+    dlInput.min = '1';
+    dlInput.placeholder = '(uses days to keep)';
+    dlInput.style.fontSize = '12px';
+
+    grid.appendChild(daysLabel);
+    grid.appendChild(daysInput);
+    grid.appendChild(dlLabel);
+    grid.appendChild(dlInput);
+    pruneSection.appendChild(grid);
+
+    const pruneBtn = document.createElement('button');
+    pruneBtn.className = 'btn-small';
+    pruneBtn.textContent = 'Prune';
+    pruneBtn.addEventListener('click', async () => {
+      const days = parseInt(daysInput.value, 10);
+      if (!Number.isFinite(days) || days < 1) {
+        showToast('Days to keep must be at least 1.', true);
+        return;
+      }
+      const dlRaw = dlInput.value.trim();
+      let daysToKeepDeadLetter = null;
+      if (dlRaw !== '') {
+        const dl = parseInt(dlRaw, 10);
+        if (!Number.isFinite(dl) || dl < 1) {
+          showToast('Dead-letter days must be at least 1.', true);
+          return;
+        }
+        daysToKeepDeadLetter = dl;
+      }
+
+      // Native confirm — the operation is irreversible per Phase 20E1 spec.
+      const dlMsg = daysToKeepDeadLetter !== null
+        ? ` (dead-letter: ${daysToKeepDeadLetter} days)`
+        : '';
+      const ok = window.confirm(
+        `Permanently delete history older than ${days} days${dlMsg}?\n\nThis cannot be undone.`
+      );
+      if (!ok) return;
+
+      try {
+        const body = { daysToKeep: days };
+        if (daysToKeepDeadLetter !== null) body.daysToKeepDeadLetter = daysToKeepDeadLetter;
+        const res = await fetch('/api/forge3d/history/prune', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          showToast(`Prune failed: ${data.error || res.status}`, true);
+          return;
+        }
+        const pruned = data.pruned ?? 0;
+        showToast(`Prune complete. ${pruned} row(s) deleted.`);
+        this._loadHistory();
+      } catch (err) {
+        showToast(`Prune failed: ${err.message}`, true);
+      }
+    });
+    pruneSection.appendChild(pruneBtn);
+    container.appendChild(pruneSection);
   }
 
   /**

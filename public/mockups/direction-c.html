@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BrightForge — Forge Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-void:      oklch(7.5% 0.014 272);
+      --bg-rack:      oklch(10.5% 0.017 275);
+      --bg-surface:   oklch(13% 0.018 276);
+      --bg-elevated:  oklch(15.5% 0.020 276);
+      --bg-input:     oklch(18% 0.019 276);
+      --rule:         oklch(19% 0.015 276);
+      --rule-mid:     oklch(26% 0.017 276);
+      --text-primary: oklch(94% 0.007 278);
+      --text-secondary: oklch(74% 0.010 278);
+      --text-muted:   oklch(52% 0.010 276);
+      --text-dim:     oklch(34% 0.009 276);
+      /* Violet: full palette primary — distinctive, not navy-on-black */
+      --violet:       oklch(69% 0.30 292);
+      --violet-hi:    oklch(76% 0.26 288);
+      --violet-mid:   oklch(54% 0.22 292);
+      --violet-dim:   oklch(37% 0.14 292);
+      --violet-bg:    oklch(15% 0.07 292);
+      --violet-bg2:   oklch(19% 0.10 292);
+      --violet-glow:  oklch(69% 0.30 292 / 0.35);
+      /* Amber: secondary role — warnings, costs, image jobs */
+      --amber:        oklch(76% 0.20 70);
+      --amber-dim:    oklch(54% 0.14 70);
+      --amber-bg:     oklch(16% 0.05 70);
+      --amber-glow:   oklch(76% 0.20 70 / 0.3);
+      --green:        oklch(71% 0.19 145);
+      --green-glow:   oklch(71% 0.19 145 / 0.3);
+      --red:          oklch(63% 0.20 20);
+      --blue:         oklch(67% 0.17 238);
+      --sans:         'Inter', sans-serif;
+      --mono:         'JetBrains Mono', monospace;
+    }
+
+    body {
+      font-family: var(--sans);
+      background: var(--bg-void);
+      color: var(--text-primary);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      font-size: 13px;
+      /* Subtle noise-like texture via repeating gradient — sells the studio rack */
+      background-image: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 3px,
+        oklch(7.5% 0.014 272 / 0.0) 3px,
+        oklch(9% 0.015 272 / 0.015) 4px
+      );
+    }
+
+    /* ── Top Rail ── */
+    .top-rail {
+      height: 40px;
+      background: var(--bg-rack);
+      border-bottom: 1px solid var(--rule-mid);
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 0;
+      flex-shrink: 0;
+      box-shadow: 0 1px 12px oklch(7% 0.012 272 / 0.8);
+    }
+    .logo-gem {
+      width: 24px; height: 24px;
+      background: var(--violet);
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 800;
+      color: oklch(7.5% 0.010 272);
+      margin-right: 12px;
+      flex-shrink: 0;
+      box-shadow: 0 0 0 1px var(--violet-bg2), 0 0 12px var(--violet-glow);
+    }
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      font-size: 12px;
+    }
+    .bc-seg {
+      color: var(--text-muted);
+      padding: 0 5px;
+      cursor: pointer;
+      transition: color 0.1s;
+    }
+    .bc-seg:hover { color: var(--text-secondary); }
+    .bc-seg.current { color: var(--text-primary); font-weight: 500; }
+    .bc-arrow { color: var(--text-dim); font-size: 10px; }
+    .rail-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .rail-btn {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 3px;
+      border: 1px solid var(--rule-mid);
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 11px;
+      cursor: pointer;
+      font-family: var(--sans);
+      transition: border-color 0.1s, color 0.1s;
+    }
+    .rail-btn:hover { border-color: var(--violet-dim); color: var(--text-secondary); }
+    .rail-btn.active { border-color: var(--violet-dim); color: var(--violet); background: var(--violet-bg); }
+    .rail-btn .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px var(--green-glow); }
+    .cost-badge {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .cost-badge .val { color: var(--amber-dim); }
+
+    /* ── Instrument Rack ── */
+    .rack {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+      /* Subtle horizontal rule between rack and rail */
+    }
+
+    /* ── Instrument shell ── */
+    .instrument {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border-right: 1px solid var(--rule-mid);
+    }
+    .instrument:last-child { border-right: none; }
+
+    .instr-header {
+      height: 32px;
+      background: var(--bg-rack);
+      border-bottom: 1px solid var(--rule-mid);
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 8px;
+      flex-shrink: 0;
+      cursor: grab;
+      user-select: none;
+    }
+    .instr-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.10em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+    .instr-label.on { color: var(--violet); }
+    .instr-label.amber { color: var(--amber-dim); }
+    .instr-led {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      flex-shrink: 0;
+      transition: background 0.2s, box-shadow 0.2s;
+    }
+    .instr-led.on {
+      background: var(--violet);
+      box-shadow: 0 0 0 2px var(--violet-bg2), 0 0 10px var(--violet-glow);
+    }
+    .instr-led.amber {
+      background: var(--amber);
+      box-shadow: 0 0 0 2px var(--amber-bg), 0 0 8px var(--amber-glow);
+    }
+    .instr-actions { margin-left: auto; display: flex; gap: 5px; }
+    .instr-btn {
+      font-family: var(--mono);
+      font-size: 9px;
+      padding: 2px 7px;
+      border-radius: 2px;
+      border: 1px solid var(--rule-mid);
+      background: transparent;
+      color: var(--text-dim);
+      cursor: pointer;
+      transition: border-color 0.1s, color 0.1s;
+    }
+    .instr-btn:hover { border-color: var(--violet-dim); color: var(--text-muted); }
+    .instr-btn.primary {
+      background: var(--violet-bg);
+      border-color: var(--violet-dim);
+      color: var(--violet);
+      font-weight: 600;
+    }
+    .instr-content {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+    .instr-content::-webkit-scrollbar { width: 3px; }
+    .instr-content::-webkit-scrollbar-thumb { background: var(--rule-mid); border-radius: 2px; }
+
+    /* ── Forge3D Panel ── */
+    .forge-panel { flex: 0 0 314px; }
+    .forge-queue { padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+
+    .forge-job {
+      background: var(--bg-surface);
+      border: 1px solid var(--rule-mid);
+      border-radius: 4px;
+      overflow: hidden;
+      transition: border-color 0.15s;
+    }
+    .forge-job.active { border-color: var(--violet-dim); box-shadow: 0 0 0 1px var(--violet-bg2); }
+    .job-header { padding: 9px 11px; display: flex; align-items: center; gap: 8px; }
+    .job-led { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .job-led.running { background: var(--violet); box-shadow: 0 0 0 2px var(--violet-bg2), 0 0 8px var(--violet-glow); }
+    .job-led.done { background: var(--green); }
+    .job-led.queued { background: var(--text-dim); }
+    .job-name { font-size: 12px; font-weight: 500; flex: 1; color: var(--text-primary); }
+    .job-type {
+      font-family: var(--mono);
+      font-size: 9px; font-weight: 700;
+      padding: 2px 5px; border-radius: 2px;
+      background: var(--violet-bg2);
+      color: var(--violet-mid);
+    }
+    .job-type.image { background: var(--amber-bg); color: var(--amber-dim); }
+
+    .job-progress-wrap { padding: 0 11px 10px; }
+    .progress-track {
+      height: 4px;
+      background: var(--rule-mid);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--violet);
+      border-radius: 2px;
+      transition: width 0.4s ease-out;
+      box-shadow: 0 0 6px var(--violet-glow);
+    }
+    .progress-fill.amber { background: var(--amber); box-shadow: 0 0 6px var(--amber-glow); }
+    .progress-fill.done { background: var(--green); box-shadow: none; }
+    .job-meta-row {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text-dim);
+      margin-top: 5px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .forge-preview {
+      margin: 0 11px 10px;
+      height: 90px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--rule-mid);
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .preview-inner { text-align: center; }
+    .preview-icon { font-size: 28px; opacity: 0.25; display: block; margin-bottom: 4px; filter: grayscale(1); }
+    .preview-label { font-family: var(--mono); font-size: 10px; color: var(--text-dim); }
+
+    .forge-input-area {
+      padding: 10px 11px;
+      border-top: 1px solid var(--rule-mid);
+      background: var(--bg-rack);
+      flex-shrink: 0;
+    }
+    .forge-prompt {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--rule-mid);
+      border-radius: 3px;
+      padding: 8px 10px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-primary);
+      outline: none;
+      resize: none;
+      transition: border-color 0.12s;
+    }
+    .forge-prompt:focus { border-color: var(--violet-dim); }
+    .forge-prompt::placeholder { color: var(--text-dim); }
+    .forge-btns { display: flex; gap: 5px; margin-top: 6px; }
+    .forge-btn {
+      font-size: 11px; padding: 5px 10px;
+      border-radius: 3px; border: 1px solid transparent;
+      cursor: pointer; font-family: var(--sans);
+      transition: opacity 0.1s;
+    }
+    .forge-btn.primary {
+      background: var(--violet); color: oklch(7.5% 0.010 272);
+      font-weight: 700; letter-spacing: 0.03em;
+    }
+    .forge-btn.primary:hover { opacity: 0.85; }
+    .forge-btn.secondary { background: transparent; border-color: var(--rule-mid); color: var(--text-muted); }
+    .forge-btn.secondary:hover { border-color: var(--violet-dim); color: var(--text-secondary); }
+
+    /* ── Chat Panel ── */
+    .chat-panel { flex: 1; }
+    .chat-messages { padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+
+    .cm { display: flex; flex-direction: column; gap: 5px; }
+    .cm-meta { font-family: var(--mono); font-size: 10px; color: var(--text-dim); display: flex; gap: 6px; align-items: center; }
+    .cm-meta .who { font-weight: 700; color: var(--violet-mid); }
+    .cm-meta .who.forge { color: var(--violet); }
+    .cm-body { font-size: 13px; line-height: 1.65; color: var(--text-secondary); }
+    .cm-body code {
+      font-family: var(--mono); font-size: 11px;
+      background: var(--bg-elevated); padding: 1px 5px;
+      border-radius: 3px; color: var(--violet); font-weight: 600;
+    }
+
+    .plan-strip { margin-top: 10px; border-top: 1px solid var(--rule-mid); }
+    .plan-row {
+      display: flex; align-items: baseline; gap: 10px;
+      padding: 7px 0; border-bottom: 1px solid var(--rule);
+      font-family: var(--mono); font-size: 11px;
+    }
+    .plan-row:last-of-type { border-bottom: none; }
+    .pr-op {
+      font-size: 9px; font-weight: 800;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      width: 28px; text-align: right; flex-shrink: 0;
+    }
+    .pr-op.m { color: var(--blue); }
+    .pr-op.c { color: var(--green); }
+    .pr-path { color: var(--text-primary); font-weight: 500; flex: 1; }
+    .pr-desc { color: var(--text-dim); font-size: 10px; }
+    .plan-btns { display: flex; gap: 7px; padding-top: 10px; }
+    .pa-btn {
+      font-size: 11px; padding: 5px 14px;
+      border-radius: 3px; border: 1px solid transparent;
+      cursor: pointer; font-family: var(--mono); font-weight: 600;
+      transition: opacity 0.1s;
+    }
+    .pa-btn.ok { background: var(--violet); color: oklch(7.5% 0.010 272); }
+    .pa-btn.ok:hover { opacity: 0.85; }
+    .pa-btn.no { background: transparent; border-color: var(--rule-mid); color: var(--text-muted); }
+
+    .chat-input-bar {
+      padding: 10px 14px;
+      border-top: 1px solid var(--rule-mid);
+      background: var(--bg-rack);
+      display: flex; gap: 8px; flex-shrink: 0;
+    }
+    .ci {
+      flex: 1; background: var(--bg-input);
+      border: 1px solid var(--rule-mid); border-radius: 3px;
+      padding: 8px 12px; font-size: 13px;
+      color: var(--text-primary); outline: none;
+      font-family: var(--sans);
+      transition: border-color 0.12s, box-shadow 0.12s;
+    }
+    .ci:focus { border-color: var(--violet-dim); box-shadow: 0 0 0 2px var(--violet-bg); }
+    .ci::placeholder { color: var(--text-dim); }
+    .ci-send {
+      background: var(--violet); color: oklch(7.5% 0.010 272);
+      border: none; border-radius: 3px; padding: 0 18px;
+      font-size: 12px; font-weight: 800; cursor: pointer;
+      letter-spacing: 0.04em; text-transform: uppercase;
+      transition: opacity 0.1s;
+    }
+    .ci-send:hover { opacity: 0.85; }
+
+    /* ── Context Panel ── */
+    .context-panel { flex: 0 0 234px; }
+    .context-panel .instr-content { overflow-y: auto; }
+    .ctx-block { padding: 10px 12px; border-bottom: 1px solid var(--rule); }
+    .ctx-title {
+      font-size: 9px; font-weight: 800;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--text-dim); margin-bottom: 8px;
+    }
+    .ctx-row {
+      display: flex; justify-content: space-between;
+      align-items: center; padding: 3px 0;
+    }
+    .ctx-key { font-size: 11px; color: var(--text-dim); }
+    .ctx-val { font-family: var(--mono); font-size: 11px; color: var(--text-muted); }
+    .ctx-val.hi { color: var(--violet); }
+    .ctx-val.amber { color: var(--amber-dim); }
+
+    .provider-chip {
+      display: flex; align-items: center; gap: 6px;
+      padding: 5px 8px; background: var(--bg-elevated);
+      border: 1px solid var(--rule-mid); border-radius: 3px;
+      margin-bottom: 5px; cursor: pointer;
+      transition: border-color 0.1s;
+    }
+    .provider-chip:hover { border-color: var(--violet-dim); }
+    .provider-chip.active { border-color: var(--violet-dim); background: var(--violet-bg); }
+    .pc-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+    .pc-dot.on { background: var(--green); box-shadow: 0 0 5px var(--green-glow); }
+    .pc-dot.off { background: var(--rule-mid); }
+    .pc-name { font-family: var(--mono); font-size: 10px; color: var(--text-muted); }
+    .pc-name.active { color: var(--violet); }
+    .pc-badge {
+      margin-left: auto; font-size: 9px;
+      padding: 1px 5px; border-radius: 2px;
+      background: var(--violet-bg2); color: var(--violet-mid);
+    }
+
+    .panel-tags { display: flex; flex-wrap: wrap; gap: 5px; padding-top: 4px; }
+    .ptag {
+      font-size: 10px; padding: 3px 8px; border-radius: 3px;
+      cursor: pointer; transition: all 0.1s; font-weight: 500;
+    }
+    .ptag.on { background: var(--violet-bg2); color: var(--violet); }
+    .ptag.off { background: var(--bg-elevated); color: var(--text-dim); border: 1px solid var(--rule-mid); }
+    .ptag.off:hover { border-color: var(--violet-dim); color: var(--text-muted); }
+  </style>
+</head>
+<body>
+
+<header class="top-rail">
+  <div class="logo-gem">BF</div>
+  <div class="breadcrumb">
+    <span class="bc-seg">workspace</span>
+    <span class="bc-arrow">›</span>
+    <span class="bc-seg">my-game</span>
+    <span class="bc-arrow">›</span>
+    <span class="bc-seg current">forge3d + chat</span>
+  </div>
+  <div class="rail-right">
+    <button class="rail-btn active"><span class="dot"></span>ollama</button>
+    <button class="rail-btn">+ panel</button>
+    <span class="cost-badge">$<span class="val">0.03</span> / $1.00</span>
+  </div>
+</header>
+
+<div class="rack">
+
+  <!-- Forge3D Instrument -->
+  <div class="instrument forge-panel">
+    <div class="instr-header">
+      <span class="instr-led on"></span>
+      <span class="instr-label on">Forge 3D</span>
+      <div class="instr-actions">
+        <button class="instr-btn">queue</button>
+        <button class="instr-btn">history</button>
+      </div>
+    </div>
+    <div class="instr-content">
+      <div class="forge-queue">
+
+        <div class="forge-job active">
+          <div class="job-header">
+            <span class="job-led running"></span>
+            <span class="job-name">warrior-mesh-v2</span>
+            <span class="job-type">mesh</span>
+          </div>
+          <div class="job-progress-wrap">
+            <div class="progress-track"><div class="progress-fill" style="width:62%"></div></div>
+            <div class="job-meta-row"><span>shap-e · step 4/6</span><span>~3m left</span></div>
+          </div>
+          <div class="forge-preview">
+            <div class="preview-inner">
+              <svg width="32" height="32" viewBox="0 0 32 32" style="opacity:0.28;display:block;margin:0 auto 4px" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <polygon points="16,2 28,9 28,23 16,30 4,23 4,9" stroke="oklch(69% 0.30 292)" stroke-width="1.5" fill="oklch(69% 0.30 292 / 0.15)"/>
+                <polygon points="16,8 23,12 23,20 16,24 9,20 9,12" stroke="oklch(69% 0.30 292)" stroke-width="1" fill="none" stroke-dasharray="2 2"/>
+              </svg>
+              <span class="preview-label">generating…</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="forge-job">
+          <div class="job-header">
+            <span class="job-led queued"></span>
+            <span class="job-name">terrain-lod-pack</span>
+            <span class="job-type">mesh</span>
+          </div>
+          <div class="job-progress-wrap">
+            <div class="progress-track"><div class="progress-fill" style="width:0%"></div></div>
+            <div class="job-meta-row"><span>queued</span><span>waiting</span></div>
+          </div>
+        </div>
+
+        <div class="forge-job">
+          <div class="job-header">
+            <span class="job-led done"></span>
+            <span class="job-name">rocky-texture-pack</span>
+            <span class="job-type image">image</span>
+          </div>
+          <div class="job-progress-wrap">
+            <div class="progress-track"><div class="progress-fill done" style="width:100%"></div></div>
+            <div class="job-meta-row"><span>SDXL · done</span><span>4 files</span></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <div class="forge-input-area">
+      <textarea class="forge-prompt" rows="2" placeholder="describe a mesh or image…"></textarea>
+      <div class="forge-btns">
+        <button class="forge-btn primary">Generate</button>
+        <button class="forge-btn secondary">image</button>
+        <button class="forge-btn secondary">full pipeline</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chat Instrument -->
+  <div class="instrument chat-panel">
+    <div class="instr-header">
+      <span class="instr-led on"></span>
+      <span class="instr-label on">Chat</span>
+      <div class="instr-actions">
+        <button class="instr-btn">sessions</button>
+        <button class="instr-btn primary">new</button>
+      </div>
+    </div>
+    <div class="instr-content">
+      <div class="chat-messages">
+
+        <div class="cm">
+          <div class="cm-meta"><span class="who">you</span><span>14:22:07</span></div>
+          <div class="cm-body">add a health component to player, bind it to the HUD health bar</div>
+        </div>
+
+        <div class="cm">
+          <div class="cm-meta"><span class="who forge">forge</span><span>14:22:09</span><span style="color:var(--text-dim)">· 1.4s</span></div>
+          <div class="cm-body">
+            Scanned 34 files. Found <code>PlayerEntity</code>, <code>HUDManager</code>. Plan: 3 ops.
+            <div class="plan-strip">
+              <div class="plan-row">
+                <span class="pr-op m">mod</span>
+                <span class="pr-path">src/entities/player.js</span>
+                <span class="pr-desc">add HealthComponent</span>
+              </div>
+              <div class="plan-row">
+                <span class="pr-op m">mod</span>
+                <span class="pr-path">src/ui/hud.js</span>
+                <span class="pr-desc">bind health bar</span>
+              </div>
+              <div class="plan-row">
+                <span class="pr-op c">new</span>
+                <span class="pr-path">src/components/health.js</span>
+                <span class="pr-desc">HealthComponent class</span>
+              </div>
+            </div>
+            <div class="plan-btns">
+              <button class="pa-btn ok" id="approveBtn">approve</button>
+              <button class="pa-btn no">reject</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <div class="chat-input-bar">
+      <input class="ci" type="text" placeholder="describe a change…">
+      <button class="ci-send">Run</button>
+    </div>
+  </div>
+
+  <!-- Context Instrument -->
+  <div class="instrument context-panel">
+    <div class="instr-header">
+      <span class="instr-led amber"></span>
+      <span class="instr-label amber">Context</span>
+    </div>
+    <div class="instr-content">
+
+      <div class="ctx-block">
+        <div class="ctx-title">Session</div>
+        <div class="ctx-row"><span class="ctx-key">project</span><span class="ctx-val hi">my-game</span></div>
+        <div class="ctx-row"><span class="ctx-key">session</span><span class="ctx-val">#14</span></div>
+        <div class="ctx-row"><span class="ctx-key">plans applied</span><span class="ctx-val">4</span></div>
+        <div class="ctx-row"><span class="ctx-key">tokens</span><span class="ctx-val">2,841</span></div>
+        <div class="ctx-row"><span class="ctx-key">files indexed</span><span class="ctx-val">34</span></div>
+      </div>
+
+      <div class="ctx-block">
+        <div class="ctx-title">Providers</div>
+        <div class="provider-chip active">
+          <span class="pc-dot on"></span>
+          <span class="pc-name active">ollama · llama3.1:8b</span>
+          <span class="pc-badge">primary</span>
+        </div>
+        <div class="provider-chip">
+          <span class="pc-dot on"></span>
+          <span class="pc-name">groq · llama3-8b</span>
+        </div>
+        <div class="provider-chip">
+          <span class="pc-dot off"></span>
+          <span class="pc-name">cerebras</span>
+        </div>
+      </div>
+
+      <div class="ctx-block">
+        <div class="ctx-title">Today</div>
+        <div class="ctx-row"><span class="ctx-key">spend</span><span class="ctx-val amber">$0.03 / $1.00</span></div>
+        <div class="ctx-row"><span class="ctx-key">queue</span><span class="ctx-val">3 jobs</span></div>
+        <div class="ctx-row"><span class="ctx-key">pipeline</span><span class="ctx-val hi">step 3/4</span></div>
+      </div>
+
+      <div class="ctx-block">
+        <div class="ctx-title">All Panels</div>
+        <div class="panel-tags">
+          <span class="ptag on">Chat</span>
+          <span class="ptag on">Forge 3D</span>
+          <span class="ptag off">Design</span>
+          <span class="ptag off">Scene</span>
+          <span class="ptag off">World</span>
+          <span class="ptag off">Gameplay</span>
+          <span class="ptag off">Playtest</span>
+          <span class="ptag off">Debug</span>
+          <span class="ptag off">Security</span>
+          <span class="ptag off">Pipeline</span>
+          <span class="ptag off">Agents</span>
+          <span class="ptag off">Health</span>
+          <span class="ptag off">Orchestration</span>
+          <span class="ptag off">Models</span>
+          <span class="ptag off">Recorder</span>
+          <span class="ptag off">Stability</span>
+          <span class="ptag off">Sessions</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+  document.getElementById('approveBtn').addEventListener('click', function() {
+    this.textContent = 'applied ✓';
+    this.style.background = 'oklch(71% 0.19 145)';
+    this.style.borderColor = 'oklch(71% 0.19 145)';
+    this.disabled = true;
+  });
+  document.querySelectorAll('.ptag').forEach(tag => {
+    tag.addEventListener('click', () => {
+      const isOn = tag.classList.contains('on');
+      tag.classList.toggle('on', !isOn);
+      tag.classList.toggle('off', isOn);
+    });
+  });
+</script>
+</body>
+</html>

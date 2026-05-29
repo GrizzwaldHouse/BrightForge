@@ -1,0 +1,70 @@
+# BrightForge AgentForge Bridge Configuration
+# Governs outbound transport to AgentForge's OwlWatcher (NERVOUS_SYSTEM) and
+# node registration with the SupervisorOrchestrator (HEART).
+# All values can be adjusted without code changes.
+# Loaded by src/integrations/agentforge-bridge.js at init time.
+
+node:
+  id: "brightforge"
+  role: "MUSCLES"
+  secondary_roles:
+    - "UI"
+    - "LYMPHATIC"
+  version: "4.2.0-alpha"
+  capabilities:
+    - "code_generation"
+    - "plan_apply"
+    - "image_generation"
+    - "mesh_generation_3d"
+    - "pipeline_orchestration"
+    - "idea_intelligence"
+
+registration:
+  enabled: false                          # Set true when AgentForge supervisor is reachable
+  supervisor_url: "${AGENTFORGE_SUPERVISOR_URL}"
+  heartbeat_interval_ms: 30000
+  heartbeat_timeout_ms: 5000
+  reconnect_delay_ms: 10000
+  max_reconnect_attempts: 5
+  auth_token_env: "AGENTFORGE_NODE_TOKEN"
+
+owlwatcher:
+  enabled: false                          # Set true when OwlWatcher is reachable
+  url: "${AGENTFORGE_OWLWATCHER_URL}"
+  transport: "websocket"                  # "websocket" | "http"
+  http_endpoint: "/events/ingest"
+  reconnect_delay_ms: 5000
+  max_reconnect_attempts: 10
+  batch_size: 20                          # Max events per HTTP POST when transport=http
+  flush_interval_ms: 1000                 # HTTP batch flush cadence
+
+# Which internal BrightForge event types are forwarded to OwlWatcher.
+# All others are suppressed at the bridge layer.
+forwarded_event_types:
+  - "BRIGHTFORGE_TASK_RECEIVED"
+  - "BRIGHTFORGE_PLAN_GENERATED"
+  - "BRIGHTFORGE_PLAN_APPLIED"
+  - "BRIGHTFORGE_3D_COMPLETE"
+  - "BRIGHTFORGE_3D_FAILED"
+  - "BRIGHTFORGE_IMAGE_COMPLETE"
+  - "BRIGHTFORGE_UI_ACTION"
+  - "BRIGHTFORGE_HEALTH_CHANGED"
+  # Idea intelligence events forwarded for BRAIN layer cross-referencing
+  - "idea_scored"
+  - "idea_indexed"
+  - "research_completed"
+
+# Inbound task intake — BrightForge listens here for delegated tasks from HEART
+intake:
+  enabled: false
+  path: "/api/agentforge/task"
+  auth_header: "x-agentforge-token"
+  auth_token_env: "AGENTFORGE_NODE_TOKEN"
+  max_concurrent_tasks: 3
+  task_timeout_ms: 300000               # 5 min
+
+# Circuit breaker — stop forwarding if OwlWatcher is consistently unavailable
+circuit_breaker:
+  failure_threshold: 5                  # Consecutive failures before opening
+  reset_timeout_ms: 60000               # Try again after 1 min
+  half_open_probe_count: 1

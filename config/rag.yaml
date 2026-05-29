@@ -1,0 +1,75 @@
+# BrightForge RAG (Retrieval-Augmented Generation) Configuration
+# Governs vector retrieval for project memory and idea intelligence.
+# Replaces flat JSON prompt injection with semantic search when enabled.
+# Loaded by src/core/project-memory.js and src/idea/idea-indexer.js.
+
+# Feature flag — flat JSON injection remains active until this is true
+enabled: false
+
+embedding:
+  provider: "ollama"
+  model: "bge-m3"                       # Replaces nomic-embed-text; 1024-dim, MIT, multilingual
+  fallback_model: "nomic-embed-text"    # Used if bge-m3 not available
+  dimensions: 1024
+  ollama_url: "${OLLAMA_HOST}"
+  timeout_ms: 10000
+  batch_size: 32
+  install_cmd: "ollama pull bge-m3"
+
+reranker:
+  enabled: false                        # Add after embedding upgrade is stable
+  provider: "ollama"
+  model: "bge-reranker-v2-m3"
+  huggingface_id: "BAAI/bge-reranker-v2-m3"
+  top_k_before_rerank: 20              # Retrieve this many, rerank to top_k
+  install_cmd: "ollama pull bge-reranker-v2-m3"
+
+vector_store:
+  backend: "sqlite-vec"                 # Zero-dependency SQLite extension, fits existing infra
+  db_path: "data/rag.db"
+  journal_mode: "WAL"
+  busy_timeout_ms: 5000
+  index_type: "hnsw"                    # Approximate nearest neighbour
+  hnsw_m: 16
+  hnsw_ef_construction: 200
+  hnsw_ef_search: 50
+
+retrieval:
+  top_k: 5                              # Number of chunks returned per query
+  similarity_threshold: 0.7            # Minimum cosine similarity to include
+  max_context_tokens: 2000             # Budget for injected retrieved chunks
+  chunk_size: 512                       # Characters per chunk during ingestion
+  chunk_overlap: 64                     # Overlap between consecutive chunks
+
+# Project memory RAG — replaces src/core/project-memory.js flat injection
+project_memory:
+  enabled: false                        # Requires vector_store.backend to be running
+  memory_path: "{projectRoot}/.brightforge/memory.json"
+  collections:
+    - "conventions"
+    - "corrections"
+    - "tech_stack"
+    - "preferences"
+  auto_index_on_write: true            # Re-index memory.json entries on POST /api/memory
+  injection_strategy: "retrieved"      # "full" (legacy flat) | "retrieved" (RAG)
+  max_injected_memories: 5
+
+# Idea intelligence RAG — used by src/idea/idea-indexer.js
+idea_indexer:
+  enabled: true                         # idea-indexer already uses embeddings; upgrade model only
+  collection: "ideas"
+  cross_link_threshold: 0.85           # Cosine similarity for idea_linked relationship
+  semantic_search_top_k: 10
+  embedding_model_override: null       # Null = use embedding.model above
+
+# Synthesis LLM for RAG answer generation (used when RAG replaces prompt injection)
+synthesis:
+  task_routing_key: "rag_synthesis"
+  provider_preference:
+    - "ollama"
+    - "groq"
+    - "cerebras"
+  model_preference:
+    ollama: "qwen2.5:7b"              # 127M downloads, Apache 2.0, strong general reasoning
+  max_tokens: 1000
+  temperature: 0.2                     # Low temp for factual memory retrieval

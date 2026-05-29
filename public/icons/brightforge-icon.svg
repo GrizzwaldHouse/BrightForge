@@ -1,0 +1,126 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <!-- Background rounded square -->
+    <radialGradient id="bg-glow" cx="50%" cy="60%" r="55%">
+      <stop offset="0%" stop-color="oklch(16% 0.05 74)" stop-opacity="1"/>
+      <stop offset="100%" stop-color="oklch(9.5% 0.008 52)" stop-opacity="1"/>
+    </radialGradient>
+    <!-- Amber glow on hammer head -->
+    <radialGradient id="hammer-glow" cx="40%" cy="55%" r="60%">
+      <stop offset="0%" stop-color="#e8922a" stop-opacity="0.9"/>
+      <stop offset="60%" stop-color="#c47a18" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#7a4a08" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Forge ember glow beneath anvil -->
+    <radialGradient id="ember-glow" cx="50%" cy="100%" r="50%">
+      <stop offset="0%" stop-color="#e8922a" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#e8922a" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Norse knotwork rune circle (faint) -->
+    <filter id="soft-glow">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <filter id="amber-bloom">
+      <feGaussianBlur stdDeviation="18" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <!-- Engraved rune texture on hammer -->
+    <pattern id="rune-lines" x="0" y="0" width="12" height="12" patternUnits="userSpaceOnUse">
+      <line x1="0" y1="6" x2="12" y2="6" stroke="#7a4a08" stroke-width="0.5" opacity="0.4"/>
+    </pattern>
+  </defs>
+
+  <!-- App icon background: rounded square -->
+  <rect width="1024" height="1024" rx="220" ry="220" fill="url(#bg-glow)"/>
+
+  <!-- Subtle outer ring — Norse circle -->
+  <circle cx="512" cy="520" r="380" fill="none" stroke="#3a2a14" stroke-width="2" opacity="0.5"/>
+  <circle cx="512" cy="520" r="362" fill="none" stroke="#2a1e0e" stroke-width="1" opacity="0.3"/>
+
+  <!-- Ember glow beneath forge -->
+  <ellipse cx="512" cy="820" rx="260" ry="80" fill="url(#ember-glow)"/>
+
+  <!-- Anvil body -->
+  <!-- Base plate -->
+  <rect x="310" y="740" width="404" height="40" rx="8" fill="#2a1e10" stroke="#4a3418" stroke-width="2"/>
+  <!-- Waist -->
+  <rect x="370" y="690" width="284" height="56" rx="6" fill="#1e1610" stroke="#3a2810" stroke-width="1.5"/>
+  <!-- Top face (working surface) -->
+  <path d="M 290 640 L 290 688 Q 290 694 296 694 L 728 694 Q 734 694 734 688 L 734 640 Q 734 634 728 634 L 296 634 Q 290 634 290 640 Z" fill="#241a0c" stroke="#5a3e1c" stroke-width="2"/>
+  <!-- Anvil horn (left beak) -->
+  <path d="M 290 660 Q 220 660 200 650 Q 190 645 200 638 Q 220 628 290 640 Z" fill="#1e1408" stroke="#3a2810" stroke-width="1.5"/>
+  <!-- Anvil top highlight -->
+  <rect x="295" y="635" width="434" height="8" rx="3" fill="#6a4a20" opacity="0.6"/>
+  <!-- Rune engraving on anvil face -->
+  <text x="450" y="673" font-family="serif" font-size="28" fill="#3a2810" opacity="0.7" letter-spacing="14" text-anchor="middle">ᚠᚢᚦ</text>
+
+  <!-- Forge sparks / ember particles -->
+  <circle cx="460" cy="610" r="4" fill="#e8922a" opacity="0.9" filter="url(#soft-glow)"/>
+  <circle cx="540" cy="595" r="3" fill="#f0a840" opacity="0.8" filter="url(#soft-glow)"/>
+  <circle cx="498" cy="580" r="2.5" fill="#e8922a" opacity="0.7"/>
+  <circle cx="570" cy="605" r="3.5" fill="#c47a18" opacity="0.75" filter="url(#soft-glow)"/>
+  <circle cx="430" cy="590" r="2" fill="#f0a840" opacity="0.6"/>
+  <circle cx="610" cy="588" r="2" fill="#e8922a" opacity="0.5"/>
+  <circle cx="390" cy="602" r="3" fill="#c47a18" opacity="0.65"/>
+
+  <!-- Glowing strike point on anvil surface -->
+  <ellipse cx="512" cy="634" rx="60" ry="10" fill="#e8922a" opacity="0.35" filter="url(#amber-bloom)"/>
+
+  <!-- Hammer handle (diagonal, raised) -->
+  <!-- Handle shaft -->
+  <rect x="498" y="160" width="48" height="420" rx="14"
+    transform="rotate(-32 512 512)"
+    fill="#2e1e0c" stroke="#4a3010" stroke-width="2"/>
+  <!-- Handle wrap bands (Norse grip tape) -->
+  <rect x="498" y="260" width="48" height="8" rx="3"
+    transform="rotate(-32 512 512)"
+    fill="#1a1008" stroke="#3a2008" stroke-width="1" opacity="0.8"/>
+  <rect x="498" y="300" width="48" height="8" rx="3"
+    transform="rotate(-32 512 512)"
+    fill="#1a1008" stroke="#3a2008" stroke-width="1" opacity="0.8"/>
+  <rect x="498" y="340" width="48" height="8" rx="3"
+    transform="rotate(-32 512 512)"
+    fill="#1a1008" stroke="#3a2008" stroke-width="1" opacity="0.8"/>
+  <!-- Handle pommel (bottom end cap) -->
+  <ellipse cx="512" cy="512" rx="28" ry="18"
+    transform="rotate(-32 512 512) translate(0 170)"
+    fill="#241808" stroke="#4a3010" stroke-width="2"/>
+
+  <!-- Hammer head -->
+  <!-- Main mass -->
+  <rect x="340" y="250" width="230" height="150" rx="18"
+    transform="rotate(-32 512 512)"
+    fill="url(#hammer-glow)" stroke="#6a4a1c" stroke-width="3"/>
+  <!-- Face plate (striking face) -->
+  <rect x="340" y="250" width="44" height="150" rx="10"
+    transform="rotate(-32 512 512)"
+    fill="#e8922a" opacity="0.9" stroke="#c47a18" stroke-width="2"/>
+  <!-- Face glow -->
+  <rect x="340" y="255" width="44" height="140" rx="8"
+    transform="rotate(-32 512 512)"
+    fill="#f0b040" opacity="0.4"/>
+  <!-- Rune channel cut across head -->
+  <rect x="344" y="316" width="222" height="18" rx="5"
+    transform="rotate(-32 512 512)"
+    fill="#1a0e06" stroke="#3a2010" stroke-width="1" opacity="0.8"/>
+  <!-- Norse knotwork inlay on head -->
+  <text font-family="serif" font-size="22" fill="#c47a18" opacity="0.85" text-anchor="middle"
+    transform="rotate(-32 512 512) translate(455, 330)">ᛗᛃᚨᛚᚾ</text>
+  <!-- Chamfer edges on head corners -->
+  <rect x="340" y="250" width="230" height="14" rx="10"
+    transform="rotate(-32 512 512)"
+    fill="#7a5a28" opacity="0.5"/>
+
+  <!-- Ambient glow halo from hammer head -->
+  <ellipse cx="420" cy="370" rx="180" ry="130" fill="#c47a18" opacity="0.08" filter="url(#amber-bloom)"/>
+
+  <!-- Wordmark: BRIGHTFORGE in amber at bottom -->
+  <text x="512" y="940" font-family="'JetBrains Mono', 'Courier New', monospace"
+    font-size="72" font-weight="700" letter-spacing="8"
+    fill="#c47a18" text-anchor="middle" opacity="0.9">BRIGHTFORGE</text>
+  <!-- Subtitle tagline -->
+  <text x="512" y="975" font-family="'JetBrains Mono', 'Courier New', monospace"
+    font-size="28" font-weight="400" letter-spacing="5"
+    fill="#7a4a18" text-anchor="middle" opacity="0.7">FORGE · REFINE · SHIP</text>
+</svg>

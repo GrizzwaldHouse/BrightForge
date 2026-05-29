@@ -41,6 +41,9 @@ import { skillRoutes } from './routes/skills.js';
 import { agentRoutes } from './routes/agents.js';
 import modelIntelligenceRoutes from './routes/model-intelligence.js';
 import { createOrchestrationRoutes } from './routes/orchestration.js';
+import integrationRoutes from './routes/integrations.js';
+import agentforgeRoutes from './routes/agentforge.js';
+import agentforgeBridge from '../integrations/agentforge-bridge.js';
 import orchestrator from '../orchestration/index.js';
 import { authMiddleware } from './middleware/auth.js';
 import { generalLimiter } from './middleware/rate-limit.js';
@@ -73,6 +76,13 @@ export function createServer(options = {}) {
   } catch (err) {
     console.warn('[SERVER] Failed to initialize orchestration runtime:', err.message);
     errorHandler.report('server_error', err, { source: 'orchestrator.init' });
+  }
+
+  // AgentForge bridge — no-op when config disabled flags are false
+  try {
+    agentforgeBridge.init();
+  } catch (err) {
+    console.warn('[SERVER] AgentForge bridge init failed (non-fatal):', err.message);
   }
 
   // ModelBridge is NOT started here on purpose.
@@ -149,6 +159,8 @@ export function createServer(options = {}) {
   app.use('/api/health', agentHealthRoutes());
   app.use('/api/models', modelIntelligenceRoutes);
   app.use('/api/orchestration', createOrchestrationRoutes());
+  app.use('/api/integrations', integrationRoutes);
+  app.use('/api/agentforge', agentforgeRoutes);
   app.use('/api', configRoutes());
 
   // Static frontend

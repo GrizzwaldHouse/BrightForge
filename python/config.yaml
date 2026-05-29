@@ -35,7 +35,7 @@ models:
     guidance_scale: 15.0
 
 model_registry:
-  default_mesh_model: "hunyuan3d"
+  default_mesh_model: "shap-e"
   default_image_model: "sdxl"
 
 vram:

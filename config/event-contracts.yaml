@@ -1,0 +1,112 @@
+# BrightForge AgentForge Event Contracts
+# Defines the shared event schema mapping between BrightForge internal events
+# and AgentForge's SKELETAL taxonomy for OwlWatcher forwarding.
+# All events use SHA256-hashed envelopes (matching src/orchestration/event-bus.js).
+# Loaded by src/integrations/agentforge-bridge.js.
+
+schema_version: "1"
+brightforge_node_id: "brightforge"
+
+# Inbound events — BrightForge receives these from AgentForge HEART
+inbound:
+  AGENTFORGE_TASK_DELEGATE:
+    description: "AgentForge SupervisorOrchestrator delegates a task to BrightForge"
+    intake_path: "/api/agentforge/task"
+    payload:
+      required:
+        - task_id
+        - task_type
+        - prompt
+      optional:
+        - priority
+        - deadline_ms
+        - context
+    response_event: "BRIGHTFORGE_TASK_RECEIVED"
+
+# Outbound events — BrightForge emits these to AgentForge OwlWatcher
+outbound:
+  BRIGHTFORGE_TASK_RECEIVED:
+    description: "BrightForge acknowledged an inbound AgentForge task delegation"
+    agentforge_taxonomy: "MUSCLES_TASK_ACCEPTED"
+    payload:
+      task_id: "string"
+      node_id: "brightforge"
+      received_at: "ISO8601"
+      estimated_duration_ms: "number|null"
+
+  BRIGHTFORGE_PLAN_GENERATED:
+    description: "LLM plan produced and awaiting user approval gate"
+    agentforge_taxonomy: "MUSCLES_TASK_PROGRESS"
+    payload:
+      task_id: "string"
+      session_id: "string"
+      operation_count: "number"
+      files_affected: "string[]"
+      provider_used: "string"
+      tokens_used: "number"
+      generated_at: "ISO8601"
+
+  BRIGHTFORGE_PLAN_APPLIED:
+    description: "Code changes written to disk after user approval"
+    agentforge_taxonomy: "MUSCLES_TASK_COMPLETE"
+    payload:
+      task_id: "string"
+      session_id: "string"
+      files_written: "string[]"
+      git_checkpoint: "string|null"
+      applied_at: "ISO8601"
+
+  BRIGHTFORGE_3D_COMPLETE:
+    description: "3D mesh generation job completed successfully"
+    agentforge_taxonomy: "MUSCLES_ASSET_READY"
+    payload:
+      job_id: "string"
+      project_id: "string"
+      asset_path: "string"
+      format: "glb|obj"
+      provider_used: "string"
+      generation_ms: "number"
+      completed_at: "ISO8601"
+
+  BRIGHTFORGE_3D_FAILED:
+    description: "3D mesh generation job failed after exhausting retries"
+    agentforge_taxonomy: "MUSCLES_TASK_FAILED"
+    payload:
+      job_id: "string"
+      project_id: "string"
+      error: "string"
+      provider_used: "string"
+      attempts: "number"
+      status: "failed|dead_letter"
+      failed_at: "ISO8601"
+
+  BRIGHTFORGE_IMAGE_COMPLETE:
+    description: "Image generation completed, asset path ready"
+    agentforge_taxonomy: "MUSCLES_ASSET_READY"
+    payload:
+      session_id: "string"
+      asset_path: "string"
+      format: "png|jpg"
+      provider_used: "string"
+      prompt_preview: "string"
+      generation_ms: "number"
+      completed_at: "ISO8601"
+
+  BRIGHTFORGE_UI_ACTION:
+    description: "User took a significant action in the dashboard"
+    agentforge_taxonomy: "UI_USER_ACTION"
+    payload:
+      action: "string"
+      panel: "string"
+      session_id: "string|null"
+      timestamp: "ISO8601"
+
+  BRIGHTFORGE_HEALTH_CHANGED:
+    description: "BrightForge system health state changed (bridge up/down, GPU status, etc.)"
+    agentforge_taxonomy: "LYMPHATIC_HEALTH_CHANGED"
+    payload:
+      component: "string"
+      previous_status: "string"
+      current_status: "string"
+      detail: "string|null"
+      timestamp: "ISO8601"

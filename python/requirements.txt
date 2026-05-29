@@ -1,7 +1,10 @@
 # ForgePipeline Python Inference Server
-# Install: pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu124
+# Standard install (CUDA 12.4, up to sm_90):
+#   pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu124
+# RTX 5080 / Blackwell (sm_120, requires cu128 nightly):
+#   py -3 -m pip install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu128
 
-# PyTorch (CUDA 12.4) - pip resolves compatible torch/torchvision pair
+# PyTorch - version resolved by install method above
 torch>=2.6.0
 torchvision>=0.21.0
 

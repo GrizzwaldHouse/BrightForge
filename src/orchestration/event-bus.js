@@ -18,10 +18,20 @@ import { randomUUID, createHash } from 'crypto';
 import { fileURLToPath } from 'url';
 import telemetryBus from '../core/telemetry-bus.js';
 import errorHandler from '../core/error-handler.js';
+import agentforgeBridge from '../integrations/agentforge-bridge.js';
 
 const __filename = fileURLToPath(import.meta.url);
 
 const VALID_EVENT_TYPES = [
+  // AgentForge SKELETAL event contracts (Phase 21)
+  'BRIGHTFORGE_TASK_RECEIVED',
+  'BRIGHTFORGE_PLAN_GENERATED',
+  'BRIGHTFORGE_PLAN_APPLIED',
+  'BRIGHTFORGE_3D_COMPLETE',
+  'BRIGHTFORGE_3D_FAILED',
+  'BRIGHTFORGE_IMAGE_COMPLETE',
+  'BRIGHTFORGE_UI_ACTION',
+  'BRIGHTFORGE_HEALTH_CHANGED',
   'task_started',
   'analysis_completed',
   'architecture_decided',
@@ -64,7 +74,12 @@ const VALID_EVENT_TYPES = [
   'recording_failed',
   'stability_started',
   'stability_checkpoint',
-  'stability_completed'
+  'stability_completed',
+  // Phase 20B1 — typed pipeline lifecycle events. Builder/Reviewer emit these
+  // through orchestrator.eventBus to drive PipelineTasksPanel card states.
+  'pipeline_task_failed',
+  'pipeline_review_rejected',
+  'pipeline_agent_apply'
 ];
 
 class OrchestrationEventBus extends EventEmitter {
@@ -175,6 +190,9 @@ class OrchestrationEventBus extends EventEmitter {
     // Emit to EventEmitter listeners
     super.emit(eventType, envelope);
     super.emit('all', envelope);
+
+    // Forward to AgentForge OwlWatcher (no-op when bridge disabled or event not in contract list)
+    agentforgeBridge.forwardEvent(eventType, envelope.payload);
 
     return eventId;
   }

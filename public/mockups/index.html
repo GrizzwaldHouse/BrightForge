@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BrightForge — Design Direction Comparison</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d0d0f;
+      --surface:   #141416;
+      --raised:    #1a1a1e;
+      --border:    #26262c;
+      --text:      #e8e8ec;
+      --muted:     #888;
+      --dim:       #444;
+      --accent:    #a78bfa;
+      --accent-bg: rgba(167,139,250,0.1);
+      --green:     #4ade80;
+      --amber:     #fbbf24;
+      --sans:      'Inter', sans-serif;
+      --mono:      'JetBrains Mono', monospace;
+    }
+
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    .header {
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .header-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .header-sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .header-right {
+      margin-left: auto;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .hdr-btn {
+      font-size: 12px;
+      padding: 6px 14px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-family: var(--sans);
+      transition: color 0.1s, border-color 0.1s;
+    }
+    .hdr-btn:hover { color: var(--text); border-color: var(--accent); }
+    .hdr-btn.primary { background: var(--accent); color: #0d0d0f; border-color: var(--accent); font-weight: 600; }
+    .hdr-btn.primary:hover { opacity: 0.85; color: #0d0d0f; }
+
+    /* ── Controls ── */
+    .controls {
+      padding: 14px 24px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    .controls-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--dim);
+    }
+    .highlight-checks {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .hl-check {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .hl-check input[type="checkbox"] { display: none; }
+    .hl-pill {
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      transition: all 0.15s;
+    }
+    .hl-check input:checked + .hl-pill {
+      background: var(--accent-bg);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .zoom-control {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .zoom-btn {
+      width: 28px; height: 28px;
+      background: var(--raised);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text);
+      cursor: pointer;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .zoom-btn:hover { border-color: var(--accent); }
+
+    /* ── Iframe Grid ── */
+    .iframe-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+      flex: 1;
+      min-height: 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .mockup-col {
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .mockup-col:last-child { border-right: none; }
+    .mockup-label {
+      padding: 10px 16px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .ml-letter {
+      width: 22px; height: 22px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .ml-letter.a { background: rgba(245,158,11,0.15); color: #f59e0b; }
+    .ml-letter.b { background: rgba(34,211,238,0.12); color: #22d3ee; }
+    .ml-letter.c { background: rgba(167,139,250,0.15); color: #a78bfa; }
+    .ml-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .ml-subtitle {
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .ml-select-btn {
+      margin-left: auto;
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 3px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-family: var(--sans);
+      transition: all 0.12s;
+    }
+    .ml-select-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .ml-select-btn.selected { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+    .iframe-wrap {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: #0a0a0c;
+    }
+    .iframe-wrap iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+    .highlight-overlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none;
+      transition: background 0.2s;
+    }
+
+    /* ── Notes Section ── */
+    .notes-section {
+      padding: 20px 24px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+    }
+    .notes-heading {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+    .notes-sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+    .notes-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    .note-card {
+      background: var(--raised);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      transition: border-color 0.15s;
+    }
+    .note-card.selected { border-color: var(--accent); }
+    .note-card-header {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface);
+    }
+    .nc-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 3px;
+    }
+    .nc-badge.a { background: rgba(245,158,11,0.15); color: #f59e0b; }
+    .nc-badge.b { background: rgba(34,211,238,0.12); color: #22d3ee; }
+    .nc-badge.c { background: rgba(167,139,250,0.15); color: #a78bfa; }
+    .nc-title { font-size: 12px; font-weight: 600; color: var(--text); }
+    .note-selected-badge {
+      margin-left: auto;
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 3px;
+      background: var(--accent-bg);
+      color: var(--accent);
+      display: none;
+    }
+    .note-card.selected .note-selected-badge { display: inline; }
+    .note-textarea {
+      width: 100%;
+      background: transparent;
+      border: none;
+      padding: 12px 14px;
+      font-size: 12px;
+      font-family: var(--sans);
+      color: var(--text);
+      resize: vertical;
+      min-height: 100px;
+      outline: none;
+      line-height: 1.6;
+    }
+    .note-textarea::placeholder { color: var(--dim); }
+    .note-footer {
+      padding: 8px 14px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 6px;
+      background: var(--surface);
+    }
+    .note-chip {
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 3px;
+      border: 1px solid var(--border);
+      color: var(--dim);
+      cursor: pointer;
+      transition: all 0.1s;
+      user-select: none;
+    }
+    .note-chip:hover { border-color: var(--accent); color: var(--muted); }
+    .note-chip.active { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+
+    /* ── Export bar ── */
+    .export-bar {
+      padding: 12px 24px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--bg);
+    }
+    .export-summary {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .export-summary strong { color: var(--text); }
+    .export-btn {
+      font-size: 12px;
+      padding: 7px 16px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--raised);
+      color: var(--text);
+      cursor: pointer;
+      font-family: var(--sans);
+      font-weight: 500;
+      transition: all 0.1s;
+    }
+    .export-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* Highlight overlay classes applied via JS */
+    .hl-nav .highlight-overlay    { background: rgba(167,139,250,0.07); outline: 2px solid rgba(167,139,250,0.3); }
+    .hl-color .highlight-overlay  { background: rgba(34,211,238,0.06); outline: 2px solid rgba(34,211,238,0.25); }
+    .hl-type .highlight-overlay   { background: rgba(245,158,11,0.06); outline: 2px solid rgba(245,158,11,0.25); }
+    .hl-density .highlight-overlay { background: rgba(74,222,128,0.05); outline: 2px solid rgba(74,222,128,0.2); }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+  <div>
+    <div class="header-title">BrightForge — Design Direction Comparison</div>
+    <div class="header-sub">Three visual directions for the dashboard redesign. Select one, add notes, export.</div>
+  </div>
+  <div class="header-right">
+    <button class="hdr-btn" onclick="openAll()">Open all full-screen</button>
+    <button class="hdr-btn primary" onclick="exportNotes()">Export notes JSON</button>
+  </div>
+</header>
+
+<!-- Controls -->
+<div class="controls">
+  <span class="controls-label">Highlight</span>
+  <div class="highlight-checks">
+    <label class="hl-check">
+      <input type="checkbox" value="nav" onchange="applyHighlight(this)">
+      <span class="hl-pill">Navigation model</span>
+    </label>
+    <label class="hl-check">
+      <input type="checkbox" value="color" onchange="applyHighlight(this)">
+      <span class="hl-pill">Color scheme</span>
+    </label>
+    <label class="hl-check">
+      <input type="checkbox" value="type" onchange="applyHighlight(this)">
+      <span class="hl-pill">Typography</span>
+    </label>
+    <label class="hl-check">
+      <input type="checkbox" value="density" onchange="applyHighlight(this)">
+      <span class="hl-pill">Information density</span>
+    </label>
+  </div>
+  <div class="zoom-control">
+    <span>Zoom</span>
+    <button class="zoom-btn" onclick="adjustZoom(-0.1)">−</button>
+    <span id="zoomLabel">100%</span>
+    <button class="zoom-btn" onclick="adjustZoom(0.1)">+</button>
+  </div>
+</div>
+
+<!-- Iframe Grid -->
+<div class="iframe-grid" id="iframeGrid" style="height: 480px;">
+
+  <!-- Direction A -->
+  <div class="mockup-col" id="col-a">
+    <div class="mockup-label">
+      <span class="ml-letter a">A</span>
+      <div>
+        <div class="ml-title">Terminal Forge</div>
+        <div class="ml-subtitle">Amber accent · left rail · monospace-forward</div>
+      </div>
+      <button class="ml-select-btn" id="selectA" onclick="selectDirection('a')">Select this</button>
+    </div>
+    <div class="iframe-wrap" id="wrap-a">
+      <iframe src="direction-a.html" title="Direction A: Terminal Forge" loading="lazy"></iframe>
+      <div class="highlight-overlay" id="overlay-a"></div>
+    </div>
+  </div>
+
+  <!-- Direction B -->
+  <div class="mockup-col" id="col-b">
+    <div class="mockup-label">
+      <span class="ml-letter b">B</span>
+      <div>
+        <div class="ml-title">Command Surface</div>
+        <div class="ml-subtitle">Teal-committed · top tabs · status-first</div>
+      </div>
+      <button class="ml-select-btn" id="selectB" onclick="selectDirection('b')">Select this</button>
+    </div>
+    <div class="iframe-wrap" id="wrap-b">
+      <iframe src="direction-b.html" title="Direction B: Command Surface" loading="lazy"></iframe>
+      <div class="highlight-overlay" id="overlay-b"></div>
+    </div>
+  </div>
+
+  <!-- Direction C -->
+  <div class="mockup-col" id="col-c">
+    <div class="mockup-label">
+      <span class="ml-letter c">C</span>
+      <div>
+        <div class="ml-title">Forge Studio</div>
+        <div class="ml-subtitle">Violet full-palette · instrument rack · spatial</div>
+      </div>
+      <button class="ml-select-btn" id="selectC" onclick="selectDirection('c')">Select this</button>
+    </div>
+    <div class="iframe-wrap" id="wrap-c">
+      <iframe src="direction-c.html" title="Direction C: Forge Studio" loading="lazy"></iframe>
+      <div class="highlight-overlay" id="overlay-c"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Notes Section -->
+<div class="notes-section" id="notesSection">
+  <div class="notes-heading">Notes &amp; Feedback</div>
+  <div class="notes-sub">For each direction: what to keep, what to change, what's missing.</div>
+  <div class="notes-grid">
+
+    <div class="note-card" id="notecard-a">
+      <div class="note-card-header">
+        <span class="nc-badge a">A</span>
+        <span class="nc-title">Terminal Forge</span>
+        <span class="note-selected-badge">selected</span>
+      </div>
+      <textarea class="note-textarea" id="notes-a" placeholder="What works? What needs to change? What's missing?&#10;&#10;e.g. Love the amber accent, but the rail feels too narrow. Diff panel should be bigger."></textarea>
+      <div class="note-footer">
+        <span class="note-chip" onclick="toggleChip(this, 'a', 'keep-nav')">keep nav</span>
+        <span class="note-chip" onclick="toggleChip(this, 'a', 'keep-color')">keep color</span>
+        <span class="note-chip" onclick="toggleChip(this, 'a', 'keep-type')">keep type</span>
+        <span class="note-chip" onclick="toggleChip(this, 'a', 'keep-density')">keep density</span>
+      </div>
+    </div>
+
+    <div class="note-card" id="notecard-b">
+      <div class="note-card-header">
+        <span class="nc-badge b">B</span>
+        <span class="nc-title">Command Surface</span>
+        <span class="note-selected-badge">selected</span>
+      </div>
+      <textarea class="note-textarea" id="notes-b" placeholder="What works? What needs to change? What's missing?&#10;&#10;e.g. The top tab bar is cleaner, but loses too much vertical space. Log column is exactly right."></textarea>
+      <div class="note-footer">
+        <span class="note-chip" onclick="toggleChip(this, 'b', 'keep-nav')">keep nav</span>
+        <span class="note-chip" onclick="toggleChip(this, 'b', 'keep-color')">keep color</span>
+        <span class="note-chip" onclick="toggleChip(this, 'b', 'keep-type')">keep type</span>
+        <span class="note-chip" onclick="toggleChip(this, 'b', 'keep-density')">keep density</span>
+      </div>
+    </div>
+
+    <div class="note-card" id="notecard-c">
+      <div class="note-card-header">
+        <span class="nc-badge c">C</span>
+        <span class="nc-title">Forge Studio</span>
+        <span class="note-selected-badge">selected</span>
+      </div>
+      <textarea class="note-textarea" id="notes-c" placeholder="What works? What needs to change? What's missing?&#10;&#10;e.g. Instrument rack layout is the right metaphor. Violet is too intense — tone it down to 60%."></textarea>
+      <div class="note-footer">
+        <span class="note-chip" onclick="toggleChip(this, 'c', 'keep-nav')">keep nav</span>
+        <span class="note-chip" onclick="toggleChip(this, 'c', 'keep-color')">keep color</span>
+        <span class="note-chip" onclick="toggleChip(this, 'c', 'keep-type')">keep type</span>
+        <span class="note-chip" onclick="toggleChip(this, 'c', 'keep-density')">keep density</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Export Bar -->
+<div class="export-bar">
+  <div class="export-summary" id="exportSummary">No direction selected yet.</div>
+  <button class="export-btn" onclick="exportNotes()">Download notes as JSON</button>
+  <button class="export-btn" onclick="copyNotes()">Copy to clipboard</button>
+</div>
+
+<script>
+  const state = {
+    selected: null,
+    chips: { a: [], b: [], c: [] },
+    zoom: 1.0,
+    highlights: new Set()
+  };
+
+  // Load from localStorage
+  try {
+    const saved = localStorage.getItem('bf-design-review');
+    if (saved) Object.assign(state, JSON.parse(saved));
+    if (state.selected) applySelectionUI(state.selected);
+    ['a','b','c'].forEach(d => {
+      if (state['notes_' + d]) document.getElementById('notes-' + d).value = state['notes_' + d];
+    });
+  } catch(e) {}
+
+  function save() {
+    try {
+      const s = { ...state };
+      ['a','b','c'].forEach(d => { s['notes_' + d] = document.getElementById('notes-' + d).value; });
+      localStorage.setItem('bf-design-review', JSON.stringify(s));
+    } catch(e) {}
+  }
+
+  // Auto-save notes on input
+  ['a','b','c'].forEach(d => {
+    document.getElementById('notes-' + d).addEventListener('input', () => {
+      save();
+      updateSummary();
+    });
+  });
+
+  function selectDirection(dir) {
+    state.selected = dir;
+    applySelectionUI(dir);
+    save();
+    updateSummary();
+    document.getElementById('notesSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function applySelectionUI(dir) {
+    ['a','b','c'].forEach(d => {
+      document.getElementById('selectA'.replace('A', d.toUpperCase())).classList.toggle('selected', d === dir);
+      document.getElementById('notecard-' + d).classList.toggle('selected', d === dir);
+    });
+  }
+
+  function toggleChip(el, dir, key) {
+    el.classList.toggle('active');
+    const arr = state.chips[dir];
+    const idx = arr.indexOf(key);
+    if (idx === -1) arr.push(key); else arr.splice(idx, 1);
+    save();
+  }
+
+  function applyHighlight(checkbox) {
+    const val = checkbox.value;
+    if (checkbox.checked) state.highlights.add(val); else state.highlights.delete(val);
+    ['a','b','c'].forEach(d => {
+      const wrap = document.getElementById('wrap-' + d);
+      wrap.classList.remove('hl-nav', 'hl-color', 'hl-type', 'hl-density');
+      state.highlights.forEach(h => wrap.classList.add('hl-' + h));
+    });
+  }
+
+  function adjustZoom(delta) {
+    state.zoom = Math.min(1.5, Math.max(0.4, state.zoom + delta));
+    document.getElementById('zoomLabel').textContent = Math.round(state.zoom * 100) + '%';
+    document.querySelectorAll('.iframe-wrap iframe').forEach(f => {
+      f.style.transform = `scale(${state.zoom})`;
+      f.style.transformOrigin = 'top left';
+      f.style.width = (100 / state.zoom) + '%';
+      f.style.height = (100 / state.zoom) + '%';
+    });
+  }
+
+  function updateSummary() {
+    const el = document.getElementById('exportSummary');
+    const names = { a: 'Terminal Forge', b: 'Command Surface', c: 'Forge Studio' };
+    let text = '';
+    if (state.selected) {
+      text += `Selected: <strong>${names[state.selected]} (${state.selected.toUpperCase()})</strong>. `;
+    }
+    const notesCount = ['a','b','c'].filter(d => document.getElementById('notes-' + d).value.trim()).length;
+    if (notesCount > 0) text += `Notes on ${notesCount}/3 directions.`;
+    else if (!state.selected) text = 'No direction selected yet.';
+    el.innerHTML = text || 'No direction selected yet.';
+  }
+
+  function buildExportData() {
+    const names = { a: 'Terminal Forge', b: 'Command Surface', c: 'Forge Studio' };
+    return {
+      exportedAt: new Date().toISOString(),
+      selectedDirection: state.selected ? { key: state.selected, name: names[state.selected] } : null,
+      directions: ['a','b','c'].map(d => ({
+        key: d,
+        name: names[d],
+        notes: document.getElementById('notes-' + d).value.trim(),
+        keepChips: state.chips[d]
+      }))
+    };
+  }
+
+  function exportNotes() {
+    const data = buildExportData();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'brightforge-design-review.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function copyNotes() {
+    const data = buildExportData();
+    navigator.clipboard.writeText(JSON.stringify(data, null, 2)).then(() => {
+      const btn = event.target;
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy to clipboard', 2000);
+    });
+  }
+
+  function openAll() {
+    ['direction-a.html','direction-b.html','direction-c.html'].forEach(f => window.open(f, '_blank'));
+  }
+
+  // Restore chip states
+  try {
+    ['a','b','c'].forEach(d => {
+      const chips = document.querySelectorAll(`#notecard-${d} .note-chip`);
+      chips.forEach(chip => {
+        const key = chip.getAttribute('onclick').match(/'([^']+)'\)$/)[1];
+        if (state.chips[d] && state.chips[d].includes(key)) chip.classList.add('active');
+      });
+    });
+  } catch(e) {}
+
+  updateSummary();
+</script>
+</body>
+</html>

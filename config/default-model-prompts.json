@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "description": "Default onboarding model prompts for BrightForge 3D generation pipeline",
+  "models": [
+    {
+      "id": "default_prop_barrel",
+      "category": "prop",
+      "pipeline": "generate_prop_asset",
+      "label": "Wooden Barrel",
+      "prompt": "A weathered wooden barrel with iron bands, slightly mossy at the base, worn stave texture, suitable for a fantasy tavern or dungeon environment",
+      "tags": ["prop", "fantasy", "environment", "furniture"],
+      "approvalRequired": true
+    },
+    {
+      "id": "default_env_rock",
+      "category": "environment",
+      "pipeline": "generate_environment_asset",
+      "label": "Mossy Rock Formation",
+      "prompt": "A cluster of smooth rounded boulders covered in patches of green moss, natural stone surface detail, suitable for outdoor environment dressing",
+      "tags": ["environment", "nature", "outdoor", "rock"],
+      "approvalRequired": true
+    },
+    {
+      "id": "default_character_knight",
+      "category": "character",
+      "pipeline": "generate_game_asset",
+      "label": "Medieval Knight",
+      "prompt": "A stylized medieval knight in full plate armor, T-pose, low-poly game-ready proportions, neutral expression, no weapon",
+      "tags": ["character", "humanoid", "fantasy", "armor"],
+      "approvalRequired": true
+    },
+    {
+      "id": "default_stylized_lantern",
+      "category": "stylized",
+      "pipeline": "generate_prop_asset",
+      "label": "Ornate Lantern",
+      "prompt": "A decorative iron street lantern with glass panels, ornate metalwork scrolling, warm glow source, stylized proportions for a fantasy setting",
+      "tags": ["prop", "stylized", "light", "fantasy"],
+      "approvalRequired": true
+    }
+  ]
+}

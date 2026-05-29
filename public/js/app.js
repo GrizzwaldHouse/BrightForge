@@ -44,6 +44,10 @@ console.log('[APP] Importing RecorderPanel...');
 import { RecorderPanel } from './recorder-panel.js';
 console.log('[APP] Importing StabilityPanel...');
 import { StabilityPanel } from './stability-panel.js';
+console.log('[APP] Importing PipelineTasksPanel...');
+import { PipelineTasksPanel } from './pipeline-tasks-panel.js';
+console.log('[APP] Importing IntegrationsPanel...');
+import { IntegrationsPanel } from './integrations-panel.js';
 console.log('[APP] ✓ All modules imported successfully');
 
 class App {
@@ -121,6 +125,16 @@ class App {
       console.log('[APP] Initializing StabilityPanel...');
       this.stabilityPanel = new StabilityPanel(this);
       console.log('[APP] StabilityPanel initialized');
+
+      // Phase 20B3 — Pipeline Tasks panel (task lifecycle cards driven by orchestration events)
+      console.log('[APP] Initializing PipelineTasksPanel...');
+      this.pipelineTasksPanel = new PipelineTasksPanel(this);
+      console.log('[APP] PipelineTasksPanel initialized');
+
+      // Phase 20 — Integrations panel (Firecrawl status + manual model knowledge sync)
+      console.log('[APP] Initializing IntegrationsPanel...');
+      this.integrationsPanel = new IntegrationsPanel(this);
+      console.log('[APP] IntegrationsPanel initialized');
 
       this.fileBrowser = null; // Initialized after DOM ready
       this.memoryPanel = null; // Initialized after DOM ready
@@ -398,6 +412,14 @@ class App {
           const container = document.getElementById('orchestration-panel');
           this.orchestrationPanel.render(container);
           this.orchestrationPanel.initialized = true;
+        }
+        // Phase 20B3 — Pipeline Tasks tab activation
+        if (targetTab === 'pipeline-tasks' && this.pipelineTasksPanel && !this.pipelineTasksPanel.initialized) {
+          this.pipelineTasksPanel.init();
+        }
+        // Phase 20 — Integrations tab activation
+        if (targetTab === 'integrations' && this.integrationsPanel && !this.integrationsPanel.initialized) {
+          this.integrationsPanel.init();
         }
       });
     });

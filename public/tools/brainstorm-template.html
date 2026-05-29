@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<!--
+  BrightForge Brainstorm Wizard — Reusable Template Engine
+  =========================================================
+  To create a new brainstorm wizard, copy this file and replace the
+  BRAINSTORM_DATA object below with your project's sections and questions.
+
+  No build step required. Uses Preact + htm via CDN (3KB total).
+
+  DATA SCHEMA:
+  {
+    meta: {
+      title: string,          // e.g. "VetAssist Pro Brainstorm"
+      subtitle: string,       // shown under topbar badge
+      badge: string,          // short badge text, e.g. "VA PRO"
+      exportFilename: string, // e.g. "vetassist-pro-answers"
+      nextStepTitle: string,  // summary card heading
+      nextStepBody: string,   // summary card body text
+    },
+    palette: {
+      bg, surface, surfaceUp, border, borderGlow,
+      accent, accentLight, accentDim,
+      text, textDim, textFaint, white, green, greenLight,
+    },
+    sections: [
+      {
+        id: string,
+        label: string,
+        icon: string,     // emoji
+        color: string,    // hex — section accent
+        questions: [
+          {
+            id: string,
+            label: string,          // "Q1"
+            text: string,           // question body
+            sub: string,            // sub-caption
+            type: "single"|"multi",
+            options: [
+              { id: string, label: string, desc: string }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BrightForge Brainstorm</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    button { font-family: inherit; cursor: pointer; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #1E2D42; border-radius: 3px; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    .fade-up   { animation: fadeUp  0.22s ease-out both; }
+    .fade-in   { animation: fadeIn  0.18s ease-out both; }
+
+    /* progress dot track */
+    .dot-track {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+    }
+    .dot {
+      height: 6px;
+      border-radius: 3px;
+      transition: width 0.25s ease, background 0.2s;
+    }
+
+    /* section tab bar */
+    .section-tabs {
+      display: flex;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .section-tabs::-webkit-scrollbar { display: none; }
+
+    .section-tab {
+      padding: 10px 18px;
+      font-size: 12px;
+      white-space: nowrap;
+      transition: color 0.15s, border-color 0.15s;
+      cursor: default;
+      user-select: none;
+    }
+
+    /* option pill */
+    .opt-pill {
+      display: block;
+      width: 100%;
+      text-align: left;
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin-bottom: 8px;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .opt-pill:hover { cursor: pointer; }
+
+    /* check/radio indicator */
+    .opt-indicator {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+      margin-top: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.12s, border-color 0.12s;
+    }
+
+    /* summary */
+    .summary-answer-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 6px;
+      align-items: flex-start;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     BRAINSTORM DATA — replace this entire object for a new project
+     ═══════════════════════════════════════════════════════════════ -->
+<script>
+// ---------------------------------------------------------------------------
+// REPLACE THIS OBJECT TO CREATE A NEW BRAINSTORM WIZARD
+// ---------------------------------------------------------------------------
+const BRAINSTORM_DATA = {
+  meta: {
+    title:          'Brainstorm Wizard',
+    subtitle:       'BRIGHTFORGE // BRAINSTORM TEMPLATE',
+    badge:          'BF',
+    exportFilename: 'brainstorm-answers',
+    nextStepTitle:  'Next Step',
+    nextStepBody:   'Share these answers to generate a build plan.',
+  },
+
+  // Terminal Forge palette — override per project
+  palette: {
+    bg:          '#080C14',
+    surface:     '#0E1520',
+    surfaceUp:   '#141E2E',
+    border:      '#1E2D42',
+    borderGlow:  '#2A4060',
+    accent:      '#C8962A',
+    accentLight: '#E8B84B',
+    accentDim:   '#7A5A18',
+    text:        '#D4DEEC',
+    textDim:     '#7A8FA8',
+    textFaint:   '#3A4D62',
+    white:       '#EEF4FF',
+    green:       '#1E9E5A',
+    greenLight:  '#2ECC7A',
+  },
+
+  sections: [
+    {
+      id: 'example',
+      label: 'Example Section',
+      icon: '🎯',
+      color: '#C8962A',
+      questions: [
+        {
+          id: 'q1',
+          label: 'Q1',
+          text: 'Replace this with your first question.',
+          sub: 'This is the sub-caption that gives context.',
+          type: 'single',
+          options: [
+            { id: 'a', label: 'Option A', desc: 'Description of option A.' },
+            { id: 'b', label: 'Option B', desc: 'Description of option B.' },
+            { id: 'c', label: 'Option C', desc: 'Description of option C.' },
+          ],
+        },
+        {
+          id: 'q2',
+          label: 'Q2',
+          text: 'A multi-select question example.',
+          sub: 'Pick everything that applies.',
+          type: 'multi',
+          options: [
+            { id: 'a', label: 'Item A', desc: 'First item description.' },
+            { id: 'b', label: 'Item B', desc: 'Second item description.' },
+            { id: 'c', label: 'Item C', desc: 'Third item description.' },
+          ],
+        },
+      ],
+    },
+  ],
+};
+// ---------------------------------------------------------------------------
+</script>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     ENGINE — do not edit below unless improving the template itself
+     ═══════════════════════════════════════════════════════════════ -->
+<script type="module">
+import { h, render } from 'https://esm.sh/preact@10';
+import { useState, useEffect, useRef } from 'https://esm.sh/preact@10/hooks';
+import { html } from 'https://esm.sh/htm@3/preact';
+
+const D = BRAINSTORM_DATA;
+const P = D.palette;
+
+// Flatten all questions with section metadata attached
+const ALL_Q = D.sections.flatMap(s =>
+  s.questions.map(q => ({ ...q, sectionId: s.id, sectionColor: s.color, sectionLabel: s.label, sectionIcon: s.icon }))
+);
+
+// ── OptionPill ────────────────────────────────────────────────────────────────
+function OptionPill({ option, selected, onToggle, color, multi }) {
+  const [hover, setHover] = useState(false);
+  const bg     = selected ? color + '22' : hover ? P.surfaceUp : 'transparent';
+  const border = `1.5px solid ${selected ? color : hover ? P.borderGlow : P.border}`;
+  const indBg  = selected ? color : 'transparent';
+  const indBdr = `2px solid ${selected ? color : P.textFaint}`;
+  const radius = multi ? 4 : 9;
+
+  return html`
+    <button
+      class="opt-pill"
+      style=${{ background: bg, border, transition: 'all 0.12s' }}
+      onMouseEnter=${() => setHover(true)}
+      onMouseLeave=${() => setHover(false)}
+      onClick=${onToggle}
+    >
+      <div style=${{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+        <div
+          class="opt-indicator"
+          style=${{ borderRadius: radius, border: indBdr, background: indBg }}
+        >
+          ${selected && html`
+            <span style=${{ color: P.bg, fontSize: 11, fontWeight: 900, lineHeight: 1 }}>
+              ${multi ? '✓' : '•'}
+            </span>
+          `}
+        </div>
+        <div style=${{ flex: 1 }}>
+          <div style=${{ color: selected ? P.white : P.text, fontWeight: 600, fontSize: 14, lineHeight: 1.3 }}>
+            ${option.label}
+          </div>
+          <div style=${{ color: selected ? color + 'cc' : P.textDim, fontSize: 12, marginTop: 3, lineHeight: 1.5 }}>
+            ${option.desc}
+          </div>
+        </div>
+      </div>
+    </button>
+  `;
+}
+
+// ── SummaryView ───────────────────────────────────────────────────────────────
+function SummaryView({ answers, onReset }) {
+  const [copied, setCopied] = useState(false);
+
+  const buildText = () => {
+    let t = `${D.meta.title.toUpperCase()} — RESPONSES\nCaptured: ${new Date().toLocaleDateString()}\n\n`;
+    D.sections.forEach(sec => {
+      t += `${sec.label.toUpperCase()}\n${'─'.repeat(40)}\n`;
+      sec.questions.forEach(q => {
+        const sel = answers[q.id] || [];
+        t += `${q.text}\n`;
+        if (!sel.length) { t += '  (no selection)\n'; }
+        else sel.forEach(id => {
+          const o = q.options.find(o => o.id === id);
+          if (o) t += `  [x] ${o.label}: ${o.desc}\n`;
+        });
+        t += '\n';
+      });
+    });
+    return t;
+  };
+
+  const buildJSON = () => {
+    const out = {};
+    D.sections.forEach(sec => {
+      out[sec.id] = {};
+      sec.questions.forEach(q => {
+        const sel = answers[q.id] || [];
+        out[sec.id][q.id] = sel.map(id => {
+          const o = q.options.find(o => o.id === id);
+          return o ? { id, label: o.label, desc: o.desc } : { id };
+        });
+      });
+    });
+    return JSON.stringify({ meta: { title: D.meta.title, capturedAt: new Date().toISOString() }, answers: out }, null, 2);
+  };
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(buildText()).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const handleExport = () => {
+    const blob = new Blob([buildJSON()], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${D.meta.exportFilename}-${Date.now()}.json`;
+    a.click();
+  };
+
+  const answeredCount = ALL_Q.filter(q => (answers[q.id] || []).length > 0).length;
+
+  return html`
+    <div class="fade-in" style=${{ background: P.bg, minHeight: '100vh' }}>
+      <!-- header -->
+      <div style=${{
+        background: `linear-gradient(135deg, ${P.surface}, ${P.surfaceUp})`,
+        borderBottom: `1px solid ${P.border}`,
+        padding: '32px 28px 24px',
+        textAlign: 'center',
+      }}>
+        <div style=${{ fontSize: 48, marginBottom: 8 }}>🎖️</div>
+        <div style=${{ color: P.accentLight, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: 3, marginBottom: 8 }}>
+          BRAINSTORM COMPLETE
+        </div>
+        <div style=${{ color: P.white, fontSize: 24, fontWeight: 700, fontFamily: 'Playfair Display, serif', marginBottom: 6 }}>
+          ${D.meta.title}
+        </div>
+        <div style=${{ color: P.textDim, fontSize: 13 }}>
+          ${answeredCount} of ${ALL_Q.length} questions answered
+        </div>
+        <div style=${{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 16, flexWrap: 'wrap' }}>
+          <button
+            onClick=${handleCopy}
+            style=${{
+              background: P.accent,
+              color: P.white,
+              border: 'none',
+              borderRadius: 8,
+              padding: '10px 20px',
+              fontSize: 13,
+              fontWeight: 700,
+            }}
+          >${copied ? 'Copied!' : 'Copy as Text'}</button>
+          <button
+            onClick=${handleExport}
+            style=${{
+              background: P.surfaceUp,
+              color: P.text,
+              border: `1px solid ${P.border}`,
+              borderRadius: 8,
+              padding: '10px 20px',
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >Export JSON</button>
+          <button
+            onClick=${onReset}
+            style=${{
+              background: 'transparent',
+              color: P.textDim,
+              border: `1px solid ${P.border}`,
+              borderRadius: 8,
+              padding: '10px 20px',
+              fontSize: 13,
+            }}
+          >Start Over</button>
+        </div>
+      </div>
+
+      <!-- answers -->
+      <div style=${{ maxWidth: 740, margin: '0 auto', padding: '24px 20px 60px' }}>
+        ${D.sections.map(sec => html`
+          <div key=${sec.id} style=${{ marginBottom: 28 }}>
+            <div style=${{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <span style=${{ fontSize: 18 }}>${sec.icon}</span>
+              <div style=${{ color: sec.color, fontWeight: 700, fontSize: 13, fontFamily: 'JetBrains Mono, monospace', letterSpacing: 1 }}>
+                ${sec.label.toUpperCase()}
+              </div>
+            </div>
+            ${sec.questions.map(q => {
+              const sel = answers[q.id] || [];
+              return html`
+                <div key=${q.id} style=${{
+                  background: P.surface,
+                  border: `1px solid ${P.border}`,
+                  borderRadius: 10,
+                  padding: '14px 16px',
+                  marginBottom: 10,
+                }}>
+                  <div style=${{ color: P.textDim, fontSize: 11, fontFamily: 'JetBrains Mono, monospace', marginBottom: 4 }}>${q.label}</div>
+                  <div style=${{ color: P.text, fontSize: 13, marginBottom: sel.length ? 10 : 0, fontWeight: 500 }}>${q.text}</div>
+                  ${!sel.length
+                    ? html`<div style=${{ color: P.textFaint, fontSize: 12, fontStyle: 'italic' }}>No selection</div>`
+                    : sel.map(id => {
+                        const o = q.options.find(o => o.id === id);
+                        return o ? html`
+                          <div key=${id} class="summary-answer-row">
+                            <span style=${{ color: sec.color, fontSize: 13, marginTop: 1 }}>+</span>
+                            <div>
+                              <span style=${{ color: P.white, fontSize: 13, fontWeight: 600 }}>${o.label}</span>
+                              <span style=${{ color: P.textDim, fontSize: 12 }}> — ${o.desc}</span>
+                            </div>
+                          </div>
+                        ` : null;
+                      })
+                  }
+                </div>
+              `;
+            })}
+          </div>
+        `)}
+
+        <!-- next step card -->
+        <div style=${{
+          background: P.accent + '18',
+          border: `1px solid ${P.accent}44`,
+          borderRadius: 10,
+          padding: '16px 18px',
+          marginTop: 8,
+        }}>
+          <div style=${{ color: P.accentLight, fontWeight: 700, fontSize: 13, marginBottom: 8 }}>
+            ${D.meta.nextStepTitle}
+          </div>
+          <div style=${{ color: P.textDim, fontSize: 13, lineHeight: 1.6 }}>
+            ${D.meta.nextStepBody}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ── WizardView ────────────────────────────────────────────────────────────────
+function WizardView() {
+  const [currentQ, setCurrentQ]     = useState(0);
+  const [answers, setAnswers]        = useState({});
+  const [showSummary, setShowSummary] = useState(false);
+  const [animKey, setAnimKey]        = useState(0);
+
+  const q       = ALL_Q[currentQ];
+  const isMulti = q?.type === 'multi';
+  const sel     = answers[q?.id] || [];
+  const sec     = D.sections.find(s => s.id === q?.sectionId);
+  const progress = currentQ / ALL_Q.length * 100;
+  const canNext  = sel.length > 0;
+
+  // Apply background color to body
+  useEffect(() => {
+    document.body.style.background = P.bg;
+    document.title = D.meta.title;
+  }, []);
+
+  const toggle = id => {
+    const prev = answers[q.id] || [];
+    const next = isMulti
+      ? (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+      : [id];
+    setAnswers({ ...answers, [q.id]: next });
+  };
+
+  const go = delta => {
+    if (delta > 0 && !canNext) return;
+    const next = currentQ + delta;
+    if (next < 0) return;
+    setAnimKey(k => k + 1);
+    setTimeout(() => {
+      if (delta > 0 && currentQ === ALL_Q.length - 1) {
+        setShowSummary(true);
+      } else {
+        setCurrentQ(next);
+      }
+    }, 160);
+  };
+
+  const handleKeyDown = e => {
+    if (e.key === 'ArrowRight' || e.key === 'Enter') go(1);
+    if (e.key === 'ArrowLeft')  go(-1);
+  };
+
+  if (showSummary) {
+    return html`<${SummaryView}
+      answers=${answers}
+      onReset=${() => { setAnswers({}); setCurrentQ(0); setShowSummary(false); setAnimKey(k => k+1); }}
+    />`;
+  }
+
+  return html`
+    <div
+      style=${{ background: P.bg, minHeight: '100vh', fontFamily: "'Inter', system-ui, sans-serif" }}
+      tabIndex=${0}
+      onKeyDown=${handleKeyDown}
+    >
+      <!-- topbar -->
+      <div style=${{
+        background: P.surface,
+        borderBottom: `1px solid ${P.border}`,
+        padding: '14px 24px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 16,
+        position: 'sticky',
+        top: 0,
+        zIndex: 10,
+      }}>
+        <div style=${{
+          background: `linear-gradient(135deg, ${P.accent}, ${P.accentLight})`,
+          color: P.bg,
+          borderRadius: 6,
+          padding: '5px 10px',
+          fontSize: 12,
+          fontWeight: 900,
+          fontFamily: 'JetBrains Mono, monospace',
+          letterSpacing: 1,
+          flexShrink: 0,
+        }}>${D.meta.badge}</div>
+
+        <div style=${{ flex: 1, minWidth: 0 }}>
+          <div style=${{ color: P.accentLight, fontSize: 10, fontFamily: 'JetBrains Mono, monospace', letterSpacing: 2, marginBottom: 4 }}>
+            ${D.meta.subtitle}
+          </div>
+          <div style=${{ background: P.surfaceUp, borderRadius: 4, height: 4, overflow: 'hidden' }}>
+            <div style=${{
+              background: `linear-gradient(90deg, ${sec?.color || P.accent}, ${P.accentLight})`,
+              height: '100%',
+              width: `${progress}%`,
+              borderRadius: 4,
+              transition: 'width 0.3s ease',
+            }} />
+          </div>
+        </div>
+
+        <div style=${{ color: P.textDim, fontFamily: 'JetBrains Mono, monospace', fontSize: 12, flexShrink: 0 }}>
+          ${currentQ + 1} / ${ALL_Q.length}
+        </div>
+      </div>
+
+      <!-- section tabs -->
+      <div class="section-tabs" style=${{ background: P.surfaceUp, borderBottom: `1px solid ${P.border}` }}>
+        ${D.sections.map(s => {
+          const qIdxs = ALL_Q.map((qq, i) => qq.sectionId === s.id ? i : -1).filter(i => i >= 0);
+          const isActive = qIdxs.includes(currentQ);
+          const isDone   = qIdxs.every(i => i < currentQ);
+          return html`
+            <div key=${s.id} class="section-tab" style=${{
+              borderBottom: `2px solid ${isActive ? s.color : 'transparent'}`,
+              color: isActive ? s.color : isDone ? P.textDim : P.textFaint,
+              fontWeight: isActive ? 700 : 400,
+            }}>
+              ${s.icon} ${s.label}
+              ${isDone && html`<span style=${{ marginLeft: 6, color: P.greenLight }}>✓</span>`}
+            </div>
+          `;
+        })}
+      </div>
+
+      <!-- question area -->
+      <div style=${{ maxWidth: 680, margin: '0 auto', padding: '32px 20px 24px' }}>
+        <div key=${animKey} class="fade-up">
+          <!-- question header -->
+          <div style=${{ marginBottom: 24 }}>
+            <div style=${{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <span style=${{
+                background: (sec?.color || P.accent) + '22',
+                color: sec?.color || P.accent,
+                border: `1px solid ${(sec?.color || P.accent) + '44'}`,
+                borderRadius: 4,
+                padding: '2px 8px',
+                fontSize: 11,
+                fontFamily: 'JetBrains Mono, monospace',
+                fontWeight: 700,
+              }}>${q?.label}</span>
+              <span style=${{ color: P.textFaint, fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}>
+                ${isMulti ? 'SELECT ALL THAT APPLY' : 'SELECT ONE'}
+              </span>
+            </div>
+
+            <div style=${{
+              color: P.white,
+              fontSize: 20,
+              fontWeight: 700,
+              fontFamily: 'Playfair Display, serif',
+              lineHeight: 1.35,
+              marginBottom: 6,
+            }}>${q?.text}</div>
+
+            ${q?.sub && html`
+              <div style=${{ color: P.textDim, fontSize: 13, lineHeight: 1.5 }}>${q.sub}</div>
+            `}
+          </div>
+
+          <!-- options -->
+          <div>
+            ${q?.options.map(opt => html`
+              <${OptionPill}
+                key=${opt.id}
+                option=${opt}
+                selected=${sel.includes(opt.id)}
+                onToggle=${() => toggle(opt.id)}
+                color=${sec?.color || P.accent}
+                multi=${isMulti}
+              />
+            `)}
+          </div>
+
+          <!-- nav row -->
+          <div style=${{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20 }}>
+            <button
+              onClick=${() => go(-1)}
+              disabled=${currentQ === 0}
+              style=${{
+                background: 'transparent',
+                border: `1px solid ${currentQ === 0 ? P.textFaint + '44' : P.border}`,
+                color: currentQ === 0 ? P.textFaint : P.textDim,
+                borderRadius: 8,
+                padding: '10px 18px',
+                fontSize: 13,
+                opacity: currentQ === 0 ? 0.5 : 1,
+                cursor: currentQ === 0 ? 'not-allowed' : 'pointer',
+              }}
+            >Back</button>
+
+            <!-- dot progress map -->
+            <div class="dot-track">
+              ${ALL_Q.map((_, i) => html`
+                <div key=${i} class="dot" style=${{
+                  width: i === currentQ ? 20 : 6,
+                  background: i < currentQ
+                    ? P.greenLight
+                    : i === currentQ
+                      ? (sec?.color || P.accent)
+                      : P.textFaint + '44',
+                }} />
+              `)}
+            </div>
+
+            <button
+              onClick=${() => go(1)}
+              disabled=${!canNext}
+              style=${{
+                background: canNext
+                  ? `linear-gradient(135deg, ${sec?.color || P.accent}, ${P.accentLight})`
+                  : P.surfaceUp,
+                color: canNext ? P.white : P.textFaint,
+                border: 'none',
+                borderRadius: 8,
+                padding: '10px 22px',
+                fontSize: 13,
+                fontWeight: 700,
+                opacity: canNext ? 1 : 0.5,
+                cursor: canNext ? 'pointer' : 'not-allowed',
+                transition: 'all 0.15s',
+              }}
+            >${currentQ === ALL_Q.length - 1 ? 'See Summary →' : 'Next →'}</button>
+          </div>
+
+          ${isMulti && html`
+            <div style=${{ textAlign: 'center', marginTop: 10, color: P.textFaint, fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}>
+              ${sel.length} selected — choose as many as apply
+            </div>
+          `}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+render(html`<${WizardView} />`, document.getElementById('app'));
+</script>
+
+<div id="app"></div>
+
+</body>
+</html>

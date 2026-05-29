@@ -909,14 +909,31 @@ router.post('/import', express.json({ limit: '50mb' }), (req, res) => {
 /**
  * POST /api/forge3d/history/prune
  * Delete generation_history entries older than N days.
- * Body: { daysToKeep: number } (defaults to 30)
+ * Body: { daysToKeep: number, daysToKeepDeadLetter?: number } (defaults to 30 each)
+ *
+ * Phase 20C — daysToKeepDeadLetter (optional) lets dead-letter rows
+ * be retained on a different cadence than regular history. When omitted,
+ * daysToKeep applies to all rows.
  */
 router.post('/history/prune', (req, res) => {
   ensureInit();
   try {
     const days = Math.max(1, parseInt(req.body?.daysToKeep) || 30);
-    const deleted = forge3dDb.pruneHistory(days);
-    res.json({ pruned: deleted, daysToKeep: days });
+    let daysDl;
+    if (req.body && req.body.daysToKeepDeadLetter !== undefined) {
+      const parsed = parseInt(req.body.daysToKeepDeadLetter);
+      if (Number.isFinite(parsed)) {
+        daysDl = Math.max(1, parsed);
+      }
+    }
+    const deleted = forge3dDb.pruneHistory(
+      typeof daysDl === 'number'
+        ? { daysToKeep: days, daysToKeepDeadLetter: daysDl }
+        : days
+    );
+    const response = { pruned: deleted, daysToKeep: days };
+    if (typeof daysDl === 'number') response.daysToKeepDeadLetter = daysDl;
+    res.json(response);
   } catch (err) {
     errorHandler.report('forge3d_error', err, { endpoint: 'prune_history' });
     res.status(500).json({ error: sanitizeError(err) });
@@ -1004,6 +1021,40 @@ router.post('/queue/resume', (_req, res) => {
     res.json({ paused: false });
   } catch (err) {
     errorHandler.report('forge3d_error', err, { endpoint: 'queue_resume' });
+    res.status(500).json({ error: sanitizeError(err) });
+  }
+});
+
+/**
+ * GET /api/forge3d/queue/dead-letters
+ * List jobs currently in the dead_letter state.
+ *
+ * Phase 20D1 — feeds the expandable dead-letter list in the dashboard.
+ * Registered before /queue/:id so Express does not match the literal
+ * "dead-letters" path against the :id param.
+ *
+ * Returns: array of { id, prompt, error, retry_count, updated_at }
+ */
+// Cap on rows returned to keep the dashboard payload small. The badge already
+// shows the full count from /queue; this list is for triage, not auditing.
+const DEAD_LETTER_LIST_LIMIT = 100;
+
+router.get('/queue/dead-letters', (_req, res) => {
+  ensureInit();
+  try {
+    // listHistory({ status }) returns generation_history rows where status matches.
+    // Dead-letter promotion writes errorMessage into the row; surface it as `error`.
+    const rows = forge3dDb.listHistory({ status: 'dead_letter', limit: DEAD_LETTER_LIST_LIMIT });
+    const items = rows.map((r) => ({
+      id: r.id,
+      prompt: r.prompt || '',
+      error: r.error_message || r.error || '',
+      retry_count: r.retry_count || 0,
+      updated_at: r.updated_at || r.created_at || null
+    }));
+    res.json({ items });
+  } catch (err) {
+    errorHandler.report('forge3d_error', err, { endpoint: 'dead_letters' });
     res.status(500).json({ error: sanitizeError(err) });
   }
 });

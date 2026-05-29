@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BrightForge — Terminal Forge</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-root:       oklch(9.5% 0.008 52);
+      --bg-rail:       oklch(11.5% 0.009 52);
+      --bg-panel:      oklch(13% 0.008 52);
+      --bg-input:      oklch(15.5% 0.009 52);
+      --bg-hover:      oklch(17.5% 0.010 52);
+      --rule:          oklch(20% 0.007 52);
+      --rule-bright:   oklch(26% 0.008 52);
+      --text-primary:  oklch(92% 0.009 58);
+      --text-secondary: oklch(70% 0.009 58);
+      --text-muted:    oklch(46% 0.008 55);
+      --text-dim:      oklch(30% 0.007 52);
+      /* Amber at full commitment — owns active chrome */
+      --amber:         oklch(76% 0.20 74);
+      --amber-mid:     oklch(58% 0.15 74);
+      --amber-dim:     oklch(38% 0.09 74);
+      --amber-bg:      oklch(16% 0.05 74);
+      --amber-bg2:     oklch(20% 0.07 74);
+      --green:         oklch(70% 0.17 145);
+      --red:           oklch(62% 0.19 22);
+      --blue:          oklch(67% 0.15 238);
+      --mono:          'JetBrains Mono', monospace;
+      --sans:          'Inter', sans-serif;
+      --rail-w:        228px;
+      --topbar-h:      42px;
+    }
+
+    body {
+      font-family: var(--sans);
+      background: var(--bg-root);
+      color: var(--text-primary);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Topbar ── */
+    .topbar {
+      height: var(--topbar-h);
+      background: var(--bg-rail);
+      border-bottom: 1px solid var(--rule);
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    .logo {
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--amber);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .logo-sep { color: var(--rule-bright); margin: 0 6px; }
+    .topbar-crumb {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .topbar-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .cost-pill {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .cost-pill strong { color: var(--amber); font-weight: 600; }
+    .status-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 2px oklch(14% 0.05 145 / 0.4), 0 0 8px var(--green);
+    }
+
+    /* ── Layout ── */
+    .workspace {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ── Left Rail ── */
+    .rail {
+      width: var(--rail-w);
+      background: var(--bg-rail);
+      border-right: 1px solid var(--rule);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .rail-section {
+      padding: 8px 0;
+      border-bottom: 1px solid var(--rule);
+    }
+    .rail-section-label {
+      font-family: var(--mono);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      padding: 4px 14px 6px;
+    }
+    .nav-item {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 5px 14px;
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: background 0.1s, color 0.1s;
+      font-family: var(--mono);
+      letter-spacing: -0.01em;
+    }
+    .nav-item:hover { background: var(--bg-hover); color: var(--text-secondary); }
+    .nav-item.active {
+      color: var(--amber);
+      background: var(--amber-bg);
+      font-weight: 600;
+    }
+    .nav-item.active::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: var(--amber);
+      border-radius: 0 2px 2px 0;
+    }
+    .nav-dot {
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      flex-shrink: 0;
+      transition: background 0.1s;
+    }
+    .nav-item.active .nav-dot { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+    .nav-badge {
+      margin-left: auto;
+      font-size: 9px;
+      padding: 1px 5px;
+      border-radius: 3px;
+      background: var(--amber-bg2);
+      color: var(--amber-mid);
+      font-weight: 700;
+    }
+    .nav-badge.running { background: oklch(16% 0.05 145); color: var(--green); }
+
+    /* ── Main Area ── */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .work-top {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ── Chat Panel ── */
+    .chat-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border-right: 1px solid var(--rule);
+    }
+    .panel-header {
+      height: 34px;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--rule);
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 8px;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      flex-shrink: 0;
+      letter-spacing: 0.02em;
+    }
+    .panel-header-title {
+      color: var(--text-secondary);
+      font-weight: 600;
+      font-size: 11px;
+    }
+    .panel-sep { color: var(--rule-bright); }
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 18px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .messages::-webkit-scrollbar { width: 4px; }
+    .messages::-webkit-scrollbar-track { background: transparent; }
+    .messages::-webkit-scrollbar-thumb { background: var(--rule-bright); border-radius: 2px; }
+    .msg { display: flex; flex-direction: column; gap: 5px; max-width: 700px; }
+    .msg-meta {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text-dim);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .msg-meta .author { color: var(--amber-mid); font-weight: 600; }
+    .msg-meta .author.forge { color: var(--amber); }
+    .msg-body {
+      font-size: 13px;
+      line-height: 1.65;
+      color: var(--text-secondary);
+      font-weight: 400;
+    }
+    .msg-body code {
+      font-family: var(--mono);
+      font-size: 11px;
+      background: var(--bg-input);
+      padding: 1px 5px;
+      border-radius: 3px;
+      color: var(--amber);
+      font-weight: 500;
+    }
+
+    /* Plan block — no card, just structured lines */
+    .plan-block {
+      margin-top: 10px;
+      border-top: 1px solid var(--rule-bright);
+      border-bottom: 1px solid var(--rule-bright);
+    }
+    .plan-block-header {
+      padding: 8px 0;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--rule);
+    }
+    .plan-block-header .ready { color: var(--amber); font-weight: 600; }
+    .plan-op {
+      padding: 7px 0;
+      font-family: var(--mono);
+      font-size: 11px;
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      border-bottom: 1px solid var(--rule);
+    }
+    .plan-op:last-of-type { border-bottom: none; }
+    .op-tag {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      width: 36px;
+      text-align: right;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+    .op-tag.modify { color: var(--blue); }
+    .op-tag.create { color: var(--green); }
+    .op-tag.delete { color: var(--red); }
+    .op-path { color: var(--text-primary); font-weight: 500; flex: 1; }
+    .op-desc { color: var(--text-dim); font-size: 10px; }
+    .plan-actions {
+      padding: 10px 0 4px;
+      display: flex;
+      gap: 8px;
+    }
+    .btn {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 6px 16px;
+      border-radius: 3px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: opacity 0.1s;
+      letter-spacing: 0.03em;
+    }
+    .btn:hover { opacity: 0.82; }
+    .btn-approve {
+      background: var(--amber);
+      color: oklch(9% 0.005 52);
+      border-color: var(--amber);
+    }
+    .btn-reject {
+      background: transparent;
+      color: var(--text-muted);
+      border-color: var(--rule-bright);
+    }
+    .chat-input-area {
+      padding: 12px 14px;
+      border-top: 1px solid var(--rule);
+      background: var(--bg-panel);
+      flex-shrink: 0;
+    }
+    .chat-input-row { display: flex; gap: 8px; align-items: flex-end; }
+    .chat-input {
+      flex: 1;
+      background: var(--bg-input);
+      border: 1px solid var(--rule-bright);
+      border-radius: 3px;
+      padding: 8px 12px;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--text-primary);
+      resize: none;
+      min-height: 36px;
+      max-height: 100px;
+      outline: none;
+      transition: border-color 0.12s;
+    }
+    .chat-input:focus { border-color: var(--amber-dim); }
+    .chat-input::placeholder { color: var(--text-dim); }
+    .btn-send {
+      background: var(--amber);
+      color: oklch(9% 0.005 52);
+      border: none;
+      border-radius: 3px;
+      padding: 0 16px;
+      height: 36px;
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: opacity 0.1s;
+      letter-spacing: 0.04em;
+    }
+    .btn-send:hover { opacity: 0.85; }
+
+    /* ── Diff file tabs ── */
+    .diff-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--rule);
+      background: var(--bg-rail);
+      flex-shrink: 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .diff-tabs::-webkit-scrollbar { display: none; }
+    .diff-tab {
+      padding: 6px 12px;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text-dim);
+      cursor: pointer;
+      white-space: nowrap;
+      border-right: 1px solid var(--rule);
+      transition: color 0.1s, background 0.1s;
+    }
+    .diff-tab:hover { color: var(--text-muted); background: var(--bg-hover); }
+    .diff-tab.active {
+      color: var(--amber);
+      background: var(--bg-panel);
+    }
+    .diff-tab .diff-tab-dot {
+      display: inline-block;
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--amber-dim);
+      margin-right: 5px;
+      vertical-align: middle;
+    }
+
+    /* ── Diff Panel ── */
+    .diff-panel {
+      width: 348px;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .diff-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 14px;
+      font-family: var(--mono);
+      font-size: 11px;
+      line-height: 1.75;
+    }
+    .diff-content::-webkit-scrollbar { width: 4px; }
+    .diff-content::-webkit-scrollbar-thumb { background: var(--rule-bright); border-radius: 2px; }
+    .diff-hunk {
+      font-size: 9px;
+      color: var(--text-dim);
+      padding: 4px 0 2px;
+      letter-spacing: 0.04em;
+    }
+    .diff-line { display: flex; gap: 0; }
+    .diff-line.add {
+      color: var(--green);
+      background: oklch(13.5% 0.025 145);
+    }
+    .diff-line.remove {
+      color: var(--red);
+      background: oklch(12.5% 0.025 22);
+    }
+    .diff-line.context { color: var(--text-dim); }
+    .diff-gutter {
+      width: 28px;
+      text-align: right;
+      color: var(--text-dim);
+      user-select: none;
+      padding-right: 8px;
+      font-size: 10px;
+      opacity: 0.6;
+    }
+    .diff-sign {
+      width: 16px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 12px;
+    }
+    .diff-line.add .diff-sign { color: var(--green); }
+    .diff-line.remove .diff-sign { color: var(--red); }
+
+    /* ── Status Bar ── */
+    .status-bar {
+      height: 28px;
+      background: var(--amber-bg);
+      border-top: 1px solid var(--amber-dim);
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 20px;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--amber-dim);
+      flex-shrink: 0;
+    }
+    .sb-item { display: flex; align-items: center; gap: 5px; }
+    .sb-item .val { color: var(--amber-mid); }
+    .sb-item:last-child { margin-left: auto; }
+
+    /* ── Provider tag ── */
+    .provider-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-family: var(--mono);
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 3px;
+      border: 1px solid var(--amber-dim);
+      color: var(--amber-mid);
+      background: var(--amber-bg);
+    }
+    .provider-tag .dot-sm {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 5px var(--green);
+    }
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <span class="logo">brightforge</span>
+  <span class="logo-sep">/</span>
+  <span class="topbar-crumb">~/projects/my-game</span>
+  <div class="topbar-right">
+    <span class="provider-tag"><span class="dot-sm"></span>ollama · llama3.1:8b</span>
+    <span class="cost-pill">today <strong>$0.03</strong> / $1.00</span>
+    <span class="status-dot"></span>
+  </div>
+</header>
+
+<div class="workspace">
+
+  <nav class="rail">
+    <div class="rail-section">
+      <div class="rail-section-label">work</div>
+      <div class="nav-item active"><span class="nav-dot"></span>Chat</div>
+      <div class="nav-item"><span class="nav-dot"></span>Forge 3D <span class="nav-badge">2</span></div>
+      <div class="nav-item"><span class="nav-dot"></span>Design</div>
+      <div class="nav-item"><span class="nav-dot"></span>Pipeline <span class="nav-badge running">▶</span></div>
+    </div>
+    <div class="rail-section">
+      <div class="rail-section-label">game</div>
+      <div class="nav-item"><span class="nav-dot"></span>Scene</div>
+      <div class="nav-item"><span class="nav-dot"></span>World</div>
+      <div class="nav-item"><span class="nav-dot"></span>Gameplay</div>
+      <div class="nav-item"><span class="nav-dot"></span>Playtest</div>
+    </div>
+    <div class="rail-section">
+      <div class="rail-section-label">ops</div>
+      <div class="nav-item"><span class="nav-dot"></span>Debug</div>
+      <div class="nav-item"><span class="nav-dot"></span>Security</div>
+      <div class="nav-item"><span class="nav-dot"></span>Agents</div>
+      <div class="nav-item"><span class="nav-dot"></span>Health</div>
+      <div class="nav-item"><span class="nav-dot"></span>Orchestration</div>
+      <div class="nav-item"><span class="nav-dot"></span>Models</div>
+      <div class="nav-item"><span class="nav-dot"></span>Recorder</div>
+      <div class="nav-item"><span class="nav-dot"></span>Stability</div>
+      <div class="nav-item"><span class="nav-dot"></span>Sessions</div>
+    </div>
+  </nav>
+
+  <div class="main">
+    <div class="work-top">
+
+      <div class="chat-panel">
+        <div class="panel-header">
+          <span class="panel-header-title">chat</span>
+          <span class="panel-sep">·</span>
+          <span>~/projects/my-game</span>
+          <span class="panel-sep" style="margin-left:auto">session #14</span>
+        </div>
+        <div class="messages">
+
+          <div class="msg">
+            <div class="msg-meta">
+              <span class="author">you</span>
+              <span>14:22:07</span>
+            </div>
+            <div class="msg-body">add a health component to the player entity and wire it to the HUD</div>
+          </div>
+
+          <div class="msg">
+            <div class="msg-meta">
+              <span class="author forge">forge</span>
+              <span>14:22:09</span>
+              <span style="color:var(--text-dim)">· 1.4s · 2,841 tok</span>
+            </div>
+            <div class="msg-body">
+              Scanned 34 files. Found <code>PlayerEntity</code>, <code>HUDManager</code>, <code>GameState</code>. Plan: 3 operations across 2 files.
+              <div class="plan-block">
+                <div class="plan-block-header">
+                  <span>PLAN · my-game · 3 ops</span>
+                  <span class="ready">ready to apply</span>
+                </div>
+                <div class="plan-op">
+                  <span class="op-tag modify">mod</span>
+                  <span class="op-path">src/entities/player.js</span>
+                  <span class="op-desc">add HealthComponent, maxHp=100</span>
+                </div>
+                <div class="plan-op">
+                  <span class="op-tag modify">mod</span>
+                  <span class="op-path">src/ui/hud.js</span>
+                  <span class="op-desc">bind health bar to player.health</span>
+                </div>
+                <div class="plan-op">
+                  <span class="op-tag create">new</span>
+                  <span class="op-path">src/components/health.js</span>
+                  <span class="op-desc">HealthComponent: take/heal/isDead</span>
+                </div>
+                <div class="plan-actions">
+                  <button class="btn btn-approve" id="approveBtn">approve</button>
+                  <button class="btn btn-reject">reject</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+        <div class="chat-input-area">
+          <div class="chat-input-row">
+            <textarea class="chat-input" placeholder="describe a change…" rows="1"></textarea>
+            <button class="btn-send">RUN</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="diff-panel">
+        <div class="panel-header">
+          <span class="panel-header-title">diff</span>
+          <span class="panel-sep">·</span>
+          <span id="diffFileName">src/entities/player.js</span>
+        </div>
+        <div class="diff-tabs" id="diffTabs">
+          <div class="diff-tab active" data-file="player"><span class="diff-tab-dot"></span>player.js</div>
+          <div class="diff-tab" data-file="hud"><span class="diff-tab-dot"></span>hud.js</div>
+          <div class="diff-tab" data-file="health"><span class="diff-tab-dot"></span>health.js <span style="color:var(--green);font-size:9px;margin-left:2px">new</span></div>
+        </div>
+        <div class="diff-content" id="diffContent">
+          <div class="diff-hunk">@@ -12,7 +12,11 @@ class PlayerEntity</div>
+          <div class="diff-line context"><span class="diff-gutter">12</span><span class="diff-sign"> </span>class PlayerEntity extends Entity {</div>
+          <div class="diff-line context"><span class="diff-gutter">13</span><span class="diff-sign"> </span>  constructor(x, y) {</div>
+          <div class="diff-line context"><span class="diff-gutter">14</span><span class="diff-sign"> </span>    super();</div>
+          <div class="diff-line add"><span class="diff-gutter"></span><span class="diff-sign">+</span>    this.health = new HealthComponent(100);</div>
+          <div class="diff-line add"><span class="diff-gutter"></span><span class="diff-sign">+</span>    this.health.on('change', () =&gt; {</div>
+          <div class="diff-line add"><span class="diff-gutter"></span><span class="diff-sign">+</span>      HUDManager.updateHealth(this.health);</div>
+          <div class="diff-line add"><span class="diff-gutter"></span><span class="diff-sign">+</span>    });</div>
+          <div class="diff-line context"><span class="diff-gutter">15</span><span class="diff-sign"> </span>    this.position = { x, y };</div>
+          <div class="diff-line context"><span class="diff-gutter">16</span><span class="diff-sign"> </span>    this.velocity = { x: 0, y: 0 };</div>
+          <div class="diff-line context"><span class="diff-gutter">17</span><span class="diff-sign"> </span>  }</div>
+          <div class="diff-hunk" style="margin-top:6px">@@ -44,3 +44,3 @@ update</div>
+          <div class="diff-line context"><span class="diff-gutter">44</span><span class="diff-sign"> </span>  update(dt) {</div>
+          <div class="diff-line remove"><span class="diff-gutter">45</span><span class="diff-sign">-</span>    this._applyPhysics(dt);</div>
+          <div class="diff-line add"><span class="diff-gutter"></span><span class="diff-sign">+</span>    if (!this.health.isDead()) this._applyPhysics(dt);</div>
+          <div class="diff-line context"><span class="diff-gutter">46</span><span class="diff-sign"> </span>    this._updateAnimation();</div>
+          <div class="diff-line context"><span class="diff-gutter">47</span><span class="diff-sign"> </span>  }</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="status-bar">
+      <span class="sb-item"><span>files</span><span class="val">34</span></span>
+      <span class="sb-item"><span>provider</span><span class="val">ollama/llama3.1:8b</span></span>
+      <span class="sb-item"><span>tokens</span><span class="val">2,841</span></span>
+      <span class="sb-item"><span>session</span><span class="val">#14 · 4 applied</span></span>
+      <span class="sb-item"><span>last apply</span><span class="val">14:18:32 clean</span></span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', () => {
+      document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+    });
+  });
+
+  const diffContents = {
+    player: `<div class="diff-hunk">@@ -12,7 +12,11 @@ class PlayerEntity</div>
+      <div class="diff-line context"><span class="diff-gutter">12</span><span class="diff-sign"> </span>class PlayerEntity extends Entity {</div>
+      <div class="diff-line context"><span class="diff-gutter">13</span><span class="diff-sign"> </span>  constructor(x, y) {</div>
+      <div class="diff-line context"><span class="diff-gutter">14</span><span class="diff-sign"> </span>    super();</div>
+      <div class="diff-line add"><span class="diff-gutter"></span><span class="diff-sign">+</span>    this.health = new HealthComponent(100);</div>
+      <div class="diff-line add"><span class="diff-gutter"></span><span class="diff-sign">+</span>    this.health.on('change', () =&gt; {</div>
+      <div class="diff-line add"><span class="diff-gutter"></span><span class="diff-sign">+</span>      HUDManager.updateHealth(this.health);</div>
+      <div class="diff-line add"><span class="diff-gutter"></span><span class="diff-sign">+</span>    });</div>
+      <div class="diff-line context"><span class="diff-gutter">15</span><span class="diff-sign"> </span>    this.position = { x, y };</div>
+      <div class="diff-line context"><span class="diff-gutter">16</span><span class="diff-sign"> </span>    this.velocity = { x: 0, y: 0 };</div>
+      <div class="diff-line context"><span class="diff-gutter">17</span><span class="diff-sign"> </span>  }</div>
+      <div class="diff-hunk" style="margin-top:6px">@@ -44,3 +44,3 @@ update</div>
+      <div class="diff-line context"><span class="diff-gutter">44</span><span class="diff-sign"> </span>  update(dt) {</div>
+      <div class="diff-line remove"><span class="diff-gutter">45</span><span class="diff-sign">-</span>    this._applyPhysics(dt);</div>
+      <div class="diff-line add"><span class="diff-gutter"></span><span class="diff-sign">+</span>    if (!this.health.isDead()) this._applyPhysics(dt);</div>
+      <div class="diff-line context"><span class="diff-gutter">46</span><span class="diff-sign"> </span>    this._updateAnimation();</div>
+      <div class="diff-line context"><span class="diff-gutter">47</span><span class="diff-sign"> </span>  }</div>`,
+    hud: `<div class="diff-hunk">@@ -8,5 +8,12 @@ HUDManager</div>
+      <div class="diff-line context"><span class="diff-gutter"> 8</span><span class="diff-sign"> </span>class HUDManager {</div>
+      <div class="diff-line context"><span class="diff-gutter"> 9</span><span class="diff-sign"> </span>  constructor() {</div>
+      <div class="diff-line context"><span class="diff-gutter">10</span><span class="diff-sign"> </span>    this.healthBar = document.querySelector('#hud-health');</div>
+      <div class="diff-line add"><span class="diff-gutter"></span><span class="diff-sign">+</span>  }</div>
+      <div class="diff-line add"><span class="diff-gutter"></span><span class="diff-sign">+</span>  updateHealth(component) {</div>
+      <div class="diff-line add"><span class="diff-gutter"></span><span class="diff-sign">+</span>    const pct = component.hp / component.maxHp;</div>
+      <div class="diff-line add"><span class="diff-gutter"></span><span class="diff-sign">+</span>    this.healthBar.style.width = (pct * 100) + '%';</div>
+      <div class="diff-line add"><span class="diff-gutter"></span><span class="diff-sign">+</span>    this.healthBar.dataset.critical = pct &lt; 0.25;</div>
+      <div class="diff-line context"><span class="diff-gutter">11</span><span class="diff-sign"> </span>  }</div>
+      <div class="diff-line context"><span class="diff-gutter">12</span><span class="diff-sign"> </span>}</div>`,
+    health: `<div class="diff-hunk">@@ -0,0 +1,18 @@ new file</div>
+      <div class="diff-line add"><span class="diff-gutter"></span><span class="diff-sign">+</span>import { EventEmitter } from '../core/events.js';</div>
+      <div class="diff-line add"><span class="diff-gutter"></span><span class="diff-sign">+</span></div>
+      <div class="diff-line add"><span class="diff-gutter"></span><span class="diff-sign">+</span>export class HealthComponent extends EventEmitter {</div>
+      <div class="diff-line add"><span class="diff-gutter"></span><span class="diff-sign">+</span>  constructor(maxHp) {</div>
+      <div class="diff-line add"><span class="diff-gutter"></span><span class="diff-sign">+</span>    super();</div>
+      <div class="diff-line add"><span class="diff-gutter"></span><span class="diff-sign">+</span>    this.maxHp = maxHp;</div>
+      <div class="diff-line add"><span class="diff-gutter"></span><span class="diff-sign">+</span>    this.hp = maxHp;</div>
+      <div class="diff-line add"><span class="diff-gutter"></span><span class="diff-sign">+</span>  }</div>
+      <div class="diff-line add"><span class="diff-gutter"></span><span class="diff-sign">+</span>  take(dmg) { this.hp = Math.max(0, this.hp - dmg); this.emit('change'); }</div>
+      <div class="diff-line add"><span class="diff-gutter"></span><span class="diff-sign">+</span>  heal(amt) { this.hp = Math.min(this.maxHp, this.hp + amt); this.emit('change'); }</div>
+      <div class="diff-line add"><span class="diff-gutter"></span><span class="diff-sign">+</span>  isDead() { return this.hp &lt;= 0; }</div>
+      <div class="diff-line add"><span class="diff-gutter"></span><span class="diff-sign">+</span>}`
+  };
+
+  const fileNames = { player: 'src/entities/player.js', hud: 'src/ui/hud.js', health: 'src/components/health.js' };
+
+  document.querySelectorAll('.diff-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.diff-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const key = tab.dataset.file;
+      document.getElementById('diffContent').innerHTML = diffContents[key];
+      document.getElementById('diffFileName').textContent = fileNames[key];
+    });
+  });
+
+  document.getElementById('approveBtn').addEventListener('click', function() {
+    this.textContent = 'applied ✓';
+    this.style.background = 'oklch(70% 0.17 145)';
+    this.style.borderColor = 'oklch(70% 0.17 145)';
+    this.disabled = true;
+    const msgs = document.querySelector('.messages');
+    const confirm = document.createElement('div');
+    confirm.className = 'msg';
+    confirm.innerHTML = `<div class="msg-meta"><span class="author forge">forge</span><span>14:22:11</span></div>
+      <div class="msg-body" style="color:var(--green)">3 files written. Backups at .brightforge-backup. Git checkpoint created.</div>`;
+    msgs.appendChild(confirm);
+    msgs.scrollTop = msgs.scrollHeight;
+  });
+</script>
+</body>
+</html>

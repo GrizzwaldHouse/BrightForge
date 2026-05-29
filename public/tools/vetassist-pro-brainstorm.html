@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<!--
+  VetAssist Pro — Accreditation-Gated Companion App Brainstorm Wizard
+  Developer: Marcus Daley  |  Date: 2026-04-28
+  Generated from: public/tools/brainstorm-template.html
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VetAssist Pro Brainstorm</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    button { font-family: inherit; cursor: pointer; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #1E2D42; border-radius: 3px; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    .fade-up { animation: fadeUp 0.22s ease-out both; }
+    .fade-in { animation: fadeIn 0.18s ease-out both; }
+    .dot-track { display: flex; gap: 5px; align-items: center; }
+    .dot { height: 6px; border-radius: 3px; transition: width 0.25s ease, background 0.2s; }
+    .section-tabs { display: flex; overflow-x: auto; scrollbar-width: none; }
+    .section-tabs::-webkit-scrollbar { display: none; }
+    .section-tab { padding: 10px 18px; font-size: 12px; white-space: nowrap; transition: color 0.15s, border-color 0.15s; cursor: default; user-select: none; }
+    .opt-pill { display: block; width: 100%; text-align: left; border-radius: 10px; padding: 12px 16px; margin-bottom: 8px; transition: background 0.12s, border-color 0.12s; }
+    .opt-pill:hover { cursor: pointer; }
+    .opt-indicator { width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px; display: flex; align-items: center; justify-content: center; transition: background 0.12s, border-color 0.12s; }
+    .summary-answer-row { display: flex; gap: 8px; margin-bottom: 6px; align-items: flex-start; }
+  </style>
+</head>
+<body>
+
+<script>
+const BRAINSTORM_DATA = {
+  meta: {
+    title:          'VetAssist Pro Brainstorm',
+    subtitle:       'VETASSIST PRO // ACCREDITATION-GATED COMPANION APP',
+    badge:          'VA PRO',
+    exportFilename: 'vetassist-pro-answers',
+    nextStepTitle:  'Next Step: Generate Dual-App Build Plan',
+    nextStepBody:   'Share these answers and I will generate a unified Claude Code build plan covering both VetAssist (free, ships now) and VetAssist Pro (accredited, feature-flag launches Month 3). The plan will include subagent architecture, shared monorepo structure, feature-flag gating logic, MVP feature lock for both tiers, sprint cadence aligned to your accreditation timeline, and a marketing pitch system that supports both tiers without undercutting the free tier.',
+  },
+
+  palette: {
+    bg:          '#080C14',
+    surface:     '#0E1520',
+    surfaceUp:   '#141E2E',
+    border:      '#1E2D42',
+    borderGlow:  '#2A4060',
+    accent:      '#6A4FA0',
+    accentLight: '#9B72D4',
+    accentDim:   '#3A2A60',
+    text:        '#D4DEEC',
+    textDim:     '#7A8FA8',
+    textFaint:   '#3A4D62',
+    white:       '#EEF4FF',
+    green:       '#1E9E5A',
+    greenLight:  '#2ECC7A',
+  },
+
+  sections: [
+    {
+      id: 'scope',
+      label: 'Pro-Tier Scope',
+      icon: '🎯',
+      color: '#C8962A',
+      questions: [
+        {
+          id: 'q1',
+          label: 'Q1',
+          text: 'When VetAssist Pro launches, what is the headline differentiator versus VetAssist (free)?',
+          sub: 'This is your marketing anchor and your legal positioning all at once.',
+          type: 'single',
+          options: [
+            { id: 'a', label: 'Personalized claim narrative review', desc: 'You as accredited rep review the veteran\'s specific facts and refine their narrative.' },
+            { id: 'b', label: 'Direct POA representation', desc: 'Veterans can file VA Form 21-22 designating you as their accredited rep through the app.' },
+            { id: 'c', label: 'Symptom-to-CFR specific analysis', desc: 'AI plus your accredited review identifies likely service-connected conditions for the specific veteran.' },
+            { id: 'd', label: 'All of the above as a Pro tier', desc: 'Full accredited service layer, priced as a single Pro subscription.' },
+          ],
+        },
+        {
+          id: 'q2',
+          label: 'Q2',
+          text: 'Which Pro features ship at launch (Month 3) versus Phase 2 (Month 6+)?',
+          sub: 'Select all you want at Month 3 launch; the rest defer to Phase 2.',
+          type: 'multi',
+          options: [
+            { id: 'a', label: 'Accredited narrative review queue', desc: 'Veterans submit, you review with AI assistance, return polished output.' },
+            { id: 'b', label: 'POA filing workflow (VA Form 21-22)', desc: 'In-app generation and submission with veteran\'s e-signature.' },
+            { id: 'c', label: 'Specific-fact symptom analysis', desc: 'AI generates personalized analysis, you sign off as accredited reviewer.' },
+            { id: 'd', label: 'Buddy statement coaching with named-author attribution', desc: 'Veterans get help refining their own buddy/lay statements.' },
+            { id: 'e', label: 'C-File review service', desc: 'Veterans upload C-File, you review with AI assist and identify gaps.' },
+            { id: 'f', label: 'NOD/appeal advisory (post-NOD only, claims agent track)', desc: 'Defers until claims agent accreditation issues at Month 6 to 12.' },
+            { id: 'g', label: 'Live consultation booking', desc: 'Veterans book direct video time with you for accredited representation.' },
+          ],
+        },
+        {
+          id: 'q3',
+          label: 'Q3',
+          text: 'Should VetAssist Pro be a separate app, a flag-gated tier inside VetAssist, or a parallel deployment?',
+          sub: 'This shapes your codebase, your billing, and your App Store strategy.',
+          type: 'single',
+          options: [
+            { id: 'a', label: 'Feature-flagged Pro tier inside VetAssist', desc: 'Single app, single codebase, Pro features unlock when veteran subscribes and you are accredited.' },
+            { id: 'b', label: 'Separate VetAssist Pro app', desc: 'Distinct App Store listing, distinct branding, shared backend services.' },
+            { id: 'c', label: 'Web-only Pro portal', desc: 'Pro tier is web-app only, mobile stays free tier.' },
+            { id: 'd', label: 'Hybrid: free mobile, Pro on web with mobile read-only access', desc: 'Mobile app is read-only for Pro features, full Pro experience on web.' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'fees',
+      label: 'Fees and Compliance',
+      icon: '💰',
+      color: '#1E8A7A',
+      questions: [
+        {
+          id: 'q4',
+          label: 'Q4',
+          text: 'How will you handle fees given § 5904 prohibits charging on initial claims?',
+          sub: 'This is the single most important business model decision for the Pro app.',
+          type: 'single',
+          options: [
+            { id: 'a', label: 'VSO model: zero fees, ever', desc: 'Pure pro bono representation; revenue from VetAssist free tier ads or donations only.' },
+            { id: 'b', label: 'Claims agent post-NOD only', desc: 'Free initial claim representation, fee agreement filed with OGC after NOD per § 5904.' },
+            { id: 'c', label: 'SaaS subscription separated from claim outcomes', desc: 'Veteran pays monthly for software access, never tied to claim results, never paid as percentage of past-due benefits.' },
+            { id: 'd', label: 'Hybrid: free representation + paid Pro software tier', desc: 'Representation always free under § 14.636, Pro subscription is for software features only.' },
+          ],
+        },
+        {
+          id: 'q5',
+          label: 'Q5',
+          text: 'Which compliance gates are absolute hard blockers before any Pro feature ships?',
+          sub: 'These cannot be deferred or worked around, only met.',
+          type: 'multi',
+          options: [
+            { id: 'a', label: 'VA accreditation letter from OGC in hand', desc: 'No specific-fact features ship until your OGC letter is filed in the codebase.' },
+            { id: 'b', label: 'California SB 694 Terms of Service block published', desc: 'Verbatim disclosure language, never collect VA.gov credentials, predatory contract clause.' },
+            { id: 'c', label: 'VA-benefits counsel sign-off on Pro fee structure', desc: 'Written legal memo confirming compliance with § 5904 and § 5905.' },
+            { id: 'd', label: 'OGC fee agreement template approved and on file', desc: 'If charging post-NOD, agreement filed with OGC within 30 days per § 14.636.' },
+            { id: 'e', label: 'Errors and Omissions insurance policy active', desc: 'Professional liability coverage before representing any veteran.' },
+            { id: 'f', label: 'POA workflow legal review', desc: '21-22 generation flow audited by counsel for accuracy and consent capture.' },
+            { id: 'g', label: 'CLE compliance tracking automated', desc: '3 hours within 12 months of accreditation, reminder system enforced.' },
+          ],
+        },
+        {
+          id: 'q6',
+          label: 'Q6',
+          text: 'What pricing model fits Pro-tier veterans realistically?',
+          sub: 'Veterans are price-sensitive, but you have real costs to cover.',
+          type: 'single',
+          options: [
+            { id: 'a', label: 'Free for all Pro features', desc: 'Funded entirely through grants, donations, fiscal sponsorship; mission-first.' },
+            { id: 'b', label: 'Sliding-scale donation model', desc: 'Suggested $9 to $29/month, veterans pay what they can, never gated.' },
+            { id: 'c', label: 'Flat $19/month Pro subscription', desc: 'Standard SaaS pricing, software access only, never tied to claim outcomes.' },
+            { id: 'd', label: 'Free for veterans, paid for VSO partners', desc: 'VSOs pay for staff licenses, individual veterans always free.' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'workflow',
+      label: 'Accredited Workflow',
+      icon: '🎖️',
+      color: '#6A4FA0',
+      questions: [
+        {
+          id: 'q7',
+          label: 'Q7',
+          text: 'How will the AI-plus-accredited-reviewer workflow function operationally?',
+          sub: 'This is the central differentiator: AI does the heavy lifting, you sign off.',
+          type: 'single',
+          options: [
+            { id: 'a', label: 'AI generates draft, you review every output before delivery', desc: 'Highest quality, slowest scaling; you are the bottleneck.' },
+            { id: 'b', label: 'AI generates, you spot-check sample, full review only on flagged outputs', desc: 'Faster scaling, AI confidence scoring routes to your queue.' },
+            { id: 'c', label: 'AI generates with structured confidence levels, veteran sees \'pending review\' until you sign off', desc: 'Transparent process, veteran knows when it\'s accredited vs AI-only.' },
+            { id: 'd', label: 'Tiered: free AI-only outputs, Pro = full accredited review', desc: 'Free tier is informational only, Pro tier is reviewed and accredited.' },
+          ],
+        },
+        {
+          id: 'q8',
+          label: 'Q8',
+          text: 'How do veterans share their service record and C-File with VetAssist Pro?',
+          sub: 'SB 694 criminalizes credential sharing, so the upload workflow must be airtight.',
+          type: 'multi',
+          options: [
+            { id: 'a', label: 'Direct PDF upload of veteran-downloaded C-File', desc: 'Veteran downloads from VA.gov themselves, uploads to Pro app, never shares login.' },
+            { id: 'b', label: 'VA Form 21-22 POA grants you VA-side access', desc: 'Once you\'re their rep, you access VBMS through your accredited credentials, not theirs.' },
+            { id: 'c', label: 'Lighthouse Veteran Health API with veteran OAuth', desc: 'Veteran OAuths their own access, app never sees credentials, fully consent-based.' },
+            { id: 'd', label: 'Manual data entry from veteran\'s records', desc: 'Lowest tech, highest friction, fully compliant with no credential risk.' },
+            { id: 'e', label: 'Hybrid based on veteran tech comfort', desc: 'Older veterans use manual entry, younger use Lighthouse OAuth.' },
+          ],
+        },
+        {
+          id: 'q9',
+          label: 'Q9',
+          text: 'How do you scale your time as the accredited reviewer without becoming the bottleneck?',
+          sub: 'You are one person. Pro tier success will create demand you cannot personally serve.',
+          type: 'single',
+          options: [
+            { id: 'a', label: 'Recruit other accredited reps to join the platform', desc: 'VetAssist Pro becomes a marketplace of accredited reps, you\'re one of many.' },
+            { id: 'b', label: 'Cap Pro tier at sustainable user count', desc: 'Only accept veterans you can personally review, waitlist beyond capacity.' },
+            { id: 'c', label: 'Partner with one VSO for overflow capacity', desc: 'DAV or VFW chapter handles overflow under partnership agreement.' },
+            { id: 'd', label: 'Build AI-first review process where you only review high-stakes', desc: 'AI handles 80% with veteran self-service, you review high-impact 20%.' },
+          ],
+        },
+        {
+          id: 'q10',
+          label: 'Q10',
+          text: 'How should the POA workflow (VA Form 21-22) work in the app?',
+          sub: 'POA is the bridge from informational to representational; design matters.',
+          type: 'single',
+          options: [
+            { id: 'a', label: 'In-app generation with e-signature, manual upload to VA', desc: 'Veteran signs in app, you submit through VA.gov accredited rep portal manually.' },
+            { id: 'b', label: 'In-app generation with VA Lighthouse direct submission', desc: 'If/when Lighthouse adds POA submission API, fully automated.' },
+            { id: 'c', label: 'Generate PDF only, veteran handles all submission themselves', desc: 'Lowest liability, highest friction, veteran controls submission entirely.' },
+            { id: 'd', label: 'Defer POA to Phase 2', desc: 'Launch Pro with review-only services, add POA in Month 6+.' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'launch',
+      label: 'Launch and Risk',
+      icon: '🚀',
+      color: '#E74C3C',
+      questions: [
+        {
+          id: 'q11',
+          label: 'Q11',
+          text: 'What is the Pro tier MVP feature lock at Month 3 launch?',
+          sub: 'Hard scope ceiling so Claude Code and your subagents have a clear stop condition.',
+          type: 'multi',
+          options: [
+            { id: 'a', label: 'SHIP: Accredited narrative review queue', desc: 'Core Pro feature, AI drafts and you sign off.' },
+            { id: 'b', label: 'SHIP: Specific-fact symptom analysis', desc: 'Personalized symptom-to-CFR analysis with your accredited review.' },
+            { id: 'c', label: 'SHIP: Pro tier billing infrastructure', desc: 'Stripe subscription, OGC-compliant fee documentation.' },
+            { id: 'd', label: 'SHIP: VA Form 21-22 generation (PDF only)', desc: 'Generation only; submission deferred to Phase 2.' },
+            { id: 'e', label: 'DEFER: Live video consultation', desc: 'Phase 2, requires HIPAA-grade infrastructure.' },
+            { id: 'f', label: 'DEFER: NOD/appeal advisory', desc: 'Defers until claims agent accreditation issues.' },
+            { id: 'g', label: 'DEFER: Multi-rep marketplace', desc: 'Phase 3 once Pro is validated with you alone.' },
+          ],
+        },
+        {
+          id: 'q12',
+          label: 'Q12',
+          text: 'What kicks off the Pro tier soft launch?',
+          sub: 'Triggering event that flips the feature flag and starts onboarding.',
+          type: 'single',
+          options: [
+            { id: 'a', label: 'OGC accreditation letter received', desc: 'Letter arrives, immediately flip flag, soft launch within 7 days.' },
+            { id: 'b', label: 'OGC letter + counsel sign-off + E&O insurance active', desc: 'All three gates met, more conservative trigger.' },
+            { id: 'c', label: 'Closed beta with 5 to 10 veterans first', desc: 'Validate workflow with controlled cohort before broader launch.' },
+            { id: 'd', label: 'VSO partnership confirmed', desc: 'Wait for partnership agreement before launching Pro independently.' },
+          ],
+        },
+        {
+          id: 'q13',
+          label: 'Q13',
+          text: 'Which veterans get first access to Pro tier?',
+          sub: 'Same beta strategy question as MVP, but now post-accreditation stakes are higher.',
+          type: 'single',
+          options: [
+            { id: 'a', label: 'Existing VetAssist free tier waitlist', desc: 'Veterans who self-selected for advanced features get first invite.' },
+            { id: 'b', label: 'Closed referral from your DAV chapter', desc: 'Sponsor org refers veterans they trust to your accredited service.' },
+            { id: 'c', label: '5 to 10 hand-picked veterans', desc: 'You personally select first cohort for highest control.' },
+            { id: 'd', label: 'Higher Heroes network referrals', desc: 'Veterans referred through your existing professional network.' },
+          ],
+        },
+        {
+          id: 'q14',
+          label: 'Q14',
+          text: 'What is the failure-mode response if a Pro veteran\'s claim gets denied?',
+          sub: 'This will happen. The system needs a defined response that protects you legally and supports the veteran.',
+          type: 'multi',
+          options: [
+            { id: 'a', label: 'Built-in NOD workflow once you\'re claims agent accredited', desc: 'Veteran can immediately appeal through Pro app with you as advocate.' },
+            { id: 'b', label: 'Refer to VSO for appeals support', desc: 'DAV/VFW/Legion appeals NSO handles, you stay in advisor role.' },
+            { id: 'c', label: 'Refer to VA-accredited attorney for high-value appeals', desc: 'Cases with significant past-due benefits go to attorney for fee-eligible representation.' },
+            { id: 'd', label: 'Free post-denial review session', desc: 'You review denial reasons with veteran at no cost, identify next steps.' },
+            { id: 'e', label: 'Refund Pro subscription fees if veteran chooses to leave', desc: 'No-fault exit, never gate veteran\'s records or future access.' },
+          ],
+        },
+        {
+          id: 'q15',
+          label: 'Q15',
+          text: 'How do you communicate the difference between VetAssist (free) and VetAssist Pro publicly?',
+          sub: 'Wrong messaging here triggers SB 694 / FTC concerns or undercuts free tier value.',
+          type: 'multi',
+          options: [
+            { id: 'a', label: 'Clear feature comparison table on marketing site', desc: 'Side-by-side, transparent, free tier remains genuinely valuable.' },
+            { id: 'b', label: 'Pro is \'optional accredited representation\'', desc: 'Frames Pro as available service, not necessary upgrade.' },
+            { id: 'c', label: 'Free tier always recommended first, Pro for veterans needing personal advocate', desc: 'Funnel design intentionally directs most veterans to free.' },
+            { id: 'd', label: 'Veteran testimonials of free tier success', desc: 'Marketing emphasizes free tier outcomes, not Pro tier conversions.' },
+            { id: 'e', label: 'Founder story: free was built first because it had to be', desc: 'Personal narrative makes clear Pro is a service offering, not a paywall.' },
+            { id: 'f', label: 'Always link to free VSO alternatives even on Pro pages', desc: 'Required by SB 694 spirit, also builds trust.' },
+          ],
+        },
+      ],
+    },
+  ],
+};
+</script>
+
+<!-- Engine — identical to brainstorm-template.html -->
+<script type="module">
+import { h, render } from 'https://esm.sh/preact@10';
+import { useState, useEffect } from 'https://esm.sh/preact@10/hooks';
+import { html } from 'https://esm.sh/htm@3/preact';
+
+const D = BRAINSTORM_DATA;
+const P = D.palette;
+
+const ALL_Q = D.sections.flatMap(s =>
+  s.questions.map(q => ({ ...q, sectionId: s.id, sectionColor: s.color, sectionLabel: s.label, sectionIcon: s.icon }))
+);
+
+function OptionPill({ option, selected, onToggle, color, multi }) {
+  const [hover, setHover] = useState(false);
+  const bg     = selected ? color + '22' : hover ? P.surfaceUp : 'transparent';
+  const border = `1.5px solid ${selected ? color : hover ? P.borderGlow : P.border}`;
+  const indBg  = selected ? color : 'transparent';
+  const indBdr = `2px solid ${selected ? color : P.textFaint}`;
+  const radius = multi ? 4 : 9;
+
+  return html`
+    <button
+      class="opt-pill"
+      style=${{ background: bg, border, transition: 'all 0.12s' }}
+      onMouseEnter=${() => setHover(true)}
+      onMouseLeave=${() => setHover(false)}
+      onClick=${onToggle}
+    >
+      <div style=${{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+        <div class="opt-indicator" style=${{ borderRadius: radius, border: indBdr, background: indBg }}>
+          ${selected && html`<span style=${{ color: P.bg, fontSize: 11, fontWeight: 900, lineHeight: 1 }}>${multi ? '✓' : '•'}</span>`}
+        </div>
+        <div style=${{ flex: 1 }}>
+          <div style=${{ color: selected ? P.white : P.text, fontWeight: 600, fontSize: 14, lineHeight: 1.3 }}>${option.label}</div>
+          <div style=${{ color: selected ? color + 'cc' : P.textDim, fontSize: 12, marginTop: 3, lineHeight: 1.5 }}>${option.desc}</div>
+        </div>
+      </div>
+    </button>
+  `;
+}
+
+function SummaryView({ answers, onReset }) {
+  const [copied, setCopied] = useState(false);
+
+  const buildText = () => {
+    let t = `${D.meta.title.toUpperCase()} — RESPONSES\nCaptured: ${new Date().toLocaleDateString()}\n\n`;
+    D.sections.forEach(sec => {
+      t += `${sec.label.toUpperCase()}\n${'─'.repeat(40)}\n`;
+      sec.questions.forEach(q => {
+        const sel = answers[q.id] || [];
+        t += `${q.text}\n`;
+        if (!sel.length) { t += '  (no selection)\n'; }
+        else sel.forEach(id => {
+          const o = q.options.find(o => o.id === id);
+          if (o) t += `  [x] ${o.label}: ${o.desc}\n`;
+        });
+        t += '\n';
+      });
+    });
+    return t;
+  };
+
+  const buildJSON = () => {
+    const out = {};
+    D.sections.forEach(sec => {
+      out[sec.id] = {};
+      sec.questions.forEach(q => {
+        const sel = answers[q.id] || [];
+        out[sec.id][q.id] = sel.map(id => {
+          const o = q.options.find(o => o.id === id);
+          return o ? { id, label: o.label, desc: o.desc } : { id };
+        });
+      });
+    });
+    return JSON.stringify({ meta: { title: D.meta.title, capturedAt: new Date().toISOString() }, answers: out }, null, 2);
+  };
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(buildText()).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const handleExport = () => {
+    const blob = new Blob([buildJSON()], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${D.meta.exportFilename}-${Date.now()}.json`;
+    a.click();
+  };
+
+  const answeredCount = ALL_Q.filter(q => (answers[q.id] || []).length > 0).length;
+
+  return html`
+    <div class="fade-in" style=${{ background: P.bg, minHeight: '100vh' }}>
+      <div style=${{ background: \`linear-gradient(135deg, ${P.surface}, ${P.surfaceUp})\`, borderBottom: \`1px solid ${P.border}\`, padding: '32px 28px 24px', textAlign: 'center' }}>
+        <div style=${{ fontSize: 48, marginBottom: 8 }}>🎖️</div>
+        <div style=${{ color: P.accentLight, fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: 3, marginBottom: 8 }}>PRO TIER PLANNING COMPLETE</div>
+        <div style=${{ color: P.white, fontSize: 24, fontWeight: 700, fontFamily: 'Playfair Display, serif', marginBottom: 6 }}>${D.meta.title}</div>
+        <div style=${{ color: P.textDim, fontSize: 13 }}>${answeredCount} of ${ALL_Q.length} questions answered. Ready to generate the dual-app build plan.</div>
+        <div style=${{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 16, flexWrap: 'wrap' }}>
+          <button onClick=${handleCopy} style=${{ background: P.accent, color: P.white, border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 13, fontWeight: 700 }}>${copied ? 'Copied!' : 'Copy as Text'}</button>
+          <button onClick=${handleExport} style=${{ background: P.surfaceUp, color: P.text, border: \`1px solid ${P.border}\`, borderRadius: 8, padding: '10px 20px', fontSize: 13, fontWeight: 600 }}>Export JSON</button>
+          <button onClick=${onReset} style=${{ background: 'transparent', color: P.textDim, border: \`1px solid ${P.border}\`, borderRadius: 8, padding: '10px 20px', fontSize: 13 }}>Start Over</button>
+        </div>
+      </div>
+
+      <div style=${{ maxWidth: 740, margin: '0 auto', padding: '24px 20px 60px' }}>
+        ${D.sections.map(sec => html`
+          <div key=${sec.id} style=${{ marginBottom: 28 }}>
+            <div style=${{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <span style=${{ fontSize: 18 }}>${sec.icon}</span>
+              <div style=${{ color: sec.color, fontWeight: 700, fontSize: 13, fontFamily: 'JetBrains Mono, monospace', letterSpacing: 1 }}>${sec.label.toUpperCase()}</div>
+            </div>
+            ${sec.questions.map(q => {
+              const sel = answers[q.id] || [];
+              return html`
+                <div key=${q.id} style=${{ background: P.surface, border: \`1px solid ${P.border}\`, borderRadius: 10, padding: '14px 16px', marginBottom: 10 }}>
+                  <div style=${{ color: P.textDim, fontSize: 11, fontFamily: 'JetBrains Mono, monospace', marginBottom: 4 }}>${q.label}</div>
+                  <div style=${{ color: P.text, fontSize: 13, marginBottom: sel.length ? 10 : 0, fontWeight: 500 }}>${q.text}</div>
+                  ${!sel.length
+                    ? html`<div style=${{ color: P.textFaint, fontSize: 12, fontStyle: 'italic' }}>No selection</div>`
+                    : sel.map(id => {
+                        const o = q.options.find(o => o.id === id);
+                        return o ? html`
+                          <div key=${id} class="summary-answer-row">
+                            <span style=${{ color: sec.color, fontSize: 13, marginTop: 1 }}>+</span>
+                            <div>
+                              <span style=${{ color: P.white, fontSize: 13, fontWeight: 600 }}>${o.label}</span>
+                              <span style=${{ color: P.textDim, fontSize: 12 }}> — ${o.desc}</span>
+                            </div>
+                          </div>
+                        ` : null;
+                      })
+                  }
+                </div>
+              `;
+            })}
+          </div>
+        `)}
+        <div style=${{ background: P.accent + '18', border: \`1px solid ${P.accent}44\`, borderRadius: 10, padding: '16px 18px', marginTop: 8 }}>
+          <div style=${{ color: P.accentLight, fontWeight: 700, fontSize: 13, marginBottom: 8 }}>${D.meta.nextStepTitle}</div>
+          <div style=${{ color: P.textDim, fontSize: 13, lineHeight: 1.6 }}>${D.meta.nextStepBody}</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function WizardView() {
+  const [currentQ, setCurrentQ]      = useState(0);
+  const [answers, setAnswers]         = useState({});
+  const [showSummary, setShowSummary] = useState(false);
+  const [animKey, setAnimKey]         = useState(0);
+
+  const q       = ALL_Q[currentQ];
+  const isMulti = q?.type === 'multi';
+  const sel     = answers[q?.id] || [];
+  const sec     = D.sections.find(s => s.id === q?.sectionId);
+  const progress = currentQ / ALL_Q.length * 100;
+  const canNext  = sel.length > 0;
+
+  useEffect(() => {
+    document.body.style.background = P.bg;
+    document.title = D.meta.title;
+  }, []);
+
+  const toggle = id => {
+    const prev = answers[q.id] || [];
+    const next = isMulti
+      ? (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+      : [id];
+    setAnswers({ ...answers, [q.id]: next });
+  };
+
+  const go = delta => {
+    if (delta > 0 && !canNext) return;
+    const next = currentQ + delta;
+    if (next < 0) return;
+    setAnimKey(k => k + 1);
+    setTimeout(() => {
+      if (delta > 0 && currentQ === ALL_Q.length - 1) { setShowSummary(true); }
+      else { setCurrentQ(next); }
+    }, 160);
+  };
+
+  const handleKeyDown = e => {
+    if (e.key === 'ArrowRight' || e.key === 'Enter') go(1);
+    if (e.key === 'ArrowLeft') go(-1);
+  };
+
+  if (showSummary) {
+    return html`<${SummaryView} answers=${answers} onReset=${() => { setAnswers({}); setCurrentQ(0); setShowSummary(false); setAnimKey(k => k+1); }} />`;
+  }
+
+  return html`
+    <div style=${{ background: P.bg, minHeight: '100vh' }} tabIndex=${0} onKeyDown=${handleKeyDown}>
+      <div style=${{ background: P.surface, borderBottom: \`1px solid ${P.border}\`, padding: '14px 24px', display: 'flex', alignItems: 'center', gap: 16, position: 'sticky', top: 0, zIndex: 10 }}>
+        <div style=${{ background: \`linear-gradient(135deg, ${P.accent}, ${P.accentLight})\`, color: P.white, borderRadius: 6, padding: '5px 10px', fontSize: 12, fontWeight: 900, fontFamily: 'JetBrains Mono, monospace', letterSpacing: 1, flexShrink: 0 }}>${D.meta.badge}</div>
+        <div style=${{ flex: 1, minWidth: 0 }}>
+          <div style=${{ color: P.accentLight, fontSize: 10, fontFamily: 'JetBrains Mono, monospace', letterSpacing: 2, marginBottom: 4 }}>${D.meta.subtitle}</div>
+          <div style=${{ background: P.surfaceUp, borderRadius: 4, height: 4, overflow: 'hidden' }}>
+            <div style=${{ background: \`linear-gradient(90deg, ${sec?.color || P.accent}, ${P.accentLight})\`, height: '100%', width: \`${progress}%\`, borderRadius: 4, transition: 'width 0.3s ease' }} />
+          </div>
+        </div>
+        <div style=${{ color: P.textDim, fontFamily: 'JetBrains Mono, monospace', fontSize: 12, flexShrink: 0 }}>${currentQ + 1} / ${ALL_Q.length}</div>
+      </div>
+
+      <div class="section-tabs" style=${{ background: P.surfaceUp, borderBottom: \`1px solid ${P.border}\` }}>
+        ${D.sections.map(s => {
+          const qIdxs = ALL_Q.map((qq, i) => qq.sectionId === s.id ? i : -1).filter(i => i >= 0);
+          const isActive = qIdxs.includes(currentQ);
+          const isDone   = qIdxs.every(i => i < currentQ);
+          return html`
+            <div key=${s.id} class="section-tab" style=${{ borderBottom: \`2px solid ${isActive ? s.color : 'transparent'}\`, color: isActive ? s.color : isDone ? P.textDim : P.textFaint, fontWeight: isActive ? 700 : 400 }}>
+              ${s.icon} ${s.label}${isDone && html`<span style=${{ marginLeft: 6, color: P.greenLight }}>✓</span>`}
+            </div>
+          `;
+        })}
+      </div>
+
+      <div style=${{ maxWidth: 680, margin: '0 auto', padding: '32px 20px 24px' }}>
+        <div key=${animKey} class="fade-up">
+          <div style=${{ marginBottom: 24 }}>
+            <div style=${{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <span style=${{ background: (sec?.color || P.accent) + '22', color: sec?.color || P.accent, border: \`1px solid ${(sec?.color || P.accent) + '44'}\`, borderRadius: 4, padding: '2px 8px', fontSize: 11, fontFamily: 'JetBrains Mono, monospace', fontWeight: 700 }}>${q?.label}</span>
+              <span style=${{ color: P.textFaint, fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}>${isMulti ? 'SELECT ALL THAT APPLY' : 'SELECT ONE'}</span>
+            </div>
+            <div style=${{ color: P.white, fontSize: 20, fontWeight: 700, fontFamily: 'Playfair Display, serif', lineHeight: 1.35, marginBottom: 6 }}>${q?.text}</div>
+            ${q?.sub && html`<div style=${{ color: P.textDim, fontSize: 13, lineHeight: 1.5 }}>${q.sub}</div>`}
+          </div>
+
+          <div>
+            ${q?.options.map(opt => html`
+              <${OptionPill} key=${opt.id} option=${opt} selected=${sel.includes(opt.id)} onToggle=${() => toggle(opt.id)} color=${sec?.color || P.accent} multi=${isMulti} />
+            `)}
+          </div>
+
+          <div style=${{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20 }}>
+            <button onClick=${() => go(-1)} disabled=${currentQ === 0} style=${{ background: 'transparent', border: \`1px solid ${currentQ === 0 ? P.textFaint + '44' : P.border}\`, color: currentQ === 0 ? P.textFaint : P.textDim, borderRadius: 8, padding: '10px 18px', fontSize: 13, opacity: currentQ === 0 ? 0.5 : 1, cursor: currentQ === 0 ? 'not-allowed' : 'pointer' }}>Back</button>
+
+            <div class="dot-track">
+              ${ALL_Q.map((_, i) => html`
+                <div key=${i} class="dot" style=${{ width: i === currentQ ? 20 : 6, background: i < currentQ ? P.greenLight : i === currentQ ? (sec?.color || P.accent) : P.textFaint + '44' }} />
+              `)}
+            </div>
+
+            <button onClick=${() => go(1)} disabled=${!canNext} style=${{ background: canNext ? \`linear-gradient(135deg, ${sec?.color || P.accent}, ${P.accentLight})\` : P.surfaceUp, color: canNext ? P.white : P.textFaint, border: 'none', borderRadius: 8, padding: '10px 22px', fontSize: 13, fontWeight: 700, opacity: canNext ? 1 : 0.5, cursor: canNext ? 'pointer' : 'not-allowed', transition: 'all 0.15s' }}>${currentQ === ALL_Q.length - 1 ? 'See Summary →' : 'Next →'}</button>
+          </div>
+
+          ${isMulti && html`<div style=${{ textAlign: 'center', marginTop: 10, color: P.textFaint, fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}>${sel.length} selected — choose as many as apply</div>`}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+render(html`<${WizardView} />`, document.getElementById('app'));
+</script>
+
+<div id="app"></div>
+</body>
+</html>
