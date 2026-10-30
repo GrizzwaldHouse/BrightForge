@@ -4,6 +4,7 @@
 // Purpose: Validate quest chain completability
 
 import db from '../database.js';
+import { isSelfTest } from '../../core/is-main-module.js';
 
 export class QuestSolver {
   solveQuests(prototypeId) {
@@ -95,7 +96,7 @@ const instance = new QuestSolver();
 export default instance;
 
 // Self-test
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('[QUEST-SOLVER] Self-test: Module loaded successfully');
   console.log('[QUEST-SOLVER] Note: Integration test requires database with prototype data');
 }

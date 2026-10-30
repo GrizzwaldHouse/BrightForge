@@ -19,6 +19,7 @@ import { existsSync, realpathSync } from 'fs';
 import { fileURLToPath } from 'url';
 import telemetryBus from '../core/telemetry-bus.js';
 import errorHandler from '../core/error-handler.js';
+import { isSelfTest } from '../core/is-main-module.js';
 
 // Deny-all: only these env keys are forwarded to child processes
 const SAFE_ENV_KEYS = new Set([
@@ -274,7 +275,7 @@ export { Sandbox };
 
 // --test block
 const __sbFilename = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] === __sbFilename) {
+if (isSelfTest(import.meta.url)) {
   console.log('\n[SANDBOX] Running self-test (P2 hardened)...\n');
 
   const { dirname: _dirname } = await import('path');

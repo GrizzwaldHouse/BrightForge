@@ -12,6 +12,7 @@ import { readFileSync, existsSync, readdirSync, statSync } from 'fs';
 import { parse as parseYaml } from 'yaml';
 import { fileURLToPath } from 'url';
 import { dirname, join, relative, extname } from 'path';
+import { isSelfTest } from './is-main-module.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -229,7 +230,7 @@ export default fileContext;
 export { FileContext };
 
 // CLI test
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('Testing File Context Scanner...\n');
 
   const testContext = new FileContext();

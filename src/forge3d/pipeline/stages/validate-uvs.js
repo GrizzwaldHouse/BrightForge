@@ -9,6 +9,7 @@
 import modelBridge from '../../model-bridge.js';
 import errorHandler from '../../../core/error-handler.js';
 import telemetryBus from '../../../core/telemetry-bus.js';
+import { isSelfTest } from '../../../core/is-main-module.js';
 
 /**
  * Validate UV coordinates stage handler.
@@ -145,7 +146,7 @@ export async function execute(context, stageConfig) {
 export const name = 'validate-uvs';
 
 // MINOR: Self-test block
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('[TEST] validate-uvs stage self-test');
   console.log('[TEST] ✓ Module loaded successfully');
   console.log('[TEST] ✓ execute function exported');

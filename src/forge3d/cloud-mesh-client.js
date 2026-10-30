@@ -9,8 +9,8 @@
  * @date March 5, 2026
  */
 
-import { fileURLToPath } from 'url';
 import telemetryBus from '../core/telemetry-bus.js';
+import { isSelfTest } from '../core/is-main-module.js';
 
 class CloudMeshClient {
   constructor() {
@@ -332,8 +332,7 @@ export default cloudMeshClient;
 export { CloudMeshClient };
 
 // --test block
-const __testFile = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(process.argv[1].split(/[\\/]/).pop())) {
+if (isSelfTest(import.meta.url)) {
   console.log('[CLOUD-MESH] Running self-test...');
 
   const client = new CloudMeshClient();

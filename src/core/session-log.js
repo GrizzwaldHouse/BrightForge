@@ -12,6 +12,7 @@ import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from 
 import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { isSelfTest } from './is-main-module.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -114,7 +115,7 @@ const logger = new SessionLog();
 export default logger;
 
 // CLI test
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('Testing SessionLog...\n');
 
   const { mkdtempSync, rmSync } = await import('fs');

@@ -84,6 +84,7 @@
     "test-recorder": "node src/agents/recorder-agent.js --test",
     "test-agents": "npm run test-planner && npm run test-builder && npm run test-tester && npm run test-reviewer && npm run test-survey && npm run test-recorder",
     "test-integration": "node src/tests/integration-suite.js",
+    "test-selftest-guard": "node src/tests/selftest-guard-check.js",
     "test-stability": "node src/tests/stability-run.js",
     "test-stability-quick": "node src/tests/stability-run.js --quick",
     "test-forge3d-e2e": "node src/tests/forge3d-e2e.js",

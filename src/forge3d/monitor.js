@@ -18,6 +18,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import forge3dConfig from './config-loader.js';
+import { isSelfTest, isMainRun } from '../core/is-main-module.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -225,8 +226,7 @@ export default forge3dMonitor;
 export { Forge3DMonitor };
 
 // --test block
-const __testFile = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(process.argv[1].split(/[\\/]/).pop())) {
+if (isSelfTest(import.meta.url)) {
   console.log('[MONITOR] Running self-test...');
 
   // Test constructor defaults
@@ -283,6 +283,6 @@ if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(pr
 }
 
 // Run as standalone script (not --test mode)
-if (!process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(process.argv[1].split(/[\\/]/).pop())) {
+if (isMainRun(import.meta.url)) {
   forge3dMonitor.start();
 }

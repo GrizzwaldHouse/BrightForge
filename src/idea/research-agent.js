@@ -6,8 +6,8 @@
 // to the ideas table via related_projects + missing_features columns.
 // Emits research_started and research_completed events.
 
-import { fileURLToPath } from 'url';
 import errorHandler from '../core/error-handler.js';
+import { isSelfTest } from '../core/is-main-module.js';
 
 const DEFAULT_MIN_PRIORITY = 'MID';
 const PRIORITY_RANK = { HIGH: 3, MID: 2, LOW: 1, SHINY_OBJECT: 0 };
@@ -193,8 +193,7 @@ class ResearchAgent {
 export { ResearchAgent };
 
 // Self-test block
-const __testFile = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(process.argv[1].split(/[\\/]/).pop())) {
+if (isSelfTest(import.meta.url)) {
   console.log('[IDEA-RESEARCH] Running self-tests...\n');
 
   const updates = [];

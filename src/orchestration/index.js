@@ -34,6 +34,7 @@ import { TaskState } from './task-state.js';
 import { SupervisorAgent } from './supervisor.js';
 import { HandoffProtocol } from './handoff.js';
 import errorHandler from '../core/error-handler.js';
+import { isSelfTest } from '../core/is-main-module.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -314,8 +315,7 @@ export { HandoffProtocol } from './handoff.js';
 export { HandoffError } from './handoff.js';
 
 // --test self-test block
-const __testFile = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(process.argv[1].split(/[/\\]/).pop())) {
+if (isSelfTest(import.meta.url)) {
   console.log('\n=== Orchestrator Facade Self-Test ===\n');
 
   // Note: This test requires the data layer modules (storage, event-bus, task-state) to exist.

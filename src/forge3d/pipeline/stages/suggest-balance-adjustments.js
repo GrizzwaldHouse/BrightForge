@@ -3,11 +3,11 @@
  * @date March 2026
  */
 
-import { fileURLToPath } from 'url';
 import telemetryBus from '../../../core/telemetry-bus.js';
 import errorHandler from '../../../core/error-handler.js';
 import balanceAnalyzer from '../../playtest/balance-analyzer.js';
 import forge3dDb from '../../database.js';
+import { isSelfTest } from '../../../core/is-main-module.js';
 
 const LOG_TAG = '[PLAYTEST]';
 
@@ -107,8 +107,7 @@ export async function execute(context, _stageConfig) {
 export const name = 'suggest-balance-adjustments';
 
 // --test block
-const __testFile = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(process.argv[1].split(/[\\/]/).pop())) {
+if (isSelfTest(import.meta.url)) {
   console.log(`${LOG_TAG} Running suggest-balance-adjustments self-test...`);
 
   // Test 1: Missing playtestReport → error

@@ -13,6 +13,7 @@ import { writeFileSync } from 'fs';
 import { join, resolve } from 'path';
 import { mkdirSync } from 'fs';
 import { tmpdir } from 'os';
+import { isSelfTest } from '../../../core/is-main-module.js';
 
 /**
  * Generate textures stage handler.
@@ -128,7 +129,7 @@ export async function execute(context, stageConfig) {
 export const name = 'generate-textures';
 
 // MINOR: Self-test block
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('[TEST] generate-textures stage self-test');
   console.log('[TEST] ✓ Module loaded successfully');
   console.log('[TEST] ✓ execute function exported');

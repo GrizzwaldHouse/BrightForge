@@ -33,6 +33,7 @@ import {
 } from 'fs';
 import telemetryBus from '../core/telemetry-bus.js';
 import errorHandler from '../core/error-handler.js';
+import { isSelfTest } from '../core/is-main-module.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -561,8 +562,7 @@ export default modelDownloader;
 export { ModelDownloader };
 
 // --test block (guarded so imports don't trigger it)
-const __testFile = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(process.argv[1].split(/[\\/]/).pop())) {
+if (isSelfTest(import.meta.url)) {
   console.log('[DOWNLOAD] Running self-test...\n');
 
   try {

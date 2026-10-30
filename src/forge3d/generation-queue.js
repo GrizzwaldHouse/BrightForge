@@ -28,6 +28,7 @@ import forge3dDb from './database.js';
 import forgeSession from './forge-session.js';
 import modelBridge from './model-bridge.js';
 import forge3dConfig from './config-loader.js';
+import { isSelfTest } from '../core/is-main-module.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -484,8 +485,7 @@ export default generationQueue;
 export { GenerationQueue };
 
 // --test block (guarded so imports don't trigger it)
-const __testFile = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(process.argv[1].split(/[\\/]/).pop())) {
+if (isSelfTest(import.meta.url)) {
   console.log('[QUEUE] Running self-test...');
 
   const queue = new GenerationQueue();

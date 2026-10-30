@@ -6,8 +6,8 @@
 // Persists the score to the ideas table and emits idea_scored /
 // idea_ranked events.
 
-import { fileURLToPath } from 'url';
 import errorHandler from '../core/error-handler.js';
+import { isSelfTest } from '../core/is-main-module.js';
 
 // Weights must sum to 1.0
 const DEFAULT_WEIGHTS = {
@@ -238,8 +238,7 @@ class IdeaScoring {
 export { IdeaScoring };
 
 // Self-test block
-const __testFile = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(process.argv[1].split(/[\\/]/).pop())) {
+if (isSelfTest(import.meta.url)) {
   console.log('[IDEA-SCORE] Running self-tests...\n');
 
   // Mock storage that captures updates in memory

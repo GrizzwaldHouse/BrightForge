@@ -5,6 +5,7 @@
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { readFileSync } from 'fs';
+import { isSelfTest } from '../core/is-main-module.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -88,7 +89,7 @@ export class BaseAgent {
 }
 
 // Self-test
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('Testing BaseAgent...\n');
 
   // Create a mock LLM client

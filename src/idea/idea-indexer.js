@@ -5,8 +5,8 @@
 // pairwise cross-linking. Embeddings are persisted as JSON strings.
 // Emits idea_indexed and idea_linked events.
 
-import { fileURLToPath } from 'url';
 import errorHandler from '../core/error-handler.js';
+import { isSelfTest } from '../core/is-main-module.js';
 
 const DEFAULT_OLLAMA_URL = 'http://127.0.0.1:11434';
 const DEFAULT_EMBEDDING_MODEL = 'nomic-embed-text';
@@ -265,8 +265,7 @@ class IdeaIndexer {
 export { IdeaIndexer, cosineSimilarity };
 
 // Self-test block
-const __testFile = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(process.argv[1].split(/[\\/]/).pop())) {
+if (isSelfTest(import.meta.url)) {
   console.log('[IDEA-INDEX] Running self-tests...\n');
 
   const updates = [];

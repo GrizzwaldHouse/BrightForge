@@ -22,6 +22,7 @@ import { EventEmitter } from 'events';
 import { randomUUID } from 'crypto';
 import { fileURLToPath } from 'url';
 import errorHandler from '../core/error-handler.js';
+import { isSelfTest } from '../core/is-main-module.js';
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -705,8 +706,7 @@ export default TaskState;
 export { TaskState, VALID_STATUSES, VALID_PHASES, VALID_AGENTS, VALID_TRANSITIONS };
 
 // Self-test block
-const __testFile = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(process.argv[1].split(/[\\/]/).pop())) {
+if (isSelfTest(import.meta.url)) {
   console.log('[TASK-STATE] Running self-tests...\n');
 
   // Mock storage

@@ -5,8 +5,8 @@
 // previously indexed ideas. Persists category, creates relationship
 // rows, and emits idea_classified / idea_duplicate events.
 
-import { fileURLToPath } from 'url';
 import errorHandler from '../core/error-handler.js';
+import { isSelfTest } from '../core/is-main-module.js';
 
 const ALLOWED_CATEGORIES = ['AI', 'Tooling', 'Product', 'Experimental', 'Game Dev', 'Infrastructure'];
 const DEFAULT_DUPLICATE_THRESHOLD = 0.92;
@@ -256,8 +256,7 @@ class IdeaClassifier {
 export { IdeaClassifier, cosineSimilarity, ALLOWED_CATEGORIES };
 
 // Self-test block
-const __testFile = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(process.argv[1].split(/[\\/]/).pop())) {
+if (isSelfTest(import.meta.url)) {
   console.log('[IDEA-CLASS] Running self-tests...\n');
 
   try {

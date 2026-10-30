@@ -3,12 +3,12 @@
  * @date March 2026
  */
 
-import { fileURLToPath } from 'url';
 import streamingLayout from '../../world/streaming-layout.js';
 import { WorldGraph } from '../../world/world-graph.js';
 import forge3dDb from '../../database.js';
 import telemetryBus from '../../../core/telemetry-bus.js';
 import errorHandler from '../../../core/error-handler.js';
+import { isSelfTest } from '../../../core/is-main-module.js';
 
 const LOG_TAG = '[WORLD]';
 
@@ -89,8 +89,7 @@ export async function execute(context, _stageConfig) {
 export const name = 'streaming-layout-stage';
 
 // --test block
-const __testFile = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(process.argv[1].split(/[\\/]/).pop())) {
+if (isSelfTest(import.meta.url)) {
   console.log('[TEST] streaming-layout-stage self-test');
 
   // Test: missing worldGraph returns error

@@ -21,13 +21,13 @@
 
 import { randomUUID } from 'crypto';
 import { EventEmitter } from 'events';
-import { fileURLToPath } from 'url';
 import telemetryBus from '../core/telemetry-bus.js';
 import modelBridge from './model-bridge.js';
 import universalMeshClient from './universal-mesh-client.js';
 import forge3dDb from './database.js';
 import forge3dConfig from './config-loader.js';
 import selfHealingOrchestrator from '../core/self-healing-orchestrator.js';
+import { isSelfTest } from '../core/is-main-module.js';
 
 const SESSION_STATES = {
   IDLE: 'idle',
@@ -513,8 +513,7 @@ export default forgeSession;
 export { ForgeSession, SESSION_STATES };
 
 // --test block (guarded so imports don't trigger it)
-const __testFile = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(process.argv[1].split(/[\\/]/).pop())) {
+if (isSelfTest(import.meta.url)) {
   console.log('[FORGE] Running self-test...');
 
   const fs = new ForgeSession();

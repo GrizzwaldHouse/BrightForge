@@ -3,11 +3,11 @@
  * @date March 2026
  */
 
-import { fileURLToPath } from 'url';
 import { SceneGraph } from '../../scene/scene-graph.js';
 import modelBridge from '../../model-bridge.js';
 import telemetryBus from '../../../core/telemetry-bus.js';
 import errorHandler from '../../../core/error-handler.js';
+import { isSelfTest } from '../../../core/is-main-module.js';
 
 const LOG_TAG = '[SCENE]';
 
@@ -80,8 +80,7 @@ export async function execute(context, _stageConfig) {
 export const name = 'assemble-scene';
 
 // --test block
-const __testFile = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(process.argv[1].split(/[\\/]/).pop())) {
+if (isSelfTest(import.meta.url)) {
   console.log('[TEST] assemble-scene stage self-test');
 
   // Test: missing sceneGraph returns error

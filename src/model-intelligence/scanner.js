@@ -31,6 +31,7 @@ import {
 } from './event-types.js';
 import telemetryBus from '../core/telemetry-bus.js';
 import errorHandler from '../core/error-handler.js';
+import { isSelfTest } from '../core/is-main-module.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -618,7 +619,7 @@ export { ModelScanner };
 export default scanner;
 
 // --test block
-if (process.argv.includes('--test') && process.argv[1]?.endsWith('scanner.js')) {
+if (isSelfTest(import.meta.url)) {
   console.log('Testing ModelScanner...\n');
 
   try {

@@ -12,6 +12,7 @@ import { EventEmitter } from 'events';
 import { randomUUID } from 'crypto';
 import telemetryBus from '../core/telemetry-bus.js';
 import errorHandler from '../core/error-handler.js';
+import { isSelfTest } from '../core/is-main-module.js';
 
 class BuilderAgent extends EventEmitter {
   constructor() {
@@ -175,7 +176,7 @@ export default builderAgent;
 export { BuilderAgent };
 
 // Self-test
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('Testing BuilderAgent...\n');
 
   try {

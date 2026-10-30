@@ -25,6 +25,7 @@ import forge3dDb from './database.js';
 import forge3dConfig from './config-loader.js';
 import modelBridge from './model-bridge.js';
 import { readFileSync, mkdirSync, existsSync, writeFileSync, unlinkSync, readdirSync, statSync, rmSync } from 'fs';
+import { isSelfTest } from '../core/is-main-module.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -320,8 +321,7 @@ export default projectManager;
 export { ProjectManager };
 
 // --test block (guarded so imports don't trigger it)
-const __testFile = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(process.argv[1].split(/[\\/]/).pop())) {
+if (isSelfTest(import.meta.url)) {
   console.log('[PROJECT] Running self-test...');
 
   const pm = new ProjectManager();

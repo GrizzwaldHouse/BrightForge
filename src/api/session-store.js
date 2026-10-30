@@ -1,3 +1,4 @@
+import { isSelfTest } from '../core/is-main-module.js';
 /**
  * SessionStore - In-memory session management
  *
@@ -91,7 +92,7 @@ export class SessionStore {
 export default SessionStore;
 
 // --test Block
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('Testing SessionStore...\n');
 
   try {

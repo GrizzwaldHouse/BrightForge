@@ -3,11 +3,11 @@
  * @date March 2026
  */
 
-import { fileURLToPath } from 'url';
 import interactionGenerator from '../../gameplay/interaction-generator.js';
 import forge3dDb from '../../database.js';
 import telemetryBus from '../../../core/telemetry-bus.js';
 import errorHandler from '../../../core/error-handler.js';
+import { isSelfTest } from '../../../core/is-main-module.js';
 
 const LOG_TAG = '[GAMEPLAY]';
 
@@ -99,8 +99,7 @@ export async function execute(context, _stageConfig) {
 export const name = 'generate-interactions';
 
 // --test block
-const __testFile = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(process.argv[1].split(/[\\/]/).pop())) {
+if (isSelfTest(import.meta.url)) {
   console.log('[TEST] generate-interactions stage self-test');
 
   // Test: missing npcs returns error

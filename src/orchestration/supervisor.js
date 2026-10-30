@@ -25,6 +25,7 @@
 import { randomUUID } from 'crypto';
 import { fileURLToPath } from 'url';
 import errorHandler from '../core/error-handler.js';
+import { isSelfTest } from '../core/is-main-module.js';
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -440,8 +441,7 @@ export default instance;
 export { SupervisorAgent };
 
 // --test self-test block
-const __testFile = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(process.argv[1].split(/[/\\]/).pop())) {
+if (isSelfTest(import.meta.url)) {
   console.log('\n=== SupervisorAgent Self-Test ===\n');
 
   // Mock storage and eventBus

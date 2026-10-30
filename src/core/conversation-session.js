@@ -21,6 +21,7 @@ import { SessionLog } from './session-log.js';
 import { MessageHistory } from './message-history.js';
 import { MultiStepPlanner } from './multi-step-planner.js';
 import { Terminal } from '../ui/terminal.js';
+import { isSelfTest } from './is-main-module.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -341,7 +342,7 @@ export class ConversationSession {
 export default ConversationSession;
 
 // CLI test
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('Testing ConversationSession...\n');
 
   const { mkdtempSync, rmSync } = await import('fs');

@@ -11,6 +11,7 @@
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join, extname } from 'path';
+import { isSelfTest } from './is-main-module.js';
 
 const MAX_CONVENTIONS = 50;
 const MAX_CORRECTIONS = 100;
@@ -268,7 +269,7 @@ export default projectMemory;
 export { ProjectMemory };
 
 // --test block
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('Testing ProjectMemory...\n');
 
   const { mkdtempSync, rmSync } = await import('fs');

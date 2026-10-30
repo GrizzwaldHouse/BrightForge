@@ -10,6 +10,7 @@ import { parse as parseYaml } from 'yaml';
 import llmClient from '../../core/llm-client.js';
 import errorHandler from '../../core/error-handler.js';
 import telemetryBus from '../../core/telemetry-bus.js';
+import { isSelfTest } from '../../core/is-main-module.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -193,8 +194,7 @@ export default npcGenerator;
 export { NPCGenerator, VALID_ROLES, VALID_BEHAVIORS };
 
 // --test block
-const __testFile = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(process.argv[1].split(/[\\/]/).pop())) {
+if (isSelfTest(import.meta.url)) {
   console.log(`${LOG_TAG} Running self-test...`);
   let passed = 0;
   let failed = 0;

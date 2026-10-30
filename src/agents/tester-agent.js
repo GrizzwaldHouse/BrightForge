@@ -14,6 +14,7 @@ import { existsSync } from 'fs';
 import telemetryBus from '../core/telemetry-bus.js';
 import errorHandler from '../core/error-handler.js';
 import sandbox from '../security/sandbox.js';
+import { isSelfTest } from '../core/is-main-module.js';
 
 class TesterAgent extends EventEmitter {
   constructor() {
@@ -238,7 +239,7 @@ export default testerAgent;
 export { TesterAgent };
 
 // Self-test
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('Testing TesterAgent...\n');
 
   try {

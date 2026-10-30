@@ -14,6 +14,7 @@ import { designEngine } from './design-engine.js';
 import pipelineDetector from './pipeline-detector.js';
 import telemetryBus from './telemetry-bus.js';
 import errorHandler from './error-handler.js';
+import { isSelfTest } from './is-main-module.js';
 
 class CreativePipeline extends EventEmitter {
   constructor(options = {}) {
@@ -287,7 +288,7 @@ export default creativePipeline;
 export { CreativePipeline };
 
 // --test block
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('Testing CreativePipeline...\n');
 
   try {

@@ -38,6 +38,7 @@ import { createHash } from 'crypto';
 import { execSync } from 'child_process';
 import telemetryBus from './telemetry-bus.js';
 import errorHandler from './error-handler.js';
+import { isSelfTest } from './is-main-module.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -739,7 +740,7 @@ export default skillOrchestrator;
 export { SkillOrchestrator };
 
 // Self-test block
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log(`${LOG_PREFIX} Running self-test...`);
 
   const testOrch = new SkillOrchestrator();

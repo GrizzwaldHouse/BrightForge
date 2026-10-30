@@ -4,6 +4,7 @@
 // Purpose: Analyze gameplay balance
 
 import db from '../database.js';
+import { isSelfTest } from '../../core/is-main-module.js';
 
 export class BalanceAnalyzer {
   analyze(prototypeId) {
@@ -53,6 +54,6 @@ const instance = new BalanceAnalyzer();
 export default instance;
 
 // Self-test
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('[BALANCE-ANALYZER] Self-test: Module loaded successfully');
 }

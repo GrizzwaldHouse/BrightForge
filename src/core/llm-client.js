@@ -16,6 +16,7 @@ import errorHandler from './error-handler.js';
 import telemetryBus from './telemetry-bus.js';
 import contextAdapter from './context-adapter.js';
 import selfHealingOrchestrator from './self-healing-orchestrator.js';
+import { isSelfTest } from './is-main-module.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -552,7 +553,7 @@ export default client;
 export { UniversalLLMClient };
 
 // CLI test
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('Testing LLM Client...\n');
 
   const testClient = new UniversalLLMClient();

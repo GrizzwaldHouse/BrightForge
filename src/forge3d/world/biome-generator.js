@@ -7,6 +7,7 @@ import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { parse as parseYaml } from 'yaml';
+import { isSelfTest } from '../../core/is-main-module.js';
 
 const LOG_TAG = '[BIOME]';
 
@@ -230,8 +231,7 @@ export default biomeGenerator;
 export { BiomeGenerator };
 
 // --test block
-const __testFile = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(process.argv[1].split(/[\\/]/).pop())) {
+if (isSelfTest(import.meta.url)) {
   console.log(`${LOG_TAG} Running self-test...`);
 
   const gen = new BiomeGenerator();

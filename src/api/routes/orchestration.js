@@ -5,6 +5,7 @@
 
 import express from 'express';
 import orchestrator from '../../orchestration/index.js';
+import { isSelfTest } from '../../core/is-main-module.js';
 
 function guardOrch(res) {
   if (!orchestrator || !orchestrator.initialized) {
@@ -170,7 +171,7 @@ export function createOrchestrationRoutes() {
 }
 
 // Self-test
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('[ORCH-ROUTES] Self-test: creating routes');
   const _router = createOrchestrationRoutes();
   console.log('[ORCH-ROUTES] ✓ Routes created successfully');

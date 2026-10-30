@@ -5,6 +5,7 @@
 
 import db from '../database.js';
 import questSolver from './quest-solver.js';
+import { isSelfTest } from '../../core/is-main-module.js';
 
 export class AgentSimulator {
   async simulate(prototypeId, iterations = 100) {
@@ -60,6 +61,6 @@ const instance = new AgentSimulator();
 export default instance;
 
 // Self-test
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('[AGENT-SIMULATOR] Self-test: Module loaded successfully');
 }

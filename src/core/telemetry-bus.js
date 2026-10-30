@@ -15,6 +15,7 @@
 
 import { EventEmitter } from 'events';
 import { randomUUID } from 'crypto';
+import { isSelfTest } from './is-main-module.js';
 
 class TelemetryBus extends EventEmitter {
   constructor() {
@@ -317,7 +318,7 @@ export { TelemetryBus, telemetryBus };
 export default telemetryBus;
 
 // --test block (only runs when this file is the direct entry point)
-if (process.argv.includes('--test') && process.argv[1]?.endsWith('telemetry-bus.js')) {
+if (isSelfTest(import.meta.url)) {
   console.log('Testing TelemetryBus...\n');
 
   try {

@@ -17,6 +17,7 @@ import errorHandler from '../core/error-handler.js';
 // the dependency is explicit; emit is wrapped in try/catch so reviewer
 // self-tests do not require a live orchestrator.
 import orchestrator from '../orchestration/index.js';
+import { isSelfTest } from '../core/is-main-module.js';
 
 class ReviewerAgent extends EventEmitter {
   constructor() {
@@ -288,7 +289,7 @@ export default reviewerAgent;
 export { ReviewerAgent };
 
 // Self-test
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('Testing ReviewerAgent...\n');
 
   try {

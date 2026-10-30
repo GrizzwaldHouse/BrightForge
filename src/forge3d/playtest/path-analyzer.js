@@ -4,6 +4,7 @@
 // Purpose: Validate world map connectivity
 
 import db from '../database.js';
+import { isSelfTest } from '../../core/is-main-module.js';
 
 export class PathAnalyzer {
   analyzeWorld(worldId) {
@@ -66,6 +67,6 @@ const instance = new PathAnalyzer();
 export default instance;
 
 // Self-test
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('[PATH-ANALYZER] Self-test: Module loaded successfully');
 }

@@ -21,6 +21,7 @@ import { fileURLToPath } from 'url';
 import failureClassifier from './failure-classifier.js';
 import telemetryBus from './telemetry-bus.js';
 import errorHandler from './error-handler.js';
+import { isSelfTest } from './is-main-module.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -264,7 +265,7 @@ export default selfHealingOrchestrator;
 export { SelfHealingOrchestrator };
 
 // --test block
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('\n[HEALING] Running self-test...\n');
 
   let passed = 0;

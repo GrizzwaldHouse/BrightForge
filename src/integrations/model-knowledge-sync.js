@@ -11,6 +11,7 @@ import { EventEmitter } from 'events';
 import firecrawlClient from './firecrawl-client.js';
 import telemetryBus from '../core/telemetry-bus.js';
 import errorHandler from '../core/error-handler.js';
+import { isSelfTest } from '../core/is-main-module.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -203,7 +204,7 @@ const modelKnowledgeSync = new ModelKnowledgeSync();
 export default modelKnowledgeSync;
 export { ModelKnowledgeSync };
 
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('[MODEL-SYNC] Running self-test...');
   const sync = new ModelKnowledgeSync();
   sync.init();

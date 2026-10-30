@@ -6,12 +6,12 @@
 // component and exposes high-level processIdea / runPipeline / search /
 // getStats methods.
 
-import { fileURLToPath } from 'url';
 import { IdeaIngestion } from './idea-ingestion.js';
 import { IdeaClassifier } from './idea-classifier.js';
 import { IdeaScoring } from './idea-scoring.js';
 import { ResearchAgent } from './research-agent.js';
 import { IdeaIndexer } from './idea-indexer.js';
+import { isSelfTest } from '../core/is-main-module.js';
 
 class IdeaIntelligence {
   // orchestrator: object exposing { storage, eventBus } (typically the
@@ -203,8 +203,7 @@ export {
 };
 
 // Self-test block
-const __testFile = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(process.argv[1].split(/[\\/]/).pop())) {
+if (isSelfTest(import.meta.url)) {
   console.log('[IDEA-INTEL] Running facade self-tests...\n');
 
   // In-memory storage emulation

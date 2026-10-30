@@ -27,6 +27,7 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { createStream } from 'rotating-file-stream';
 import telemetryBus from './telemetry-bus.js';
+import { isSelfTest } from './is-main-module.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -413,7 +414,7 @@ export { ErrorHandler, errorHandler };
 export default errorHandler;
 
 // --test block (only runs when this file is the direct entry point)
-if (process.argv.includes('--test') && process.argv[1]?.endsWith('error-handler.js')) {
+if (isSelfTest(import.meta.url)) {
   console.log('Testing ErrorHandler...\n');
 
   const { mkdtempSync, rmSync, readFileSync } = await import('fs');

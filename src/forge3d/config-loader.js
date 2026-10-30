@@ -13,6 +13,7 @@ import { readFileSync } from 'fs';
 import { parse as parseYaml } from 'yaml';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { isSelfTest } from '../core/is-main-module.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -224,8 +225,7 @@ export default forge3dConfig;
 export { Forge3DConfig };
 
 // --test block
-const __testFile = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(process.argv[1].split(/[\\/]/).pop())) {
+if (isSelfTest(import.meta.url)) {
   console.log('[CONFIG] Running self-test...');
 
   const cfg = new Forge3DConfig();

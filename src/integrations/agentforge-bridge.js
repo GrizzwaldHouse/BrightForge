@@ -19,6 +19,7 @@ import { dirname, join } from 'path';
 import { parse } from 'yaml';
 import telemetryBus from '../core/telemetry-bus.js';
 import errorHandler from '../core/error-handler.js';
+import { isSelfTest } from '../core/is-main-module.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -331,7 +332,7 @@ export { AgentForgeBridge };
 
 // ─── Self-test ────────────────────────────────────────────────────────────
 
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('[AGENTFORGE-BRIDGE] Running self-test...');
 
   // Test 1: init() with no config file (should not throw)

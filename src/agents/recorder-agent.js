@@ -12,6 +12,7 @@ import { EventEmitter } from 'events';
 import { randomUUID } from 'crypto';
 import telemetryBus from '../core/telemetry-bus.js';
 import errorHandler from '../core/error-handler.js';
+import { isSelfTest } from '../core/is-main-module.js';
 
 // Dynamic import for OBS WebSocket (optional dependency)
 let OBSWebSocket = null;
@@ -324,7 +325,7 @@ export default recorderAgent;
 export { RecorderAgent };
 
 // Self-test
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('Testing RecorderAgent...\n');
 
   try {

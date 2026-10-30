@@ -1,3 +1,4 @@
+import { isSelfTest } from './is-main-module.js';
 /**
  * PipelineDetector - Multi-domain prompt analysis
  *
@@ -152,7 +153,7 @@ export default pipelineDetector;
 export { PipelineDetector };
 
 // --test block
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('Testing PipelineDetector...\n');
 
   const detector = new PipelineDetector();

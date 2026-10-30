@@ -14,6 +14,7 @@ import { fileURLToPath } from 'url';
 import errorHandler from './error-handler.js';
 import telemetryBus from './telemetry-bus.js';
 import gitCheckpointer from './git-checkpointer.js';
+import { isSelfTest } from './is-main-module.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -242,7 +243,7 @@ const applier = new DiffApplier();
 export default applier;
 
 // CLI test
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('Testing DiffApplier...\n');
 
   const { mkdtempSync, rmSync } = await import('fs');

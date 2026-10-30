@@ -4,8 +4,11 @@
 // Purpose: Self-test suite for asset pipeline orchestration system
 
 import { fileURLToPath } from 'url';
+import { readdirSync } from 'fs';
+import { dirname, join } from 'path';
 import { AssetPipelineRunner } from './asset-pipeline-runner.js';
 import { getStageHandler, listHandlers } from './stages/index.js';
+import { isSelfTest } from '../../core/is-main-module.js';
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -28,7 +31,13 @@ async function runTests() {
   // Test 1: Stage registry
   console.log('Test 1: Stage handler registry');
   const handlers = listHandlers();
-  assertTest(handlers.length === 5, `5 handlers registered (got ${handlers.length})`);
+  const stageFiles = readdirSync(join(dirname(__filename), 'stages'))
+    .filter((name) => name.endsWith('.js') && name !== 'index.js')
+    .map((name) => name.replace(/\.js$/, ''));
+  // Stage files registered under a different handler name (see stages/index.js and asset-pipelines.yaml)
+  const HANDLER_ALIASES = { 'package-asset': 'package-game-asset' };
+  const unregistered = stageFiles.filter((name) => !handlers.includes(HANDLER_ALIASES[name] || name));
+  assertTest(unregistered.length === 0, `every stage file is registered (${handlers.length} handlers; missing: ${unregistered.join(', ') || 'none'})`);
   assertTest(handlers.includes('generate-mesh'), 'generate-mesh handler exists');
   assertTest(handlers.includes('optimize-mesh'), 'optimize-mesh handler exists');
   assertTest(handlers.includes('generate-lods'), 'generate-lods handler exists');
@@ -147,6 +156,6 @@ async function runTests() {
   process.exit(testFailed > 0 ? 1 : 0);
 }
 
-if (process.argv.includes('--test') && process.argv[1] && __filename.endsWith(process.argv[1].split(/[/\\]/).pop())) {
+if (isSelfTest(import.meta.url)) {
   runTests();
 }

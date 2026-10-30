@@ -11,6 +11,7 @@
 import { execSync } from 'child_process';
 import { existsSync } from 'fs';
 import { join } from 'path';
+import { isSelfTest } from './is-main-module.js';
 
 const COMMIT_PREFIX = 'brightforge:';
 const AUTHOR = 'BrightForge <noreply@brightforge.dev>';
@@ -266,7 +267,7 @@ export default gitCheckpointer;
 export { GitCheckpointer };
 
 // --test block
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('Testing GitCheckpointer...\n');
 
   const { mkdtempSync, writeFileSync, rmSync } = await import('fs');

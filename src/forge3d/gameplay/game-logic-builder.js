@@ -9,6 +9,7 @@ import { dirname, join } from 'path';
 import { parse as parseYaml } from 'yaml';
 import errorHandler from '../../core/error-handler.js';
 import telemetryBus from '../../core/telemetry-bus.js';
+import { isSelfTest } from '../../core/is-main-module.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -445,7 +446,7 @@ export default gameLogicBuilder;
 export { GameLogicBuilder, SUPPORTED_ENGINES };
 
 // Self-test block
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log(`${LOG_TAG} Running self-tests...`);
 
   const testNPC = {

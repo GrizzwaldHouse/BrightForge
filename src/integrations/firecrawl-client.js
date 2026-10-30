@@ -10,6 +10,7 @@ import { dirname, join } from 'path';
 import { parse } from 'yaml';
 import telemetryBus from '../core/telemetry-bus.js';
 import errorHandler from '../core/error-handler.js';
+import { isSelfTest } from '../core/is-main-module.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -168,7 +169,7 @@ const firecrawlClient = new FirecrawlClient();
 export default firecrawlClient;
 export { FirecrawlClient };
 
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('[FIRECRAWL] Running self-test...');
   const client = new FirecrawlClient();
   console.log('[FIRECRAWL] Config loaded:', client.enabled ? 'enabled' : 'disabled');

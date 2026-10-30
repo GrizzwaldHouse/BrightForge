@@ -10,6 +10,7 @@
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import telemetryBus from './telemetry-bus.js';
+import { isSelfTest } from './is-main-module.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -143,7 +144,7 @@ export default contextAdapter;
 export { ContextAdapter };
 
 // Self-test
-if (process.argv.includes('--test') && process.argv[1]?.endsWith('context-adapter.js')) {
+if (isSelfTest(import.meta.url)) {
   console.log('[CONTEXT] Running self-test...\n');
 
   const adapter = new ContextAdapter();

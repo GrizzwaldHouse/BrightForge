@@ -14,6 +14,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import errorHandler from './error-handler.js';
 import telemetryBus from './telemetry-bus.js';
+import { isSelfTest } from './is-main-module.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -502,7 +503,7 @@ export default imageClient;
 /**
  * Self-test
  */
-if (import.meta.url === `file://${process.argv[1]}` && process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   (async () => {
     console.log('\n=== Testing ImageClient ===\n');
 

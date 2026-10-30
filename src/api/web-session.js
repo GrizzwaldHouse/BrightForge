@@ -19,6 +19,7 @@ import { resolve, join as pathJoin, sep } from 'path';
 import errorHandler from '../core/error-handler.js';
 import telemetryBus from '../core/telemetry-bus.js';
 import planEngine from '../core/plan-engine.js';
+import { isSelfTest } from '../core/is-main-module.js';
 
 export class WebSession extends EventEmitter {
   constructor({ projectRoot, sessionsDir }) {
@@ -487,7 +488,7 @@ export class WebSession extends EventEmitter {
 export default WebSession;
 
 // --test Block
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('Testing WebSession...\n');
 
   const { mkdtempSync, rmSync } = await import('fs');

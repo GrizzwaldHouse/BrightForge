@@ -14,6 +14,7 @@
 
 import { randomUUID } from 'crypto';
 import { fileURLToPath } from 'url';
+import { isSelfTest } from './is-main-module.js';
 
 export const FAILURE_CATEGORIES = {
   VALIDATION_ERROR: 'validation_error',           // 400: bad request body
@@ -199,7 +200,7 @@ export { FailureClassifier };
 
 // --test block
 const __fcFilename = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] === __fcFilename) {
+if (isSelfTest(import.meta.url)) {
   console.log('\n[FAILURE-CLASSIFIER] Running self-test...\n');
 
   let passed = 0;

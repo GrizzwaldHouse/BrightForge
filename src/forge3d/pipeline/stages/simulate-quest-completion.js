@@ -3,10 +3,10 @@
  * @date March 2026
  */
 
-import { fileURLToPath } from 'url';
 import agentSimulator from '../../playtest/agent-simulator.js';
 import telemetryBus from '../../../core/telemetry-bus.js';
 import errorHandler from '../../../core/error-handler.js';
+import { isSelfTest } from '../../../core/is-main-module.js';
 
 const LOG_TAG = '[PLAYTEST]';
 
@@ -101,8 +101,7 @@ export async function execute(context, stageConfig) {
 export const name = 'simulate-quest-completion';
 
 // --test block
-const __testFile = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(process.argv[1].split(/[\\/]/).pop())) {
+if (isSelfTest(import.meta.url)) {
   console.log('[TEST] simulate-quest-completion stage self-test');
 
   // Test 1: Missing quests

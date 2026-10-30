@@ -3,8 +3,8 @@
  * @date March 2026
  */
 
-import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
+import { isSelfTest } from '../../core/is-main-module.js';
 
 const LOG_TAG = '[WORLD-GRAPH]';
 
@@ -252,8 +252,7 @@ export default worldGraph;
 export { WorldGraph, GRID_SIZES };
 
 // --test block
-const __testFile = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(process.argv[1].split(/[\\/]/).pop())) {
+if (isSelfTest(import.meta.url)) {
   console.log(`${LOG_TAG} Running self-test...`);
   let assertions = 0;
 

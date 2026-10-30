@@ -3,11 +3,11 @@
  * @date March 2026
  */
 
-import { fileURLToPath } from 'url';
 import biomeGenerator from '../../world/biome-generator.js';
 import { WorldGraph } from '../../world/world-graph.js';
 import telemetryBus from '../../../core/telemetry-bus.js';
 import errorHandler from '../../../core/error-handler.js';
+import { isSelfTest } from '../../../core/is-main-module.js';
 
 const LOG_TAG = '[WORLD]';
 
@@ -85,8 +85,7 @@ export async function execute(context, stageConfig) {
 export const name = 'generate-world-map';
 
 // --test block
-const __testFile = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(process.argv[1].split(/[\\/]/).pop())) {
+if (isSelfTest(import.meta.url)) {
   console.log('[TEST] generate-world-map stage self-test');
 
   // Test: missing worldGraph returns error

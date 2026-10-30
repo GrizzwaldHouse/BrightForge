@@ -36,6 +36,7 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import telemetryBus from '../core/telemetry-bus.js';
 import errorHandler from '../core/error-handler.js';
+import { isSelfTest } from '../core/is-main-module.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -697,8 +698,7 @@ export default wsEventBus;
 export { WebSocketEventBus };
 
 // Self-test block
-const __testFile = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(process.argv[1].split(/[\\/]/).pop())) {
+if (isSelfTest(import.meta.url)) {
   console.log('\n=== WebSocketEventBus Self-Test ===\n');
 
   // Import additional test dependencies

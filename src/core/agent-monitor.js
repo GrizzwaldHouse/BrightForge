@@ -11,6 +11,7 @@ import { EventEmitter } from 'events';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import telemetryBus from './telemetry-bus.js';
+import { isSelfTest } from './is-main-module.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -159,7 +160,7 @@ export default agentMonitor;
 export { AgentMonitor };
 
 // Self-test
-if (process.argv.includes('--test') && process.argv[1]?.endsWith('agent-monitor.js')) {
+if (isSelfTest(import.meta.url)) {
   console.log('[AGENT-MONITOR] Running self-test...\n');
 
   const monitor = new AgentMonitor();

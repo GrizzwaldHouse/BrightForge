@@ -7,12 +7,12 @@ import { writeFileSync, mkdirSync } from 'fs';
 import { join, resolve } from 'path';
 import { tmpdir } from 'os';
 import { randomUUID } from 'crypto';
-import { fileURLToPath } from 'url';
 import { SceneGraph } from '../../scene/scene-graph.js';
 import forgeSession from '../../forge-session.js';
 import forge3dDb from '../../database.js';
 import telemetryBus from '../../../core/telemetry-bus.js';
 import errorHandler from '../../../core/error-handler.js';
+import { isSelfTest } from '../../../core/is-main-module.js';
 
 const LOG_TAG = '[SCENE]';
 
@@ -189,8 +189,7 @@ export async function execute(context, _stageConfig) {
 export const name = 'generate-scene-assets';
 
 // --test block
-const __testFile = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(process.argv[1].split(/[\\/]/).pop())) {
+if (isSelfTest(import.meta.url)) {
   console.log('[TEST] generate-scene-assets stage self-test');
 
   // Test: missing sceneGraph returns error

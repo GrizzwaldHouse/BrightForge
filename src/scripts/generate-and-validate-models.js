@@ -9,6 +9,7 @@ import { join, dirname, extname } from 'path';
 import { fileURLToPath } from 'url';
 
 import forge3dConfig from '../forge3d/config-loader.js';
+import { isSelfTest, isMainRun } from '../core/is-main-module.js';
 
 // Heavy singletons are lazy-imported inside main() so their --test blocks
 // don't fire when this script itself is run with --test.
@@ -542,7 +543,7 @@ async function main() {
   process.exit(0);
 }
 
-if (!process.argv.includes('--test')) {
+if (isMainRun(import.meta.url)) {
   main().catch((err) => {
     errorHandler.report('generation_error', err, { script: 'generate-and-validate-models' });
     console.error('[FATAL]', err.message);
@@ -551,8 +552,7 @@ if (!process.argv.includes('--test')) {
 }
 
 // --test block
-const __testFile = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(process.argv[1].split(/[\\/]/).pop())) {
+if (isSelfTest(import.meta.url)) {
   (async () => {
     console.log('[TEST] Running generate-and-validate-models self-tests...');
     const { unlinkSync } = await import('fs');

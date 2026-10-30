@@ -14,6 +14,7 @@
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { readFileSync } from 'fs';
+import { isSelfTest } from './is-main-module.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -186,7 +187,7 @@ export class MultiStepPlanner {
 export default MultiStepPlanner;
 
 // --test Block
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('Testing MultiStepPlanner...\n');
 
   // Mock MasterAgent

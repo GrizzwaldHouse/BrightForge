@@ -10,6 +10,7 @@ import { join, extname, basename } from 'path';
 import { createHash, randomUUID } from 'crypto';
 import { fileURLToPath } from 'url';
 import errorHandler from '../core/error-handler.js';
+import { isSelfTest } from '../core/is-main-module.js';
 
 const SUPPORTED_EXTENSIONS = new Set(['.md', '.txt', '.json']);
 const SUMMARY_MAX_CHARS = 500;
@@ -263,8 +264,7 @@ class IdeaIngestion {
 export { IdeaIngestion };
 
 // Self-test block
-const __testFile = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(process.argv[1].split(/[\\/]/).pop())) {
+if (isSelfTest(import.meta.url)) {
   console.log('[IDEA-INGEST] Running self-tests...\n');
 
   // In-memory mock storage

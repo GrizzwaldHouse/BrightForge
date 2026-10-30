@@ -11,6 +11,7 @@
 import { EventEmitter } from 'events';
 import { randomUUID } from 'crypto';
 import telemetryBus from '../core/telemetry-bus.js';
+import { isSelfTest } from '../core/is-main-module.js';
 
 class SurveyAgent extends EventEmitter {
   constructor() {
@@ -260,7 +261,7 @@ export default surveyAgent;
 export { SurveyAgent };
 
 // Self-test
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('Testing SurveyAgent...\n');
 
   try {

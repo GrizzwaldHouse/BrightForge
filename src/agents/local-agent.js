@@ -4,6 +4,7 @@
  */
 
 import { BaseAgent } from './base-agent.js';
+import { isSelfTest } from '../core/is-main-module.js';
 
 export class LocalAgent extends BaseAgent {
   constructor(llmClient) {
@@ -15,7 +16,7 @@ export class LocalAgent extends BaseAgent {
 export default LocalAgent;
 
 // Self-test
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('Testing LocalAgent...\n');
 
   const mockClient = {

@@ -5,12 +5,12 @@
 
 import { readFileSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
 import { SceneGraph } from '../../scene/scene-graph.js';
 import projectManager from '../../project-manager.js';
 import forge3dDb from '../../database.js';
 import telemetryBus from '../../../core/telemetry-bus.js';
 import errorHandler from '../../../core/error-handler.js';
+import { isSelfTest } from '../../../core/is-main-module.js';
 
 const LOG_TAG = '[SCENE]';
 
@@ -155,8 +155,7 @@ export async function execute(context, stageConfig) {
 export const name = 'export-scene';
 
 // --test block
-const __testFile = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(process.argv[1].split(/[\\/]/).pop())) {
+if (isSelfTest(import.meta.url)) {
   console.log('[TEST] export-scene stage self-test');
 
   // Test: missing assembledBuffer returns error

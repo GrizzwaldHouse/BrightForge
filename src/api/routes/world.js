@@ -22,6 +22,7 @@ import assetPipelineRunner from '../../forge3d/pipeline/asset-pipeline-runner.js
 import { forge3dLimiter } from '../middleware/rate-limit.js';
 import errorHandler from '../../core/error-handler.js';
 import telemetryBus from '../../core/telemetry-bus.js';
+import { isSelfTest } from '../../core/is-main-module.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -322,8 +323,7 @@ router.delete('/:id', (req, res) => {
 export default router;
 
 // --test block
-const __testFile = fileURLToPath(import.meta.url);
-if (process.argv.includes('--test') && process.argv[1] && __testFile.endsWith(process.argv[1].split(/[\\/]/).pop())) {
+if (isSelfTest(import.meta.url)) {
   console.log('[WORLD] Running route self-test...');
 
   // Verify router has expected routes

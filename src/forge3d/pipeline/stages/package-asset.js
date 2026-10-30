@@ -11,6 +11,7 @@ import errorHandler from '../../../core/error-handler.js';
 import telemetryBus from '../../../core/telemetry-bus.js';
 import { writeFileSync } from 'fs';
 import { join, dirname } from 'path';
+import { isSelfTest } from '../../../core/is-main-module.js';
 
 /**
  * Package game asset stage handler.
@@ -142,7 +143,7 @@ export async function execute(context, stageConfig) {
 export const name = 'package-game-asset';
 
 // MINOR: Self-test block
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('[TEST] package-asset stage self-test');
   console.log('[TEST] ✓ Module loaded successfully');
   console.log('[TEST] ✓ execute function exported');

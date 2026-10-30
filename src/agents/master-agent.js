@@ -24,6 +24,7 @@ import { LocalAgent } from './local-agent.js';
 import { CloudAgent } from './cloud-agent.js';
 import telemetryBus from '../core/telemetry-bus.js';
 import projectMemory from '../core/project-memory.js';
+import { isSelfTest } from '../core/is-main-module.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -229,7 +230,7 @@ export class MasterAgent {
 export default MasterAgent;
 
 // --test Block
-if (process.argv.includes('--test')) {
+if (isSelfTest(import.meta.url)) {
   console.log('Testing MasterAgent...\n');
 
   // Test classification

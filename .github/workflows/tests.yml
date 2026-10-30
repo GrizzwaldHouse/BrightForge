@@ -30,6 +30,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Self-test isolation check
+        run: npm run test-selftest-guard
+
       - name: Run core self-tests
         run: npm run test-all-core
 
