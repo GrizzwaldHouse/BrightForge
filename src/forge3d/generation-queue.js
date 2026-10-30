@@ -227,6 +227,7 @@ class GenerationQueue extends EventEmitter {
         currentJobId: this.currentJobId,
         queuedCount: 0,
         processingCount: 0,
+        deadLetterCount: 0,
         jobs: [],
         initialized: false
       };
@@ -234,6 +235,9 @@ class GenerationQueue extends EventEmitter {
 
     const queued = forge3dDb.listHistory({ status: 'queued' });
     const processing = forge3dDb.listHistory({ status: 'processing' });
+    const deadLetterCount = forge3dDb.db.prepare(
+      'SELECT COUNT(*) AS count FROM generation_history WHERE status = ?'
+    ).get('dead_letter').count;
 
     return {
       paused: this.paused,
@@ -241,6 +245,7 @@ class GenerationQueue extends EventEmitter {
       currentJobId: this.currentJobId,
       queuedCount: queued.length,
       processingCount: processing.length,
+      deadLetterCount,
       jobs: [...processing, ...queued],
       initialized: true
     };
@@ -390,8 +395,10 @@ class GenerationQueue extends EventEmitter {
           error: err.message
         });
       } else {
+        // Retries exhausted: park the job in the dead-letter state so it can be
+        // inspected and manually retried (retryDeadLetter / retryAllDeadLetters)
         forge3dDb.updateHistoryEntry(job.id, {
-          status: 'failed',
+          status: 'dead_letter',
           errorMessage: retryCount > 0
             ? `Failed after ${retryCount} retries: ${err.message}`
             : err.message
@@ -402,10 +409,12 @@ class GenerationQueue extends EventEmitter {
           type: job.type,
           error: err.message,
           retries: retryCount,
-          priority: job.priority
+          priority: job.priority,
+          deadLetter: true
         });
 
-        this.emit('failed', { jobId: job.id, error: err.message });
+        this.emit('dead_letter', { jobId: job.id, error: err.message, retries: retryCount });
+        this.emit('failed', { jobId: job.id, error: err.message, deadLetter: true });
       }
     }
 

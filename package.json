@@ -86,6 +86,7 @@
     "test-integration": "node src/tests/integration-suite.js",
     "test-selftest-guard": "node src/tests/selftest-guard-check.js",
     "test-security": "node src/tests/security-regression.js",
+    "test-events-queue": "node src/tests/events-queue-integration.js",
     "test-bind-policy": "node src/api/bind-policy.js --test",
     "test-stability": "node src/tests/stability-run.js",
     "test-stability-quick": "node src/tests/stability-run.js --quick",

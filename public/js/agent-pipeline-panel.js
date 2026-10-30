@@ -196,7 +196,7 @@ export class AgentPipelinePanel {
   _connectWebSocket() {
     try {
       const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-      this.ws = new WebSocket(`${wsProtocol}//${location.host}`);
+      this.ws = new WebSocket(`${wsProtocol}//${location.host}/ws/events`);
 
       this.ws.onopen = () => {
         console.log('[PIPELINE-PANEL] WebSocket connected');
@@ -230,7 +230,7 @@ export class AgentPipelinePanel {
     if (logContainer && msg.type === 'event') {
       const entry = document.createElement('div');
       entry.className = 'pipeline-log-entry';
-      entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg.payload?.event_type || msg.type}: ${JSON.stringify(msg.payload || {}).substring(0, 120)}`;
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg.payload?.eventType || msg.payload?.event_type || msg.type}: ${JSON.stringify(msg.payload || {}).substring(0, 120)}`;
       logContainer.prepend(entry);
 
       // Keep max 50 log entries
@@ -244,14 +244,15 @@ export class AgentPipelinePanel {
       const node = document.querySelector(`.pipeline-node[data-agent="${msg.payload.agent.toLowerCase()}"]`);
       if (node) {
         const statusEl = node.querySelector('.pipeline-node-status');
-        if (msg.payload.event_type?.includes('started')) {
+        const eventType = msg.payload.eventType || msg.payload.event_type || '';
+        if (eventType.includes('started')) {
           node.classList.add('active');
           if (statusEl) statusEl.textContent = 'running';
-        } else if (msg.payload.event_type?.includes('completed')) {
+        } else if (eventType.includes('completed')) {
           node.classList.remove('active');
           node.classList.add('complete');
           if (statusEl) statusEl.textContent = 'done';
-        } else if (msg.payload.event_type?.includes('failed')) {
+        } else if (eventType.includes('failed')) {
           node.classList.remove('active');
           node.classList.add('error');
           if (statusEl) statusEl.textContent = 'error';

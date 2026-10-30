@@ -109,7 +109,7 @@ export class PipelineTasksPanel {
   _connectWebSocket() {
     try {
       const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-      this.ws = new WebSocket(`${wsProtocol}//${location.host}`);
+      this.ws = new WebSocket(`${wsProtocol}//${location.host}/ws/events`);
 
       this.ws.onopen = () => {
         this._setWsStatus('connected');

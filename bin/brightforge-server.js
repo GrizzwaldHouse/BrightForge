@@ -120,7 +120,10 @@ async function main() {
 
     // Attach WebSocket event bus to the HTTP server
     try {
-      wsEventBus.attach(server);
+      if (!orchestrator.eventBus) {
+        console.warn('  [SERVER] Orchestration event bus unavailable; WebSocket clients will not receive orchestration events');
+      }
+      wsEventBus.attach(server, orchestrator.eventBus);
       console.log(`  [SERVER] WebSocket: ws://localhost:${port}/ws/events`);
     } catch (err) {
       console.warn(`  [SERVER] WebSocket bus attach failed: ${err.message}`);

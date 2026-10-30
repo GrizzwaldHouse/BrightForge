@@ -37,6 +37,28 @@ import { dirname } from 'path';
 import telemetryBus from '../core/telemetry-bus.js';
 import errorHandler from '../core/error-handler.js';
 import { isSelfTest } from '../core/is-main-module.js';
+import { tokensMatch, isLoopbackRequest } from './middleware/auth.js';
+
+/**
+ * Authorize a WebSocket upgrade with the same policy as the HTTP API:
+ * - BRIGHTFORGE_API_KEY unset: loopback peers only
+ * - key set: `Authorization: Bearer <key>` header or `?token=<key>` query
+ *   (browsers cannot set headers on a WebSocket handshake)
+ * @param {import('http').IncomingMessage} req
+ * @returns {boolean}
+ */
+export function verifyWsClient(req) {
+  const expected = process.env.BRIGHTFORGE_API_KEY;
+  if (!expected) return isLoopbackRequest(req);
+  const header = req.headers?.authorization || '';
+  if (header.startsWith('Bearer ') && tokensMatch(header.slice(7), expected)) return true;
+  try {
+    const token = new URL(req.url || '/', 'http://localhost').searchParams.get('token');
+    return token !== null && tokensMatch(token, expected);
+  } catch (_e) {
+    return false;
+  }
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -87,7 +109,8 @@ class WebSocketEventBus extends EventEmitter {
       // Create WebSocket server
       this.wss = new WebSocketServer({
         server: httpServer,
-        path: '/ws/events'
+        path: '/ws/events',
+        verifyClient: (info) => verifyWsClient(info.req)
       });
 
       // Set up connection handler
