@@ -396,8 +396,3 @@ export class IntegrationsPanel {
     log.scrollTop = log.scrollHeight;
   }
 }
-
-? `${prev}\n` : '') + `${ts}  ${text}`;
-    log.scrollTop = log.scrollHeight;
-  }
-}
