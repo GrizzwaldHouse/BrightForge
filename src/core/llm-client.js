@@ -35,6 +35,7 @@ class UniversalLLMClient {
     }
 
     this.providers = this.config.providers || {};
+    this._applyOllamaEnv(process.env);
     this.taskRouting = this.config.task_routing || {};
     this.budget = this.config.budget || { daily_limit_usd: 1.0 };
 
@@ -48,6 +49,60 @@ class UniversalLLMClient {
 
     // Cache for provider health (e.g. Ollama availability) to avoid repeated timeouts
     this.healthCache = new Map();
+  }
+
+  /**
+   * Environment overrides for the local Ollama provider, so the endpoint,
+   * model and timeout never need code changes:
+   *   OLLAMA_BASE_URL   e.g. http://127.0.0.1:11434 (with or without /v1)
+   *   OLLAMA_MODEL      model tag used for code/fast/default routing
+   *   OLLAMA_TIMEOUT_MS per-request timeout for Ollama calls
+   * @private
+   */
+  _applyOllamaEnv(env) {
+    const ollama = this.providers.ollama;
+    if (!ollama) return;
+    if (env.OLLAMA_BASE_URL) {
+      ollama.base_url = `${env.OLLAMA_BASE_URL.replace(/\/+$/, '').replace(/\/v1$/, '')}/v1`;
+    }
+    if (env.OLLAMA_MODEL) {
+      ollama.models = { ...(ollama.models || {}), code: env.OLLAMA_MODEL, fast: env.OLLAMA_MODEL, default: env.OLLAMA_MODEL };
+    }
+    const timeout = Number.parseInt(env.OLLAMA_TIMEOUT_MS, 10);
+    if (Number.isFinite(timeout) && timeout > 0) {
+      ollama.timeout_ms = timeout;
+    }
+  }
+
+  /**
+   * Ollama server root (base_url without the OpenAI-compatible /v1 suffix).
+   * @returns {string}
+   */
+  ollamaRootUrl() {
+    const base = this.providers.ollama?.base_url || 'http://127.0.0.1:11434/v1';
+    return base.replace(/\/+$/, '').replace(/\/v1$/, '');
+  }
+
+  /**
+   * Ollama health: server reachable, installed models, configured model present.
+   * Never pulls or downloads a model.
+   * @param {{ timeoutMs?: number }} [opts]
+   * @returns {Promise<{ running: boolean, models: string[], model: string|null, modelAvailable: boolean, error?: string }>}
+   */
+  async getOllamaHealth({ timeoutMs = 2000 } = {}) {
+    const model = this.getModel('ollama', 'code');
+    try {
+      const response = await fetch(`${this.ollamaRootUrl()}/api/tags`, { method: 'GET', signal: AbortSignal.timeout(timeoutMs) });
+      if (!response.ok) {
+        return { running: false, models: [], model, modelAvailable: false, error: `HTTP ${response.status}` };
+      }
+      const data = await response.json();
+      const models = Array.isArray(data?.models) ? data.models.map((m) => m.name || m.model).filter(Boolean) : [];
+      const modelAvailable = Boolean(model) && models.some((name) => name === model || name === `${model}:latest`);
+      return { running: true, models, model, modelAvailable };
+    } catch (err) {
+      return { running: false, models: [], model, modelAvailable: false, error: err.name === 'TimeoutError' ? 'timeout' : err.message };
+    }
   }
 
   getDefaultConfig() {
@@ -111,7 +166,7 @@ class UniversalLLMClient {
     }
 
     try {
-      const response = await fetch('http://127.0.0.1:11434/api/tags', {
+      const response = await fetch(`${this.ollamaRootUrl()}/api/tags`, {
         method: 'GET',
         signal: AbortSignal.timeout(2000)
       });
@@ -273,7 +328,7 @@ class UniversalLLMClient {
         method: 'POST',
         headers,
         body,
-        signal: options.signal || AbortSignal.timeout(options.timeout || 60000)
+        signal: this._requestSignal(options.signal, options.timeout || provider.timeout_ms || 60000)
       });
     } catch (fetchErr) {
       // Strip any URL (which may contain API key for Gemini) from the error message
@@ -286,7 +341,12 @@ class UniversalLLMClient {
       throw new Error(`${providerName} API error (${response.status}): ${errorText}`);
     }
 
-    const data = await response.json();
+    let data;
+    try {
+      data = await response.json();
+    } catch (_parseErr) {
+      throw new Error(`${providerName} returned a malformed response (not JSON)`);
+    }
 
     // Normalize response format
     let content, usage;
@@ -306,7 +366,10 @@ class UniversalLLMClient {
         total_tokens: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0)
       };
     } else {
-      content = data.choices?.[0]?.message?.content || '';
+      if (!Array.isArray(data?.choices) || typeof data.choices[0]?.message?.content !== 'string') {
+        throw new Error(`${providerName} returned a malformed response (no choices[0].message.content)`);
+      }
+      content = data.choices[0].message.content;
       usage = data.usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
     }
 
@@ -321,6 +384,23 @@ class UniversalLLMClient {
       usage,
       cost
     };
+  }
+
+  /**
+   * Combine a caller's AbortSignal with a request timeout (a caller signal
+   * must not disable the timeout).
+   * @private
+   */
+  _requestSignal(callerSignal, timeoutMs) {
+    const timeoutSignal = AbortSignal.timeout(timeoutMs);
+    if (!callerSignal) return timeoutSignal;
+    if (typeof AbortSignal.any === 'function') return AbortSignal.any([callerSignal, timeoutSignal]);
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    if (callerSignal.aborted || timeoutSignal.aborted) controller.abort();
+    callerSignal.addEventListener('abort', abort, { once: true });
+    timeoutSignal.addEventListener('abort', abort, { once: true });
+    return controller.signal;
   }
 
   /**
@@ -395,6 +475,12 @@ class UniversalLLMClient {
    */
   async chat(messages, options = {}) {
     const task = options.task || 'default';
+
+    // Explicit provider (e.g. /api/chat/upgrade): no routing, no fallback
+    if (options.forceProvider) {
+      return this.chatWithProvider(messages, options.forceProvider, options);
+    }
+
     const routing = this.taskRouting[task] || { prefer: ['groq', 'ollama'], fallback: null };
 
     // Adapt context for target providers (outside healing scope — pure transform, no I/O)
@@ -471,7 +557,11 @@ class UniversalLLMClient {
         if (routing.fallback) {
           const { provider: fallbackProvider, modelHint } = this.parseProviderModel(routing.fallback);
 
-          if (this.isProviderAvailable(fallbackProvider)) {
+          const fallbackBudget = this.checkBudget(fallbackProvider);
+          if (!fallbackBudget.allowed) {
+            routingLog.push({ provider: fallbackProvider, status: 'skipped', reason: fallbackBudget.reason, fallback: true });
+            errors.push({ provider: fallbackProvider, error: fallbackBudget.reason });
+          } else if (this.isProviderAvailable(fallbackProvider)) {
             try {
               const model = this.getModel(fallbackProvider, modelHint, options.complexity);
               console.log(`[LLM] Trying fallback: ${routing.fallback}...`);
@@ -527,11 +617,21 @@ class UniversalLLMClient {
    * @returns {Promise<Object>} { content, provider, model, usage, cost, routingLog }
    */
   async chatWithProvider(messages, providerName, options = {}) {
+    if (!this.providers[providerName]) {
+      throw new Error(`Unknown provider: ${providerName}`);
+    }
     if (!this.isProviderAvailable(providerName)) {
       throw new Error(`Provider ${providerName} is not available`);
     }
+    const budgetCheck = this.checkBudget(providerName);
+    if (!budgetCheck.allowed) {
+      const err = new Error(budgetCheck.reason);
+      err.code = 'BUDGET_EXCEEDED';
+      throw err;
+    }
 
-    const result = await this.callProvider(providerName, messages, options);
+    const { forceProvider: _forced, ...callOptions } = options;
+    const result = await this.callProvider(providerName, messages, callOptions);
     const routingLog = [{ provider: providerName, model: result.model, status: 'success', cost: result.cost, forced: true }];
     return { ...result, routingLog };
   }
@@ -554,28 +654,9 @@ export { UniversalLLMClient };
 
 // CLI test
 if (isSelfTest(import.meta.url)) {
-  console.log('Testing LLM Client...\n');
-
-  const testClient = new UniversalLLMClient();
-
-  console.log('Available providers:');
-  for (const [name, config] of Object.entries(testClient.providers)) {
-    const available = testClient.isProviderAvailable(name);
-    console.log(`  ${name}: ${available ? 'AVAILABLE' : 'NOT AVAILABLE'} (priority: ${config.priority})`);
-  }
-
-  console.log('\nTesting chat...');
-  try {
-    const result = await testClient.chat([
-      { role: 'user', content: 'Say "Hello from Bob!" in exactly 5 words.' }
-    ], { task: 'morning_brief' });
-
-    console.log('\nResult:');
-    console.log(`  Provider: ${result.provider}`);
-    console.log(`  Model: ${result.model}`);
-    console.log(`  Content: ${result.content}`);
-    console.log(`  Cost: $${result.cost.toFixed(4)}`);
-  } catch (error) {
-    console.error('Test failed:', error.message);
-  }
+  // Deterministic contract tests (fake provider server; no keys, no network).
+  // OLLAMA_LIVE=1 adds an opt-in check against a real local Ollama.
+  const { runProviderContractTests } = await import('../tests/llm-provider-contract.js');
+  const ok = await runProviderContractTests({ Client: UniversalLLMClient });
+  process.exit(ok ? 0 : 1);
 }

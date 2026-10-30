@@ -167,7 +167,8 @@ export class MasterAgent {
       maxTokens: options.maxTokens || 4096,
       signal: options.signal,
       onProviderTrying: options.onProviderTrying,
-      onProviderFailed: options.onProviderFailed
+      onProviderFailed: options.onProviderFailed,
+      forceProvider: options.forceProvider
     });
 
     // 5. Parse LLM output into structured plan

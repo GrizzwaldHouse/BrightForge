@@ -47,6 +47,12 @@ jobs:
       - name: Mesh optimize -> export data flow
         run: npm run test-mesh-flow
 
+      - name: Frontend/API route alignment
+        run: npm run test-frontend-routes
+
+      - name: LLM provider contract (mock providers, no keys)
+        run: npm run test-llm-contract
+
       - name: Run core self-tests
         run: npm run test-all-core
 

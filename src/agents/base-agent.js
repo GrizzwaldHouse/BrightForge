@@ -44,7 +44,8 @@ export class BaseAgent {
       temperature: options.temperature ?? 0.3,
       signal: options.signal,
       onProviderTrying: options.onProviderTrying,
-      onProviderFailed: options.onProviderFailed
+      onProviderFailed: options.onProviderFailed,
+      forceProvider: options.forceProvider
     });
 
     return result;
