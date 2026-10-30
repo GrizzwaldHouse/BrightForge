@@ -33,6 +33,11 @@ jobs:
       - name: Self-test isolation check
         run: npm run test-selftest-guard
 
+      - name: Security regression tests
+        run: |
+          npm run test-bind-policy
+          npm run test-security
+
       - name: Run core self-tests
         run: npm run test-all-core
 

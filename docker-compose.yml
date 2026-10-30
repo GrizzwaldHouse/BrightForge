@@ -8,7 +8,8 @@ services:
       target: node-server
     container_name: brightforge-web
     ports:
-      - "3847:3847"
+      # Published on host loopback only; change deliberately to expose on a LAN
+      - "127.0.0.1:3847:3847"
     environment:
       # LLM Provider API Keys (override in .env.docker)
       - GROQ_API_KEY=${GROQ_API_KEY:-}
@@ -21,6 +22,10 @@ services:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       # Server config
       - PORT=3847
+      # Inside the container the server must bind all interfaces to be reachable
+      # through the port mapping; bind-policy.js then REQUIRES an API key.
+      - BRIGHTFORGE_HOST=0.0.0.0
+      - BRIGHTFORGE_API_KEY=${BRIGHTFORGE_API_KEY:-}
       - NODE_ENV=production
     volumes:
       # Persist database and generated assets
@@ -40,7 +45,7 @@ services:
       target: python-server
     container_name: brightforge-python
     ports:
-      - "8765:8765"
+      - "127.0.0.1:8765:8765"
     environment:
       - PYTHONUNBUFFERED=1
     volumes:

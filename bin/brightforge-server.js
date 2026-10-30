@@ -34,12 +34,32 @@ import wsEventBus from '../src/api/ws-event-bus.js';
 import orchestrator from '../src/orchestration/index.js';
 import modelIntelligence from '../src/model-intelligence/index.js';
 import forgeDb from '../src/forge3d/database.js';
+import { resolveBindPolicy } from '../src/api/bind-policy.js';
+import { readFileSync } from 'fs';
+import { parse as parseYaml } from 'yaml';
 
 /**
  * Start the HTTP server.
  */
 async function main() {
   const port = parseInt(process.env.PORT || '3847', 10);
+
+  // Loopback by default; non-loopback binding requires BRIGHTFORGE_API_KEY
+  let configHost;
+  try {
+    configHost = parseYaml(readFileSync(join(__dirname, '../config/agent-config.yaml'), 'utf8'))?.web_server?.host;
+  } catch (_e) {
+    configHost = undefined;
+  }
+  let bind;
+  try {
+    bind = resolveBindPolicy({ configHost });
+  } catch (err) {
+    console.error(`  [FATAL] ${err.message}`);
+    process.exit(1);
+  }
+  const host = bind.host;
+  const displayHost = host.includes(':') ? `[${host}]` : host;
   const sessionsDir = join(__dirname, '../sessions');
 
   // Ensure sessions directory exists
@@ -70,13 +90,13 @@ async function main() {
   }
 
   // Start server
-  const server = app.listen(port, () => {
+  const server = app.listen(port, host, () => {
     console.log('');
     console.log('  ╔══════════════════════════════════════╗');
     console.log('  ║    BrightForge Server v4.2.0          ║');
     console.log('  ╚══════════════════════════════════════╝');
     console.log('');
-    console.log(`  [SERVER] Listening on http://localhost:${port}`);
+    console.log(`  [SERVER] Listening on http://${displayHost}:${port} (bind: ${bind.source}, auth: ${bind.authRequired ? 'required' : 'local-only'})`);
     console.log(`  [SERVER] Dashboard: http://localhost:${port}`);
     console.log(`  [SERVER] API Base:  http://localhost:${port}/api`);
     console.log('');

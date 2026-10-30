@@ -85,6 +85,8 @@
     "test-agents": "npm run test-planner && npm run test-builder && npm run test-tester && npm run test-reviewer && npm run test-survey && npm run test-recorder",
     "test-integration": "node src/tests/integration-suite.js",
     "test-selftest-guard": "node src/tests/selftest-guard-check.js",
+    "test-security": "node src/tests/security-regression.js",
+    "test-bind-policy": "node src/api/bind-policy.js --test",
     "test-stability": "node src/tests/stability-run.js",
     "test-stability-quick": "node src/tests/stability-run.js --quick",
     "test-forge3d-e2e": "node src/tests/forge3d-e2e.js",
