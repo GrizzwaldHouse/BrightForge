@@ -9,8 +9,9 @@
  */
 
 import { EventEmitter } from 'events';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { randomUUID } from 'crypto';
+import { fileURLToPath } from 'url';
 import telemetryBus from '../core/telemetry-bus.js';
 import errorHandler from '../core/error-handler.js';
 // Phase 20B2 — typed pipeline rejection event. Imported at module top so
@@ -153,6 +154,19 @@ class ReviewerAgent extends EventEmitter {
     return Math.max(0, score);
   }
 
+  /**
+   * Read a JS artifact for review. Returns null when it does not exist.
+   * @private
+   */
+  _readArtifact(path) {
+    if (!existsSync(path)) return null;
+    try {
+      return readFileSync(path, 'utf8');
+    } catch (_e) {
+      return null;
+    }
+  }
+
   _checkStructure(buildArtifacts, findings, recommendations) {
     let score = 100;
     let issueCount = 0;
@@ -161,45 +175,56 @@ class ReviewerAgent extends EventEmitter {
     for (const artifact of artifacts) {
       if (artifact.type !== 'file' || !artifact.path.endsWith('.js')) continue;
 
-      // Check file exists (simulated - would check actual files)
-      if (!existsSync(artifact.path)) {
-        // Simulated checks
-        const hasHeader = Math.random() > 0.3;
-        const hasSelfTest = Math.random() > 0.2;
-        const hasExports = Math.random() > 0.1;
+      const content = this._readArtifact(artifact.path);
 
-        if (!hasHeader) {
-          issueCount++;
-          findings.push({
-            category: 'structure',
-            severity: 'info',
-            message: 'Missing file header documentation',
-            file: artifact.path
-          });
-          recommendations.push(`Add JSDoc header to ${artifact.path}`);
-        }
+      // A claimed artifact that does not exist is a critical finding
+      if (content === null) {
+        issueCount += 3;
+        findings.push({
+          category: 'structure',
+          severity: 'critical',
+          message: 'Artifact not found on disk',
+          file: artifact.path
+        });
+        recommendations.push(`Produce ${artifact.path} or remove it from the build artifacts`);
+        continue;
+      }
 
-        if (!hasSelfTest) {
-          issueCount++;
-          findings.push({
-            category: 'structure',
-            severity: 'warning',
-            message: 'Missing self-test block',
-            file: artifact.path
-          });
-          recommendations.push(`Add --test block to ${artifact.path}`);
-        }
+      const hasHeader = /^(#!.*\r?\n)?\s*\/\*\*/.test(content);
+      const hasSelfTest = /isSelfTest\(import\.meta\.url\)/.test(content);
+      const hasExports = /^export default /m.test(content) && /^export \{/m.test(content);
 
-        if (!hasExports) {
-          issueCount++;
-          findings.push({
-            category: 'structure',
-            severity: 'critical',
-            message: 'Missing exports (singleton + named class)',
-            file: artifact.path
-          });
-          recommendations.push(`Add singleton and named exports to ${artifact.path}`);
-        }
+      if (!hasHeader) {
+        issueCount++;
+        findings.push({
+          category: 'structure',
+          severity: 'info',
+          message: 'Missing file header documentation',
+          file: artifact.path
+        });
+        recommendations.push(`Add JSDoc header to ${artifact.path}`);
+      }
+
+      if (!hasSelfTest) {
+        issueCount++;
+        findings.push({
+          category: 'structure',
+          severity: 'warning',
+          message: 'Missing self-test block',
+          file: artifact.path
+        });
+        recommendations.push(`Add --test block to ${artifact.path}`);
+      }
+
+      if (!hasExports) {
+        issueCount++;
+        findings.push({
+          category: 'structure',
+          severity: 'critical',
+          message: 'Missing exports (singleton + named class)',
+          file: artifact.path
+        });
+        recommendations.push(`Add singleton and named exports to ${artifact.path}`);
       }
     }
 
@@ -215,42 +240,33 @@ class ReviewerAgent extends EventEmitter {
     for (const artifact of artifacts) {
       if (artifact.type !== 'file' || !artifact.path.endsWith('.js')) continue;
 
-      // Check file exists
-      if (!existsSync(artifact.path)) {
-        // Simulated standards checks
-        const hasSingleQuotes = Math.random() > 0.2;
-        const hasCorrectIndent = Math.random() > 0.3;
-        const hasSemicolons = Math.random() > 0.2;
+      // Missing artifacts are already reported by the structure check
+      const content = this._readArtifact(artifact.path);
+      if (content === null) continue;
 
-        if (!hasSingleQuotes) {
-          issueCount++;
-          findings.push({
-            category: 'standards',
-            severity: 'info',
-            message: 'Use single quotes for strings',
-            file: artifact.path
-          });
-        }
+      const lines = content.split(/\r?\n/);
+      const tabIndented = lines.filter((l) => /^\t/.test(l)).length;
+      const oddIndented = lines.filter((l) => /^( {2})* \S/.test(l) && !/^\s*\*/.test(l)).length;
+      const doubleQuoted = lines.filter((l) => /^\s*(import .* from |.*= )"[^"'`]*";?\s*$/.test(l)).length;
 
-        if (!hasCorrectIndent) {
-          issueCount++;
-          findings.push({
-            category: 'standards',
-            severity: 'info',
-            message: 'Use 2-space indentation',
-            file: artifact.path
-          });
-        }
+      if (tabIndented + oddIndented > 0) {
+        issueCount++;
+        findings.push({
+          category: 'standards',
+          severity: 'info',
+          message: `Use 2-space indentation (${tabIndented + oddIndented} line(s))`,
+          file: artifact.path
+        });
+      }
 
-        if (!hasSemicolons) {
-          issueCount++;
-          findings.push({
-            category: 'standards',
-            severity: 'info',
-            message: 'Missing semicolons',
-            file: artifact.path
-          });
-        }
+      if (doubleQuoted > 0) {
+        issueCount++;
+        findings.push({
+          category: 'standards',
+          severity: 'info',
+          message: `Use single quotes for strings (${doubleQuoted} line(s))`,
+          file: artifact.path
+        });
       }
     }
 
@@ -433,7 +449,23 @@ if (isSelfTest(import.meta.url)) {
     agent._checkTestResults = originalCheck;
     console.log('[TEST] Error handling: PASSED');
 
-    console.log('\n[TEST] All 9 tests PASSED!');
+    // Test 10: Deterministic, artifact-based review
+    console.log('\n[TEST] Test 10: Deterministic review of real artifacts...');
+    agent.reset?.();
+    const realArtifacts = [
+      { type: 'file', path: fileURLToPath(import.meta.url) },
+      { type: 'file', path: '/nonexistent/brightforge/artifact.js' }
+    ];
+    const okTests = { testId: 't-det', passed: [], failed: [], lintErrors: [] };
+    const r1 = await agent.review(okTests, realArtifacts);
+    const r2 = await agent.review(okTests, realArtifacts);
+    if (r1.score !== r2.score || r1.findings.length !== r2.findings.length) throw new Error(`Review is not deterministic: ${r1.score} vs ${r2.score}`);
+    if (!r1.findings.some(f => f.severity === 'critical' && /not found/i.test(f.message))) throw new Error('Missing artifact must be a critical finding');
+    if (r1.findings.some(f => f.file === realArtifacts[0].path && f.category === 'structure')) throw new Error('This file has header, self-test and exports; no structure findings expected');
+    if (r1.verdict === 'approved') throw new Error('A missing artifact must not be approved');
+    console.log(`[TEST] Deterministic review: PASSED (score ${r1.score}, verdict ${r1.verdict})`);
+
+    console.log('\n[TEST] All 10 tests PASSED!');
     console.log('ReviewerAgent test PASSED');
 
   } catch (error) {

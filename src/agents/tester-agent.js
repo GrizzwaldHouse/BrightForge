@@ -11,6 +11,7 @@
 import { EventEmitter } from 'events';
 import { randomUUID } from 'crypto';
 import { existsSync } from 'fs';
+import { join } from 'path';
 import telemetryBus from '../core/telemetry-bus.js';
 import errorHandler from '../core/error-handler.js';
 import sandbox from '../security/sandbox.js';
@@ -116,28 +117,27 @@ class TesterAgent extends EventEmitter {
         console.log(`[TESTER] [AAA] Act: ${act}`);
       }
 
-      // Check if file exists (in real implementation)
-      // For mock, simulate test execution
-      const exists = existsSync(file);
-
-      if (!exists) {
-        // Simulated test - in real world would run: node <file> --test
+      // A missing artifact is a failure, never a pass
+      if (!existsSync(file)) {
         if (verbose) {
-          console.log('[TESTER] [AAA] Assert: File does not exist (simulated pass)');
+          console.log('[TESTER] [AAA] Assert: File does not exist (FAIL)');
         }
 
         return {
           file,
-          success: true,
-          duration: Math.floor(Math.random() * 100) + 50,
-          output: 'Test passed (simulated)',
-          aaa: { arrange, act, assert: 'Test passed' }
+          success: false,
+          duration: 0,
+          error: `Artifact not found: ${file}`,
+          output: '',
+          aaa: { arrange, act, assert: 'Test failed: artifact not found' }
         };
       }
 
       // Real execution via sandbox (no shell interpolation)
       const projectRoot = process.cwd();
+      const startedAt = Date.now();
       const result = sandbox.runNodeTest(file, projectRoot, 30000);
+      const duration = Date.now() - startedAt;
 
       if (result.timedOut) {
         throw new Error(`Test timed out after 30s: ${file}`);
@@ -157,7 +157,8 @@ class TesterAgent extends EventEmitter {
       return {
         file,
         success: true,
-        duration: 0,
+        duration,
+        exitCode: result.status,
         output: result.stdout.trim(),
         aaa: { arrange, act, assert: 'Test passed' }
       };
@@ -260,15 +261,37 @@ if (isSelfTest(import.meta.url)) {
     agent.on('test_pass', () => { testPassEmitted = true; });
     agent.on('test_complete', () => { testCompleteEmitted = true; });
 
+    // Real artifacts inside the project (data/ is git-ignored): one passing,
+    // one failing, and one that does not exist (must FAIL, never pass)
+    const { mkdirSync, writeFileSync, rmSync } = await import('fs');
+    const fixtureDir = join(process.cwd(), 'data', `tester-selftest-${process.pid}`);
+    mkdirSync(fixtureDir, { recursive: true });
+    const passingFile = join(fixtureDir, 'passing.js');
+    const failingFile = join(fixtureDir, 'failing.js');
+    const missingFile = join(fixtureDir, 'missing.js');
+    writeFileSync(passingFile, "console.log('ok');\n");
+    writeFileSync(failingFile, "console.error('boom'); process.exit(1);\n");
+
     const mockBuildResult = {
       buildId: 'build-123',
       artifacts: [
-        { type: 'file', path: 'src/test1.js', description: 'Test file 1' },
-        { type: 'file', path: 'src/test2.js', description: 'Test file 2' }
+        { type: 'file', path: passingFile, description: 'Passing artifact' },
+        { type: 'file', path: failingFile, description: 'Failing artifact' },
+        { type: 'file', path: missingFile, description: 'Missing artifact' }
       ]
     };
 
-    const result = await agent.runTests(mockBuildResult, { skipLint: true, verbose: false });
+    let result;
+    try {
+      result = await agent.runTests(mockBuildResult, { skipLint: true, verbose: false });
+    } finally {
+      rmSync(fixtureDir, { recursive: true, force: true });
+    }
+
+    if (result.passed.length !== 1 || result.passed[0].file !== passingFile) throw new Error(`Expected exactly the passing artifact to pass, got ${result.passed.map(p => p.file)}`);
+    if (result.failed.length !== 2) throw new Error(`Expected 2 failures (non-zero exit + missing), got ${result.failed.length}`);
+    if (!result.failed.some(f => f.file === missingFile && /not found/i.test(f.error))) throw new Error('Missing artifact must fail with "not found"');
+    if (result.passed[0].exitCode !== 0) throw new Error('Passing result should record exit code 0');
 
     if (!result.testId) throw new Error('Result should have testId');
     if (result.buildId !== 'build-123') throw new Error('Result buildId mismatch');
