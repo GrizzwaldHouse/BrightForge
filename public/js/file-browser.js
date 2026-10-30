@@ -109,27 +109,15 @@ export class FileBrowser {
   }
 
   /**
-   * Perform fuzzy search through recent projects and API (if available)
+   * Perform fuzzy search through recent projects.
+   * (There is intentionally no server-side filesystem search endpoint:
+   * enumerating the host's directories over HTTP is not exposed.)
    */
   async _performSearch(query) {
-    // Fuzzy search through recent projects first
-    const recentMatches = this.recentProjects.filter(p =>
+    const matches = this.recentProjects.filter(p =>
       p.toLowerCase().includes(query.toLowerCase())
     );
-
-    // If API endpoint exists, fetch more results
-    let apiMatches = [];
-    try {
-      const res = await fetch(`/api/projects/search?q=${encodeURIComponent(query)}`);
-      if (res.ok) {
-        apiMatches = await res.json();
-      }
-    } catch (err) {
-      console.warn('[FILE-BROWSER] API search unavailable:', err.message);
-    }
-
-    const allMatches = [...new Set([...recentMatches, ...apiMatches])];
-    this._renderSearchResults(allMatches, query);
+    this._renderSearchResults(matches, query);
   }
 
   /**
