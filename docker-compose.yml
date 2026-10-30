@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Node.js Web Server + Coding Agent
   web:
@@ -63,6 +61,84 @@ services:
     restart: unless-stopped
     networks:
       - brightforge
+
+  # ----------------------------------------------------------------------------
+  # Test profiles (docker compose --profile test run --rm brightforge-test)
+  # No network, read-only root filesystem, size-limited tmpfs for writable
+  # paths, no capabilities, bounded CPU/memory/PIDs, no host mounts, no Docker
+  # socket and no API keys.
+  # ----------------------------------------------------------------------------
+  brightforge-test:
+    profiles: ["test"]
+    build:
+      context: .
+      target: test
+    image: brightforge-test:local
+    network_mode: "none"
+    read_only: true
+    user: "node"
+    environment:
+      - NODE_ENV=test
+      - SUITE_TIMEOUT_MS=300000
+    tmpfs:
+      - /tmp:size=512m,mode=1777
+      - /app/data:size=256m,uid=1000,gid=1000
+      - /app/sessions:size=64m,uid=1000,gid=1000
+      - /app/logs:size=64m,uid=1000,gid=1000
+      - /app/output:size=64m,uid=1000,gid=1000
+      - /app/qa-reports:size=16m,uid=1000,gid=1000
+      - /app/.claude:size=16m,uid=1000,gid=1000
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 512
+    mem_limit: 2g
+    cpus: 2.0
+
+  brightforge-python-test:
+    profiles: ["test"]
+    build:
+      context: .
+      target: python-test
+    image: brightforge-python-test:local
+    network_mode: "none"
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 256
+    mem_limit: 1g
+    cpus: 1.0
+
+  # Opt-in live Ollama check (docker compose --profile ollama run --rm brightforge-ollama-test)
+  # Ollama must already be running on the host WITH the model installed;
+  # nothing is pulled. Bridge network only (it must reach the host).
+  brightforge-ollama-test:
+    profiles: ["ollama"]
+    image: brightforge-test:local
+    build:
+      context: .
+      target: test
+    read_only: true
+    user: "node"
+    command: ["node", "src/tests/llm-provider-contract.js", "--live"]
+    environment:
+      - NODE_ENV=test
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3:8b}
+      - OLLAMA_TIMEOUT_MS=${OLLAMA_TIMEOUT_MS:-120000}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+      - /app/data:size=64m,uid=1000,gid=1000
+      - /app/logs:size=16m,uid=1000,gid=1000
+      - /app/.claude:size=16m,uid=1000,gid=1000
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 256
+    mem_limit: 1g
+    cpus: 1.0
 
 volumes:
   brightforge-data:

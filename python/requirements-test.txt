@@ -1,0 +1,6 @@
+# CPU-only dependencies for python/tests (mesh post-processing).
+# Exact pins for a reproducible python-test image; no torch, no GPU.
+trimesh==5.2.0
+fast-simplification==0.2.0
+numpy==2.4.6
+pyyaml==6.0.3

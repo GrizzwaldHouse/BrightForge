@@ -1,7 +1,7 @@
 # Node
 node_modules/
 npm-debug.log
-package-lock.json
+# package-lock.json must be in the build context: npm ci installs from it
 
 # Python
 __pycache__/
@@ -23,6 +23,8 @@ data/
 sessions/
 output/
 .cache/
+qa-reports/
+logs/
 
 # Git
 .git/
@@ -57,3 +59,12 @@ DeveloperProductivityTracker/
 *.log
 *.tmp
 nul
+
+# Local env files and machine state (never in images)
+.env.*
+!.env.example
+!.env.local.example
+!.env.docker.example
+.omc/
+.agentforge/
+.brightforge/
