@@ -91,6 +91,24 @@ async function helperCheck() {
   }
 }
 
+async function assertGuardCheck() {
+  // A self-test whose only failure is a console.assert must exit non-zero,
+  // even when it calls process.exit(0) afterwards.
+  const dir = mkdtempSync(join(tmpdir(), 'bf-assert-'));
+  try {
+    const file = join(dir, 'assert-probe.mjs');
+    writeFileSync(file, `import { isSelfTest } from '${pathToFileURL(HELPER).href}';\n` +
+      'if (isSelfTest(import.meta.url)) { console.assert(false, "deliberate"); process.exit(0); }\n');
+    const failing = await runNode([file, '--test'], dir);
+    const plain = await runNode([file], dir);
+    if (failing.code !== 1) return `expected exit 1 for a failed assertion, got ${failing.code}`;
+    if (plain.code !== 0) return `expected exit 0 without --test, got ${plain.code}`;
+    return null;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 async function dynamicCheck(files) {
   const dir = mkdtempSync(join(tmpdir(), 'bf-probe-'));
   const probe = join(dir, 'probe.mjs');
@@ -129,6 +147,9 @@ async function main() {
   } else {
     console.log('[GUARD-CHECK] PASS static: no bare --test guards');
   }
+
+  const assertErr = await assertGuardCheck();
+  if (assertErr) { failed++; console.log(`[GUARD-CHECK] FAIL assert guard: ${assertErr}`); } else console.log('[GUARD-CHECK] PASS assert guard: failed console.assert -> exit 1');
 
   const helperErr = await helperCheck();
   if (helperErr) { failed++; console.log(`[GUARD-CHECK] FAIL helper: ${helperErr}`); } else console.log('[GUARD-CHECK] PASS helper: basename collision handled');

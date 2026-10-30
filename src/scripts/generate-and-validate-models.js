@@ -262,6 +262,12 @@ function writeReviewReport(results) {
  * @returns {Object[]} Updated results with promotedPath set
  */
 function promoteApproved(results) {
+  // Nothing approved: touch nothing on disk (defaults/ is tracked in git)
+  if (!results.some(r => r.approved && r.status === 'pass' && r.reviewFilePath)) {
+    console.log('[PROMOTE] No approved models to promote.');
+    return results;
+  }
+
   ensureDir(DEFAULTS_MODELS_DIR);
 
   const existingPrompts = existsSync(DEFAULTS_PROMPTS)

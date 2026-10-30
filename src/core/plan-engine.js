@@ -316,11 +316,10 @@ export function formatDate(date) {
   const diff = planEngine.generateDiff(originalContent, modifiedContent, 'test.txt');
   console.log(diff);
 
-  // Write sample output to test directory
-  const testDir = path.join(path.dirname(__dirname), '..', 'test');
-  if (!fs.existsSync(testDir)) {
-    fs.mkdirSync(testDir, { recursive: true });
-  }
+  // Write sample output to a temp directory (never into the tracked repo:
+  // test/sample-llm-output.txt is a committed fixture)
+  const { tmpdir } = await import('os');
+  const testDir = fs.mkdtempSync(path.join(tmpdir(), 'bf-plan-'));
 
   const sampleOutputPath = path.join(testDir, 'sample-llm-output.txt');
   fs.writeFileSync(sampleOutputPath, sampleLlmOutput, 'utf8');

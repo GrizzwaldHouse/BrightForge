@@ -237,7 +237,7 @@ if (isSelfTest(import.meta.url)) {
   console.assert(cfg.generation.timeout_ms === 600000, 'Gen timeout should be 600000');
   console.assert(cfg.database.path === 'data/forge3d.db', 'DB path should match');
   console.assert(cfg.project.output_dir === 'data/output', 'Output dir should match');
-  console.assert(cfg.queue.max_size === 20, 'Queue max size should be 20');
+  console.assert(cfg.queue.max_size === 50, 'Queue max size should match config/forge3d.yaml (50)');
   console.assert(cfg.api.raw_body_limit === '20mb', 'Body limit should be 20mb');
   console.assert(cfg.session.id_length === 12, 'Session ID length should be 12');
   console.assert(cfg.viewer.camera.fov === 45, 'Camera FOV should be 45');

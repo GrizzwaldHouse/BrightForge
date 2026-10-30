@@ -43,13 +43,63 @@ export function isMainModule(metaUrl) {
   return canonical(modulePath) === canonical(entry);
 }
 
+let assertionGuardInstalled = false;
+
+/**
+ * Make console.assert failures fail the self-test.
+ *
+ * Node's console.assert only prints "Assertion failed" and carries on, so a
+ * self-test built on it exits 0 even when assertions fail. While a module's
+ * self-test runs, failed assertions are counted and the process exit code is
+ * forced to 1 (including over an explicit process.exit(0)). Control flow is
+ * unchanged.
+ */
+function installAssertionGuard() {
+  if (assertionGuardInstalled) return;
+  assertionGuardInstalled = true;
+
+  let failures = 0;
+  const originalAssert = console.assert.bind(console);
+  console.assert = (condition, ...details) => {
+    if (!condition) {
+      failures++;
+      originalAssert(condition, ...details);
+    }
+  };
+
+  const report = () => {
+    if (failures > 0) {
+      console.error(`[SELF-TEST] ${failures} console.assert failure(s); exiting with code 1`);
+    }
+  };
+
+  const originalExit = process.exit.bind(process);
+  process.exit = (code) => {
+    if (failures > 0 && (code === undefined || code === 0)) {
+      report();
+      return originalExit(1);
+    }
+    return originalExit(code);
+  };
+
+  process.on('exit', (code) => {
+    if (failures > 0 && code === 0) {
+      report();
+      process.exitCode = 1;
+    }
+  });
+}
+
 /**
  * True when the module is the entry point AND `--test` was passed.
+ * Also installs the console.assert guard for the self-test run.
  * @param {string} metaUrl - pass `import.meta.url`
  * @returns {boolean}
  */
 export function isSelfTest(metaUrl) {
-  return process.argv.includes('--test') && isMainModule(metaUrl);
+  const active = process.argv.includes('--test') && isMainModule(metaUrl);
+  if (active) installAssertionGuard();
+  return active;
 }
 
 /**
