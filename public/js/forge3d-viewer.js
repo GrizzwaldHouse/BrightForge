@@ -8,7 +8,15 @@
  * @date February 14, 2026
  */
 
-/* global THREE */
+// three.js is served from the pinned npm package via the import map in
+// index.html (/vendor/three/...). The examples/js globals (THREE.OrbitControls,
+// THREE.GLTFLoader) no longer exist in three r171, so the jsm modules are
+// imported and exposed on a local THREE namespace.
+import * as THREE_CORE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const THREE = { ...THREE_CORE, OrbitControls, GLTFLoader };
 
 class Forge3DViewer {
   constructor(containerId, config = {}) {

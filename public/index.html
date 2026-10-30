@@ -600,13 +600,18 @@
     </div>
   </div>
 
-  <!-- Three.js (CDN) -->
-  <script src="https://cdn.jsdelivr.net/npm/three@0.171.0/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.171.0/examples/js/controls/OrbitControls.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.171.0/examples/js/loaders/GLTFLoader.js"></script>
-  
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Three.js: pinned npm package served locally (see /vendor routes in src/api/server.js) -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "/vendor/three/build/three.module.js",
+        "three/addons/": "/vendor/three/examples/jsm/"
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons: pinned npm package served locally -->
+  <script src="/vendor/lucide/lucide.min.js"></script>
 
   <script src="/js/sse-client.js"></script>
   <script src="/js/model-panel.js"></script>

@@ -167,6 +167,17 @@ export function createServer(options = {}) {
   const publicDir = join(__dirname, '../../public');
   app.use(express.static(publicDir));
 
+  // Vendored front-end libraries, served from the pinned npm packages
+  // (package-lock.json is the single source of the version; no CDN).
+  // Only the browser bundles are exposed, not whole package directories.
+  const nodeModules = join(__dirname, '../../node_modules');
+  const vendorStatic = (dir) => express.static(join(nodeModules, dir), { index: false, immutable: true, maxAge: '7d' });
+  app.use('/vendor/three/build', vendorStatic('three/build'));
+  app.use('/vendor/three/examples/jsm', vendorStatic('three/examples/jsm'));
+  app.use('/vendor/lucide', vendorStatic('lucide/dist/umd'));
+  // Anything else under /vendor is a plain 404 (never the SPA fallback)
+  app.use('/vendor', (_req, res) => res.status(404).type('text/plain').send('Not found'));
+
   // SPA fallback - serve index.html for non-API routes
   app.get('*', (req, res) => {
     if (!req.path.startsWith('/api')) {

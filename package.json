@@ -87,6 +87,7 @@
     "test-selftest-guard": "node src/tests/selftest-guard-check.js",
     "test-security": "node src/tests/security-regression.js",
     "test-events-queue": "node src/tests/events-queue-integration.js",
+    "test-frontend-assets": "node src/tests/frontend-assets-check.js",
     "test-bind-policy": "node src/api/bind-policy.js --test",
     "test-stability": "node src/tests/stability-run.js",
     "test-stability-quick": "node src/tests/stability-run.js --quick",
@@ -135,8 +136,10 @@
     "express": "^4.21.0",
     "express-rate-limit": "^8.3.0",
     "helmet": "^8.1.0",
+    "lucide": "1.57.0",
     "obs-websocket-js": "^5.0.8",
     "rotating-file-stream": "^3.2.9",
+    "three": "0.171.0",
     "undici": "^7.22.0",
     "ws": "^8.20.0",
     "yaml": "^2.3.4"
