@@ -21,7 +21,7 @@
 
 import { Router } from 'express';
 import { WebSession } from '../web-session.js';
-import gitCheckpointer from '../../core/git-checkpointer.js';
+import gitCheckpointer, { isValidCommitHash } from '../../core/git-checkpointer.js';
 import llmClient from '../../core/llm-client.js';
 import pipelineDetector from '../../core/pipeline-detector.js';
 import creativePipeline from '../../core/creative-pipeline.js';
@@ -396,7 +396,7 @@ export function chatRoutes() {
       const { commitHash } = req.params;
       const projectRoot = req.body.projectRoot || process.cwd();
 
-      if (!commitHash || commitHash.length < 7) {
+      if (!isValidCommitHash(commitHash)) {
         return res.status(400).json({ error: 'Invalid commit hash' });
       }
 
@@ -405,7 +405,7 @@ export function chatRoutes() {
       if (result.success) {
         res.json({ status: 'reverted', commitHash });
       } else {
-        res.status(400).json({ status: 'failed', error: result.error });
+        res.status(result.code === 'NOT_FOUND' ? 404 : 400).json({ status: 'failed', error: result.error });
       }
     } catch (error) {
       console.error(`[ROUTE] /api/chat/revert error: ${error.message}`);

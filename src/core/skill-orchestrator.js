@@ -35,7 +35,7 @@ import { join, basename, relative } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { createHash } from 'crypto';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import telemetryBus from './telemetry-bus.js';
 import errorHandler from './error-handler.js';
 import { isSelfTest } from './is-main-module.js';
@@ -55,6 +55,17 @@ const COWORK_SKILLS_DIR = join(CLAUDE_DIR, 'cowork-skills', 'skills');
 const MAX_ACTIVE_SKILLS = 15;
 const ARCHIVE_THRESHOLD_DAYS = 30;
 const LOG_PREFIX = '[SKILL-ORCH]';
+const SKILL_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+
+/**
+ * Skill names become file names and URL path segments, so only a strict
+ * character set is accepted (no separators, no '..', no shell metacharacters).
+ * @param {unknown} name
+ * @returns {boolean}
+ */
+export function isValidSkillName(name) {
+  return typeof name === 'string' && SKILL_NAME_PATTERN.test(name) && !name.includes('..');
+}
 
 class SkillOrchestrator extends EventEmitter {
   constructor() {
@@ -179,6 +190,11 @@ class SkillOrchestrator extends EventEmitter {
     const failed = [];
 
     for (const skillName of requiredSkills) {
+      if (!isValidSkillName(skillName)) {
+        failed.push(String(skillName));
+        this._logTransition('WARN', 'Rejected invalid skill name');
+        continue;
+      }
       try {
         const entry = this.registry[skillName];
 
@@ -390,7 +406,7 @@ class SkillOrchestrator extends EventEmitter {
 
     try {
       const coworkRoot = join(COWORK_SKILLS_DIR, '..');
-      execSync('git pull origin main', {
+      execFileSync('git', ['pull', 'origin', 'main'], {
         cwd: coworkRoot,
         stdio: 'pipe',
         timeout: 30000
@@ -647,18 +663,21 @@ class SkillOrchestrator extends EventEmitter {
   }
 
   _fetchFromGitHub(skillName) {
-    if (!this.gitRemote) return false;
+    if (!this.gitRemote || !isValidSkillName(skillName)) return false;
+    if (!/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(this.gitRemote)) return false;
 
     // Attempt sparse checkout of skill from remote
     try {
       const tempDir = join(TEMP_CACHE_DIR, `_fetch_${Date.now()}`);
       mkdirSync(tempDir, { recursive: true });
 
-      // Try to fetch raw file from GitHub
-      const rawUrl = `${this.gitRemote}/raw/main/.claude/skills/${skillName}.md`;
-      execSync(`curl -sf -o "${join(tempDir, `${skillName}.md`)}" "${rawUrl}"`, {
+      // Try to fetch raw file from GitHub (argument vector, no shell)
+      const rawUrl = `${this.gitRemote}/raw/main/.claude/skills/${encodeURIComponent(skillName)}.md`;
+      execFileSync('curl', ['-sf', '--max-filesize', '1048576', '-o', join(tempDir, `${skillName}.md`), rawUrl], {
         stdio: 'pipe',
-        timeout: 15000
+        timeout: 15000,
+        shell: false,
+        windowsHide: true
       });
 
       const fetchedFile = join(tempDir, `${skillName}.md`);
@@ -682,7 +701,7 @@ class SkillOrchestrator extends EventEmitter {
 
   _discoverGitRemote() {
     try {
-      const remote = execSync('git remote get-url origin', {
+      const remote = execFileSync('git', ['remote', 'get-url', 'origin'], {
         cwd: PROJECT_ROOT,
         stdio: 'pipe',
         timeout: 5000
