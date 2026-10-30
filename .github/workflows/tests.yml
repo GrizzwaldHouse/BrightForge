@@ -44,6 +44,9 @@ jobs:
       - name: Frontend asset check
         run: npm run test-frontend-assets
 
+      - name: Mesh optimize -> export data flow
+        run: npm run test-mesh-flow
+
       - name: Run core self-tests
         run: npm run test-all-core
 
@@ -78,6 +81,23 @@ jobs:
 
       - name: Run integration test suite
         run: npm run test-integration
+
+  python-mesh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install CPU-only mesh dependencies
+        run: pip install 'trimesh>=4.6.0' numpy pyyaml 'fast-simplification>=0.1.7'
+
+      - name: Mesh post-processing tests
+        run: python -m unittest discover -s python/tests -v
 
   stability-test:
     runs-on: ubuntu-latest

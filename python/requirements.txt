@@ -20,6 +20,8 @@ python-multipart>=0.0.9
 
 # Mesh processing
 trimesh>=4.6.0
+# Backend required by trimesh.simplify_quadric_decimation (mesh optimize + LOD)
+fast-simplification>=0.1.7
 
 # FBX conversion (GLB -> FBX for Unreal Engine)
 pyassimp>=5.2.5

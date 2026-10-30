@@ -6,6 +6,7 @@
 #          Uses adapter pattern for pluggable model backends.
 
 import gc
+import shutil
 import os
 import time
 import threading
@@ -545,18 +546,23 @@ class ModelManager:
 
             if target_faces >= original_faces:
                 logger.info(f'[MODEL] Mesh already has {original_faces} faces (target: {target_faces}), skipping')
-                output_path = input_path
+                # Still produce the requested output file so callers can always
+                # download the result from output_path
+                if output_path.resolve() != input_path.resolve():
+                    output_path.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copyfile(str(input_path), str(output_path))
                 return {
                     'success': True,
                     'output_path': str(output_path),
                     'original_faces': original_faces,
                     'optimized_faces': original_faces,
                     'reduction_pct': 0.0,
-                    'file_size_bytes': input_path.stat().st_size,
+                    'file_size_bytes': output_path.stat().st_size,
                     'skipped': True,
                 }
 
-            optimized = mesh.simplify_quadric_decimation(target_faces)
+            # trimesh >= 4: first positional parameter is `percent`; pass face_count by name
+            optimized = mesh.simplify_quadric_decimation(face_count=int(target_faces))
 
             output_path.parent.mkdir(parents=True, exist_ok=True)
             optimized.export(str(output_path), file_type='glb')
@@ -621,7 +627,7 @@ class ModelManager:
                     mesh.export(str(out_path), file_type='glb')
                     faces = original_faces
                 else:
-                    decimated = mesh.simplify_quadric_decimation(target)
+                    decimated = mesh.simplify_quadric_decimation(face_count=int(target))
                     decimated.export(str(out_path), file_type='glb')
                     faces = len(decimated.faces)
 

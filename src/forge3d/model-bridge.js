@@ -677,6 +677,19 @@ class ModelBridge extends EventEmitter {
 
     const result = await response.json();
     console.log(`[BRIDGE] Mesh optimized: ${result.original_faces} -> ${result.optimized_faces} faces (${result.reduction_pct}%)`);
+
+    // The server returns metadata plus a download path; fetch the optimized
+    // bytes so downstream stages export the optimized mesh, not the input.
+    const match = typeof result.download_path === 'string'
+      ? result.download_path.match(/^\/download\/([^/]+)\/([^/]+)$/)
+      : null;
+    if (!match) {
+      throw new Error('Optimization response did not include a valid download_path');
+    }
+    result.buffer = await this.downloadFile(decodeURIComponent(match[1]), decodeURIComponent(match[2]));
+    if (!result.buffer || result.buffer.length === 0) {
+      throw new Error('Optimized mesh download was empty');
+    }
     return result;
   }
 

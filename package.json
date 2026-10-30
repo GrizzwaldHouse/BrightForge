@@ -88,6 +88,8 @@
     "test-security": "node src/tests/security-regression.js",
     "test-events-queue": "node src/tests/events-queue-integration.js",
     "test-frontend-assets": "node src/tests/frontend-assets-check.js",
+    "test-mesh-flow": "node src/tests/mesh-optimize-flow.js",
+    "test-python-mesh": "python -m unittest discover -s python/tests -v",
     "test-bind-policy": "node src/api/bind-policy.js --test",
     "test-stability": "node src/tests/stability-run.js",
     "test-stability-quick": "node src/tests/stability-run.js --quick",

@@ -52,11 +52,21 @@ export async function execute(context, stageConfig) {
       context.sessionId || 'pipeline'
     );
 
+    const optimizedBuffer = result.buffer || result.optimizedBuffer || null;
+    if (!optimizedBuffer || optimizedBuffer.length === 0) {
+      // Never let later stages silently export the unoptimized mesh
+      return {
+        success: false,
+        result: null,
+        error: 'Optimization returned no mesh bytes'
+      };
+    }
+
     // Update context with optimized mesh
     return {
       success: true,
       result: {
-        optimizedBuffer: result.buffer || result.optimizedBuffer || null,
+        optimizedBuffer,
         originalFaces: result.original_faces || result.originalFaces,
         optimizedFaces: result.optimized_faces || result.optimizedFaces,
         reductionRatio: result.reduction_ratio || result.reductionRatio,
