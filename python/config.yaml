@@ -71,8 +71,12 @@ validation:
 
 fbx_export:
   enabled: true
-  preferred_backend: "assimp"  # assimp | blender | auto
-  blender_path: null  # auto-detect from PATH if null
+  preferred_backend: "blender"  # blender | assimp | auto. Blender gives the most reliable FBX for Unreal; pyassimp needs a native assimp library
+  blender_path: null  # auto-detect if null (BRIGHTFORGE_BLENDER env, PATH, then the globs below)
+  blender_search_globs:  # standard install locations; newest match wins
+    - "%ProgramFiles%/Blender Foundation/Blender */blender.exe"
+    - "/Applications/Blender.app/Contents/MacOS/Blender"
+    - "/usr/bin/blender"
   scale_factor: 100.0  # meters -> centimeters for Unreal
   coordinate_system: "unreal"  # unreal (Z-up, cm) | default
 
