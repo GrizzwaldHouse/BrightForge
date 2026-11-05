@@ -47,7 +47,9 @@ function runScript(name) {
   return new Promise((resolve) => {
     const started = Date.now();
     const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-    const child = spawn(npm, ['run', '-s', name], { cwd: ROOT, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
+    // Windows: Node refuses to spawn .cmd files without a shell (EINVAL since
+    // the CVE-2024-27980 fix). Script names come from package.json, not users.
+    const child = spawn(npm, ['run', '-s', name], { cwd: ROOT, env: process.env, stdio: ['ignore', 'pipe', 'pipe'], shell: process.platform === 'win32' });
     let out = '';
     child.stdout.on('data', (d) => { out += d; });
     child.stderr.on('data', (d) => { out += d; });

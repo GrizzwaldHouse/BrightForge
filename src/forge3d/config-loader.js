@@ -43,7 +43,9 @@ class Forge3DConfig {
       max_restart_attempts: 3,
       restart_cooldown_ms: 5000,
       shutdown_grace_ms: 5000,
-      command_timeout_ms: 15000
+      command_timeout_ms: 15000,
+      python_executable: null,
+      venv_dir: '.venv'
     });
 
     this.healthCheck = this._section('health_check', {

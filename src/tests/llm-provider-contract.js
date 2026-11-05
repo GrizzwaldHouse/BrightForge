@@ -13,6 +13,9 @@
  *   - an exhausted budget blocks paid preferred AND fallback providers
  *   - a caller AbortSignal does not disable the request timeout
  *
+ *   - config-driven models: ordered candidates resolved against installed
+ *     models, typed MODEL_UNAVAILABLE error, router falls through, env pins
+ *
  * Live (opt-in): --live or OLLAMA_LIVE=1 [OLLAMA_BASE_URL=...] [OLLAMA_MODEL=...]
  *   checks health and runs one real completion IF the model is already
  *   installed. It never pulls a model. Live results are reported separately.
@@ -22,6 +25,7 @@
 
 import { createServer } from 'http';
 import { isMainModule } from '../core/is-main-module.js';
+import { toCandidates, findInstalled, sameModel, roleEnvVar } from '../core/model-resolver.js';
 
 const MODEL = 'fixture-model:1b';
 
@@ -75,6 +79,24 @@ function makeClient(UniversalLLMClient, baseUrl, { timeoutMs = 1500 } = {}) {
   } finally {
     for (const [k, v] of [['OLLAMA_BASE_URL', saved.b], ['OLLAMA_MODEL', saved.m], ['OLLAMA_TIMEOUT_MS', saved.t]]) {
       if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  }
+}
+
+// Client that resolves models from config candidates (no env pins).
+function makeUnpinnedClient(UniversalLLMClient, baseUrl, models) {
+  const keys = ['OLLAMA_BASE_URL', 'OLLAMA_MODEL', ...['code', 'fast', 'default', 'embed'].map(roleEnvVar)];
+  const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
+  for (const k of keys) delete process.env[k];
+  process.env.OLLAMA_BASE_URL = baseUrl;
+  try {
+    const client = new UniversalLLMClient();
+    client.providers.ollama.models = models;
+    client.providers.ollama.timeout_ms = 1500;
+    return client;
+  } finally {
+    for (const k of keys) {
+      if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k];
     }
   }
 }
@@ -157,6 +179,47 @@ export async function runProviderContractTests({ Client, log = console.log } = {
     check(Boolean(e) && paidCalls.length === 0, `exhausted budget blocks preferred and fallback (${paidCalls.length} provider calls)`);
     e = await errOf(() => budgetClient.chat(msgs, { task: 't', forceProvider: 'paidfake' }));
     check(/budget/i.test(e || ''), 'exhausted budget also blocks a forced provider');
+
+    log('\n[6] Config-driven model selection');
+    check(JSON.stringify(toCandidates(['a', ' ', 'b '])) === '["a","b"]' && toCandidates(null).length === 0, 'config value normalised to an ordered candidate list');
+    check(sameModel('m', 'm:latest') && !sameModel('m:7b', 'm:14b'), 'implicit :latest tag treated as the same model');
+    check(findInstalled(['x:1b', 'y:2b'], ['y:2b', 'x:1b']) === 'x:1b' && findInstalled(['z'], ['x:1b']) === null, 'first installed candidate in config order wins');
+
+    fake.state.mode = 'ok';
+    const MISSING = 'not-installed:1b';
+    const cfg = makeUnpinnedClient(Client, fake.url, { code: [MISSING, MODEL], fast: MISSING, embed: [MISSING] });
+    check(cfg.getModel('ollama', 'code') === MISSING, 'getModel returns the first configured candidate (no I/O)');
+    check(await cfg.resolveModel('ollama', 'code') === MODEL, 'resolveModel skips an uninstalled candidate');
+    const okCfg = await cfg.callProvider('ollama', msgs, { modelHint: 'code' });
+    check(okCfg.content === 'fixture reply', 'completion uses the installed fallback candidate');
+
+    const before = fake.state.calls.filter((c) => c.url === '/v1/chat/completions').length;
+    let typed = null;
+    try { await cfg.callProvider('ollama', msgs, { modelHint: 'fast' }); } catch (err) { typed = err; }
+    const after = fake.state.calls.filter((c) => c.url === '/v1/chat/completions').length;
+    check(typed?.code === 'MODEL_UNAVAILABLE' && after === before, 'no candidate installed -> typed MODEL_UNAVAILABLE error, no request sent');
+
+    const h6 = await cfg.getOllamaHealth();
+    check(h6.modelAvailable && h6.model === MODEL && h6.candidates.length === 2, 'health reports which candidate is installed');
+
+    cfg.providers.localfallback = { enabled: true, base_url: `${fake.url}/v1`, api_key: 'test', models: { default: MODEL }, cost_per_1k_tokens: 0 };
+    cfg.taskRouting = { t: { prefer: ['ollama:fast', 'localfallback'], fallback: null } };
+    const routed = await cfg.chat(msgs, { task: 't' });
+    const skipped = routed.routingLog?.find((r) => r.provider === 'ollama');
+    check(routed.provider === 'localfallback' && skipped?.status === 'failed', 'router moves to the next provider when the local model is missing');
+
+    const unreachable = makeUnpinnedClient(Client, 'http://127.0.0.1:9', { code: [MISSING, MODEL] });
+    check(await unreachable.resolveModel('ollama', 'code') === MISSING, 'server unreachable -> first candidate, request reports the outage');
+
+    const pinKey = roleEnvVar('embed');
+    const savedPin = process.env[pinKey];
+    process.env[pinKey] = 'pinned-embed:1b';
+    try {
+      const pinned = new Client();
+      check(pinned.getModel('ollama', 'embed') === 'pinned-embed:1b' && pinned.pinnedModels.has('ollama:embed'), `${pinKey} pins one role without code changes`);
+    } finally {
+      if (savedPin === undefined) delete process.env[pinKey]; else process.env[pinKey] = savedPin;
+    }
   } finally {
     fake.server.close();
   }

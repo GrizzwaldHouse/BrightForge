@@ -7,6 +7,7 @@ Fallback backend: Blender CLI subprocess.
 """
 
 import os
+import glob
 import time
 import shutil
 import logging
@@ -27,6 +28,32 @@ except Exception:
 def _cfg(section, key, default=None):
     """Get a config value with fallback to default."""
     return CONFIG.get(section, {}).get(key, default)
+
+
+# Environment override for the Blender executable used as the FBX backend
+BLENDER_ENV_VAR = 'BRIGHTFORGE_BLENDER'
+
+
+def _find_blender():
+    """Locate Blender: env var, configured path, PATH, then configured install globs.
+
+    Returns the newest match from the globs (sorted by path, so 'Blender 5.0'
+    sorts after 'Blender 4.2'), or None.
+    """
+    env_path = os.environ.get(BLENDER_ENV_VAR)
+    if env_path and Path(env_path).exists():
+        return env_path
+    configured_path = _cfg('fbx_export', 'blender_path', None)
+    if configured_path and Path(configured_path).exists():
+        return configured_path
+    in_path = shutil.which('blender')
+    if in_path:
+        return in_path
+    for pattern in _cfg('fbx_export', 'blender_search_globs', []) or []:
+        matches = sorted(glob.glob(os.path.expandvars(pattern)))
+        if matches:
+            return matches[-1]
+    return None
 
 
 class FbxConverter:
@@ -52,16 +79,9 @@ class FbxConverter:
                 logger.info(f'[FBX] pyassimp not available ({e}), checking Blender...')
 
         # Try Blender
-        configured_path = _cfg('fbx_export', 'blender_path', None)
-        if configured_path and Path(configured_path).exists():
-            self.blender_path = configured_path
-            self.backend = 'blender'
-            logger.info(f'[FBX] Backend: Blender at {self.blender_path}')
-            return
-
-        blender_in_path = shutil.which('blender')
-        if blender_in_path:
-            self.blender_path = blender_in_path
+        blender_path = _find_blender()
+        if blender_path:
+            self.blender_path = blender_path
             self.backend = 'blender'
             logger.info(f'[FBX] Backend: Blender at {self.blender_path}')
             return
@@ -73,8 +93,8 @@ class FbxConverter:
                 self.backend = 'assimp'
                 logger.info('[FBX] Backend: pyassimp (Blender not found, falling back)')
                 return
-            except ImportError:
-                pass
+            except Exception as e:  # pyassimp raises AssimpError when the native library is missing
+                logger.info(f'[FBX] pyassimp not available ({e})')
 
         logger.warning('[FBX] No FBX conversion backend available. Install pyassimp or Blender.')
         self.backend = 'none'
