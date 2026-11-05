@@ -13,9 +13,19 @@ torch>=2.6.0
 torchvision>=0.21.0
 
 # AI model loading
-diffusers>=0.33.0
-transformers>=4.49.0
+# transformers 5.x renamed the DINOv2 attention weights, so the Hunyuan3D-2
+# checkpoint no longer loads; diffusers 0.36+ needs huggingface-hub 1.x, which
+# transformers 4.x does not accept. Verified pair: diffusers 0.35.2 + transformers 4.57.6.
+diffusers>=0.33.0,<0.36
+transformers>=4.49.0,<5
 accelerate>=1.4.0
+
+# Hunyuan3D shape generation (hy3dgen) is not on PyPI. Install it from the
+# official repo into the same environment (shape only; texturing needs a CUDA
+# toolkit build of its rasterizer):
+#   git clone --depth 1 https://github.com/Tencent-Hunyuan/Hunyuan3D-2.git
+#   .venv\Scripts\python -m pip install --no-deps -e Hunyuan3D-2
+#   .venv\Scripts\python -m pip install opencv-python omegaconf pymeshlab xatlas
 
 # Inference server
 fastapi>=0.115.0
