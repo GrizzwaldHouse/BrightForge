@@ -7,10 +7,16 @@ providers:
     enabled: true
     base_url: "http://127.0.0.1:11434/v1"
     api_key: null  # No key needed for local
+    # Each role lists candidate model tags in preference order. The first tag
+    # that is installed in Ollama is used; missing tags are skipped. If none is
+    # installed, the request fails with MODEL_UNAVAILABLE and the task router
+    # moves on to the next provider. Change models here, or pin them with
+    # OLLAMA_MODEL (all chat roles) or OLLAMA_MODEL_<ROLE>; no code changes.
     models:
-      code: "llama3:8b"
-      fast: "llama3:8b"
-      embed: "nomic-embed-text"
+      code: ["qwen2.5-coder:14b-instruct-q6_K", "qwen2.5-coder:14b"]
+      fast: ["qwen2.5-coder:14b-instruct-q6_K", "qwen2.5-coder:14b"]
+      embed: ["nomic-embed-text"]
+    model_cache_ttl_ms: 30000  # how long the installed-model list is reused
     priority: 1
     cost_per_1k_tokens: 0
     requires_local: true

@@ -21,8 +21,8 @@
 
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
-import { dirname, extname, join } from 'path';
-import { createWriteStream, statSync } from 'fs';
+import { dirname, extname, join, resolve } from 'path';
+import { createWriteStream, existsSync, statSync } from 'fs';
 import { EventEmitter } from 'events';
 import forge3dConfig from './config-loader.js';
 import telemetryBus from '../core/telemetry-bus.js';
@@ -32,7 +32,11 @@ import { isSelfTest } from '../core/is-main-module.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const PYTHON_DIR = join(__dirname, '../../python');
+const PROJECT_ROOT = join(__dirname, '../..');
+const PYTHON_DIR = join(PROJECT_ROOT, 'python');
+// Environment override for the Python interpreter (absolute path or command)
+const PYTHON_ENV_VAR = 'BRIGHTFORGE_PYTHON';
+const VENV_PYTHON_RELATIVE = process.platform === 'win32' ? join('Scripts', 'python.exe') : join('bin', 'python');
 const ERROR_LOG_PATH = join(__dirname, '../../sessions/bridge-errors.log');
 const MAX_LOG_SIZE = 1024 * 1024; // 1MB
 
@@ -1047,8 +1051,23 @@ class ModelBridge extends EventEmitter {
   async _checkEnvironment() {
     const issues = [];
 
-    // Try py launcher first (most reliable on Windows), then direct commands
+    // Configured interpreters first (env, config, project venv), so the
+    // environment that has torch/CUDA installed wins over a bare system Python.
+    const configured = [];
+    if (process.env[PYTHON_ENV_VAR]) {
+      configured.push({ cmd: process.env[PYTHON_ENV_VAR], prefixArgs: [] });
+    }
+    if (forge3dConfig.pythonServer.python_executable) {
+      configured.push({ cmd: resolve(PROJECT_ROOT, forge3dConfig.pythonServer.python_executable), prefixArgs: [] });
+    }
+    if (forge3dConfig.pythonServer.venv_dir) {
+      const venvPython = join(resolve(PROJECT_ROOT, forge3dConfig.pythonServer.venv_dir), VENV_PYTHON_RELATIVE);
+      if (existsSync(venvPython)) configured.push({ cmd: venvPython, prefixArgs: [] });
+    }
+
+    // Then the py launcher (most reliable on Windows), then direct commands
     const candidates = [
+      ...configured,
       { cmd: 'py', prefixArgs: ['-3.13'] },
       { cmd: 'py', prefixArgs: ['-3.12'] },
       { cmd: 'py', prefixArgs: ['-3.11'] },
@@ -1087,7 +1106,8 @@ class ModelBridge extends EventEmitter {
     }
 
     if (!foundPython) {
-      issues.push('Python 3.10+ not found (tried: py -3.13, py -3.12, py -3.11, py -3.10, py -3, python3.13, python3.12, python3.11, python3.10, python, python3)');
+      const tried = candidates.map((c) => [c.cmd, ...c.prefixArgs].join(' ')).join(', ');
+      issues.push(`Python 3.10+ not found (tried: ${tried}). Set ${PYTHON_ENV_VAR} or python_server.python_executable in config/forge3d.yaml`);
       return { ready: false, issues };
     }
 

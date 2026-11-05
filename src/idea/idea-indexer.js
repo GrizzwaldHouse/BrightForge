@@ -1,6 +1,7 @@
 // idea-indexer.js / Developer: Marcus Daley / 2026-04-07 / Embedding generation, semantic search, cross-linking
 
-// Generates 768-dim embeddings for ideas via Ollama nomic-embed-text,
+// Generates embeddings for ideas via the Ollama embed model configured in
+// config/llm-providers.yaml (providers.ollama.models.embed),
 // stores them on the ideas table, and provides semantic search and
 // pairwise cross-linking. Embeddings are persisted as JSON strings.
 // Emits idea_indexed and idea_linked events.
@@ -9,10 +10,13 @@ import errorHandler from '../core/error-handler.js';
 import { isSelfTest } from '../core/is-main-module.js';
 
 const DEFAULT_OLLAMA_URL = 'http://127.0.0.1:11434';
-const DEFAULT_EMBEDDING_MODEL = 'nomic-embed-text';
 const DEFAULT_DIMENSIONS = 768;
 const DEFAULT_DUPLICATE_THRESHOLD = 0.92;
 const DEFAULT_RELATED_THRESHOLD = 0.70;
+// Config role that names the embedding model (see config/llm-providers.yaml)
+const EMBED_MODEL_ROLE = 'embed';
+// Environment pin for the embedding model when no LLM client is supplied
+const EMBED_MODEL_ENV = 'OLLAMA_MODEL_EMBED';
 
 // Cosine similarity between two equal-length numeric vectors.
 // Returns 0 for invalid or zero-norm inputs.
@@ -35,11 +39,11 @@ function cosineSimilarity(a, b) {
 class IdeaIndexer {
   // storage: OrchestrationStorage
   // eventBus: OrchestrationEventBus
-  // llmClient: UniversalLLMClient (unused for embeddings; kept for parity)
+  // llmClient: UniversalLLMClient (resolves the configured embed model and Ollama URL)
   // options: {
   //   embeddingFn,         // optional custom embed function (text) => Promise<number[]>
-  //   ollamaUrl,           // base url for Ollama (default 127.0.0.1:11434)
-  //   embeddingModel,      // model name (default nomic-embed-text)
+  //   ollamaUrl,           // base url for Ollama (default: llmClient config, then 127.0.0.1:11434)
+  //   embeddingModel,      // model name (default: OLLAMA_MODEL_EMBED, then config models.embed)
   //   dimensions,          // expected embedding length (default 768)
   //   duplicateThreshold,  // cosine threshold for duplicates (default 0.92)
   //   relatedThreshold     // cosine threshold for related links (default 0.70)
@@ -49,8 +53,9 @@ class IdeaIndexer {
     this.eventBus = eventBus;
     this.llmClient = llmClient;
     this.embeddingFn = options.embeddingFn || null;
-    this.ollamaUrl = options.ollamaUrl || DEFAULT_OLLAMA_URL;
-    this.embeddingModel = options.embeddingModel || DEFAULT_EMBEDDING_MODEL;
+    this.ollamaUrl = options.ollamaUrl || llmClient?.ollamaRootUrl?.() || DEFAULT_OLLAMA_URL;
+    // Explicit option or env pin; otherwise resolved from config at first use
+    this.embeddingModel = options.embeddingModel || process.env[EMBED_MODEL_ENV] || null;
     this.dimensions = options.dimensions || DEFAULT_DIMENSIONS;
     this.duplicateThreshold = typeof options.duplicateThreshold === 'number'
       ? options.duplicateThreshold
@@ -75,6 +80,7 @@ class IdeaIndexer {
       return vec;
     }
 
+    const model = await this.resolveEmbeddingModel();
     const url = `${this.ollamaUrl}/api/embeddings`;
     let response;
     try {
@@ -82,7 +88,7 @@ class IdeaIndexer {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: this.embeddingModel,
+          model,
           prompt: text
         })
       });
@@ -101,6 +107,17 @@ class IdeaIndexer {
     }
 
     return data.embedding;
+  }
+
+  // Embedding model: explicit option / env pin, else the first installed
+  // candidate for the "embed" role in config/llm-providers.yaml.
+  async resolveEmbeddingModel() {
+    if (this.embeddingModel) return this.embeddingModel;
+    if (this.llmClient?.resolveModel) {
+      const resolved = await this.llmClient.resolveModel('ollama', EMBED_MODEL_ROLE);
+      if (resolved) return resolved;
+    }
+    throw new Error(`No embedding model configured: set providers.ollama.models.${EMBED_MODEL_ROLE} in config/llm-providers.yaml or ${EMBED_MODEL_ENV}`);
   }
 
   // Compose the text used for embedding from an idea record.

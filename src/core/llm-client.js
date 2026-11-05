@@ -17,12 +17,23 @@ import telemetryBus from './telemetry-bus.js';
 import contextAdapter from './context-adapter.js';
 import selfHealingOrchestrator from './self-healing-orchestrator.js';
 import { isSelfTest } from './is-main-module.js';
+import { ModelUnavailableError, toCandidates, findInstalled, roleEnvVar } from './model-resolver.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Load provider config
 const configPath = join(__dirname, '../../config/llm-providers.yaml');
+
+// How long the list of installed Ollama models is reused before asking again.
+// Override per install with providers.ollama.model_cache_ttl_ms.
+const DEFAULT_MODEL_CACHE_TTL_MS = 30000;
+// Timeout for the lightweight /api/tags probe.
+const DEFAULT_OLLAMA_PROBE_TIMEOUT_MS = 2000;
+// Chat roles that the global OLLAMA_MODEL override applies to.
+const OLLAMA_CHAT_ROLES = ['code', 'fast', 'default'];
+// Roles that can always be pinned by environment even if absent from config.
+const OLLAMA_PINNABLE_ROLES = [...OLLAMA_CHAT_ROLES, 'embed'];
 
 class UniversalLLMClient {
   constructor(configOverride = null) {
@@ -35,6 +46,8 @@ class UniversalLLMClient {
     }
 
     this.providers = this.config.providers || {};
+    // "provider:role" keys pinned by environment; pinned models are used as given
+    this.pinnedModels = new Set();
     this._applyOllamaEnv(process.env);
     this.taskRouting = this.config.task_routing || {};
     this.budget = this.config.budget || { daily_limit_usd: 1.0 };
@@ -49,6 +62,8 @@ class UniversalLLMClient {
 
     // Cache for provider health (e.g. Ollama availability) to avoid repeated timeouts
     this.healthCache = new Map();
+    // Cache for the installed Ollama model list ({ models: string[]|null, timestamp })
+    this.ollamaModelCache = null;
   }
 
   /**
@@ -56,6 +71,7 @@ class UniversalLLMClient {
    * model and timeout never need code changes:
    *   OLLAMA_BASE_URL   e.g. http://127.0.0.1:11434 (with or without /v1)
    *   OLLAMA_MODEL      model tag used for code/fast/default routing
+   *   OLLAMA_MODEL_<ROLE> model tag for one role, e.g. OLLAMA_MODEL_EMBED
    *   OLLAMA_TIMEOUT_MS per-request timeout for Ollama calls
    * @private
    */
@@ -65,9 +81,21 @@ class UniversalLLMClient {
     if (env.OLLAMA_BASE_URL) {
       ollama.base_url = `${env.OLLAMA_BASE_URL.replace(/\/+$/, '').replace(/\/v1$/, '')}/v1`;
     }
+    const models = { ...(ollama.models || {}) };
     if (env.OLLAMA_MODEL) {
-      ollama.models = { ...(ollama.models || {}), code: env.OLLAMA_MODEL, fast: env.OLLAMA_MODEL, default: env.OLLAMA_MODEL };
+      for (const role of OLLAMA_CHAT_ROLES) {
+        models[role] = env.OLLAMA_MODEL;
+        this.pinnedModels.add(`ollama:${role}`);
+      }
     }
+    for (const role of new Set([...Object.keys(models), ...OLLAMA_PINNABLE_ROLES])) {
+      const pinned = env[roleEnvVar(role)];
+      if (pinned) {
+        models[role] = pinned;
+        this.pinnedModels.add(`ollama:${role}`);
+      }
+    }
+    ollama.models = models;
     const timeout = Number.parseInt(env.OLLAMA_TIMEOUT_MS, 10);
     if (Number.isFinite(timeout) && timeout > 0) {
       ollama.timeout_ms = timeout;
@@ -84,24 +112,25 @@ class UniversalLLMClient {
   }
 
   /**
-   * Ollama health: server reachable, installed models, configured model present.
-   * Never pulls or downloads a model.
+   * Ollama health: server reachable, installed models, and which configured
+   * candidate for the code role is installed. Never pulls or downloads a model.
    * @param {{ timeoutMs?: number }} [opts]
-   * @returns {Promise<{ running: boolean, models: string[], model: string|null, modelAvailable: boolean, error?: string }>}
+   * @returns {Promise<{ running: boolean, models: string[], model: string|null, modelAvailable: boolean, candidates: string[], error?: string }>}
    */
-  async getOllamaHealth({ timeoutMs = 2000 } = {}) {
-    const model = this.getModel('ollama', 'code');
+  async getOllamaHealth({ timeoutMs = DEFAULT_OLLAMA_PROBE_TIMEOUT_MS } = {}) {
+    const candidates = this.getModelCandidates('ollama', this._modelRole('ollama', 'code') || 'code');
+    const model = candidates[0] || null;
     try {
       const response = await fetch(`${this.ollamaRootUrl()}/api/tags`, { method: 'GET', signal: AbortSignal.timeout(timeoutMs) });
       if (!response.ok) {
-        return { running: false, models: [], model, modelAvailable: false, error: `HTTP ${response.status}` };
+        return { running: false, models: [], model, modelAvailable: false, candidates, error: `HTTP ${response.status}` };
       }
       const data = await response.json();
       const models = Array.isArray(data?.models) ? data.models.map((m) => m.name || m.model).filter(Boolean) : [];
-      const modelAvailable = Boolean(model) && models.some((name) => name === model || name === `${model}:latest`);
-      return { running: true, models, model, modelAvailable };
+      const installedModel = findInstalled(candidates, models);
+      return { running: true, models, model: installedModel || model, modelAvailable: Boolean(installedModel), candidates };
     } catch (err) {
-      return { running: false, models: [], model, modelAvailable: false, error: err.name === 'TimeoutError' ? 'timeout' : err.message };
+      return { running: false, models: [], model, modelAvailable: false, candidates, error: err.name === 'TimeoutError' ? 'timeout' : err.message };
     }
   }
 
@@ -194,25 +223,90 @@ class UniversalLLMClient {
    * Get model name for provider
    */
   getModel(provider, modelHint = null, complexity = 'default') {
-    const providerConfig = this.providers[provider];
-    if (!providerConfig?.models) return null;
+    const role = this._modelRole(provider, modelHint, complexity);
+    if (role === undefined) return null;
+    if (role === null) return modelHint; // modelHint is an explicit configured model name
+    return this.getModelCandidates(provider, role)[0] || null;
+  }
 
-    // If modelHint matches a model key (code, fast, default, etc.)
-    if (modelHint && providerConfig.models[modelHint]) {
-      return providerConfig.models[modelHint];
+  /**
+   * Ordered model candidates configured for a provider role. A role may be a
+   * single tag or a list in config/llm-providers.yaml.
+   * @param {string} provider
+   * @param {string} role
+   * @returns {string[]}
+   */
+  getModelCandidates(provider, role) {
+    return toCandidates(this.providers[provider]?.models?.[role]);
+  }
+
+  /**
+   * Which config role a request maps to.
+   * @returns {string|null|undefined} role key; null when modelHint is itself a
+   *   configured model name; undefined when the provider has no models
+   * @private
+   */
+  _modelRole(provider, modelHint = null, complexity = 'default') {
+    const models = this.providers[provider]?.models;
+    if (!models) return undefined;
+    const hasRole = (key) => key && toCandidates(models[key]).length > 0;
+
+    if (hasRole(modelHint)) return modelHint;
+    if (modelHint && Object.values(models).some((value) => toCandidates(value).includes(modelHint))) return null;
+    if (hasRole(complexity)) return complexity;
+    if (hasRole('default')) return 'default';
+    return Object.keys(models).find(hasRole);
+  }
+
+  /**
+   * Installed Ollama model tags, cached for model_cache_ttl_ms.
+   * @returns {Promise<string[]|null>} null when the server cannot be reached
+   */
+  async getInstalledOllamaModels({ timeoutMs = DEFAULT_OLLAMA_PROBE_TIMEOUT_MS } = {}) {
+    const ttl = this.providers.ollama?.model_cache_ttl_ms ?? DEFAULT_MODEL_CACHE_TTL_MS;
+    const cached = this.ollamaModelCache;
+    if (cached && Date.now() - cached.timestamp < ttl) return cached.models;
+
+    let models = null;
+    try {
+      const response = await fetch(`${this.ollamaRootUrl()}/api/tags`, { method: 'GET', signal: AbortSignal.timeout(timeoutMs) });
+      if (response.ok) {
+        const data = await response.json();
+        models = Array.isArray(data?.models) ? data.models.map((m) => m.name || m.model).filter(Boolean) : [];
+      }
+    } catch (_err) {
+      models = null;
+    }
+    this.ollamaModelCache = { models, timestamp: Date.now() };
+    return models;
+  }
+
+  /** Forget the cached installed-model list (e.g. after pulling a model). */
+  invalidateModelCache() {
+    this.ollamaModelCache = null;
+  }
+
+  /**
+   * Model to use for a request. For Ollama, the first configured candidate
+   * that is installed wins; environment-pinned models are used as given.
+   * @throws {ModelUnavailableError} Ollama is reachable but no candidate is installed
+   */
+  async resolveModel(provider, modelHint = null, complexity = 'default') {
+    const role = this._modelRole(provider, modelHint, complexity);
+    if (role === undefined) return null;
+    if (role === null) return modelHint;
+
+    const candidates = this.getModelCandidates(provider, role);
+    if (provider !== 'ollama' || this.pinnedModels.has(`${provider}:${role}`)) {
+      return candidates[0] || null;
     }
 
-    // If modelHint is an actual model name
-    if (modelHint && Object.values(providerConfig.models).includes(modelHint)) {
-      return modelHint;
-    }
+    const installed = await this.getInstalledOllamaModels();
+    if (installed === null) return candidates[0] || null; // unreachable: the request reports it
 
-    // Fall back to complexity-based selection
-    if (providerConfig.models[complexity]) {
-      return providerConfig.models[complexity];
-    }
-
-    return providerConfig.models.default || Object.values(providerConfig.models)[0];
+    const hit = findInstalled(candidates, installed);
+    if (hit) return hit;
+    throw new ModelUnavailableError({ provider, role, candidates, installed });
   }
 
   /**
@@ -281,7 +375,7 @@ class UniversalLLMClient {
     if (!provider) throw new Error(`Unknown provider: ${providerName}`);
 
     const apiKey = this.getApiKey(providerName);
-    const model = this.getModel(providerName, options.modelHint, options.complexity);
+    const model = await this.resolveModel(providerName, options.modelHint, options.complexity);
 
     if (!model) throw new Error(`No model available for provider: ${providerName}`);
 

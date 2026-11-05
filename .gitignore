@@ -26,6 +26,10 @@ BrightForge/
 DeveloperProductivityTracker/
 StructuredLogging/
 __pycache__/
+.venv/
+.venv-setup.log
+.npm-ci.log
+.suite.log
 *.pyc
 .claude/worktrees/
 qa-reports/
