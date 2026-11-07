@@ -52,9 +52,12 @@ providers:
     priority: 3
     cost_per_image: 0.0  # Free tier
     rate_limit: 60  # requests per minute
+    # Original Nano Banana (gemini-2.5-flash-image) is free in AI Studio; Nano
+    # Banana 2 / Pro (gemini-3.1-flash-image, gemini-3-pro-image) need a paid
+    # plan (checked 2026-11-07). gemini-2.0-flash-exp image output is retired.
     models:
-      default: "gemini-2.0-flash-exp"
-      image_gen: "gemini-2.0-flash-exp"
+      default: "gemini-2.5-flash-image"
+      image_gen: "gemini-2.5-flash-image"
     generation_config:
       responseModalities:
         - "TEXT"

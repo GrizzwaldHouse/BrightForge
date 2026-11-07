@@ -26,10 +26,14 @@ providers:
     enabled: true
     base_url: "https://api.groq.com/openai/v1"
     api_key_env: "GROQ_API_KEY"
+    # Llama 3.x shut down on Groq 2026-08-16; replacements per Groq's
+    # deprecation table (checked 2026-11-07). Free tier lists gpt-oss-120b and
+    # qwen3.8-27b (1,000 req/day each). gpt-oss-20b would be faster for "fast"
+    # but is paid ($0.075/$0.30 per 1M), so every role stays on the free model.
     models:
-      default: "llama-3.3-70b-versatile"
-      fast: "llama-3.1-8b-instant"
-      code: "llama-3.3-70b-versatile"
+      default: "openai/gpt-oss-120b"
+      fast: "openai/gpt-oss-120b"
+      code: "openai/gpt-oss-120b"
     priority: 2
     cost_per_1k_tokens: 0
     rate_limit:
@@ -40,15 +44,21 @@ providers:
     enabled: true
     base_url: "https://api.cerebras.ai/v1"
     api_key_env: "CEREBRAS_API_KEY"
+    # llama-3.3-70b deprecated 2026-02-16; Cerebras recommends GPT OSS 120B,
+    # and qwen-3.8-27b for Shared Inference (checked 2026-11-07).
     models:
-      default: "llama-3.3-70b"
+      default: "gpt-oss-120b"
+      code: "qwen-3.8-27b"
     priority: 3
     cost_per_1k_tokens: 0
     rate_limit:
       requests_per_minute: 30
 
+  # Disabled 2026-11-07: both configured models were removed from Together's
+  # serverless tier (Qwen2.5-Coder-32B on 2025-11-13, Llama-3.3-70B-Turbo on
+  # 2026-10-22). Pick current IDs from Together's catalog before re-enabling.
   together:
-    enabled: true
+    enabled: false
     base_url: "https://api.together.xyz/v1"
     api_key_env: "TOGETHER_API_KEY"
     models:
@@ -73,29 +83,36 @@ providers:
     enabled: true
     base_url: "https://generativelanguage.googleapis.com/v1beta"
     api_key_env: "GEMINI_API_KEY"
+    # gemini-2.0-flash shut down 2026-06-01. 2.5 Flash/Flash-Lite/Pro are on
+    # the AI Studio free tier (free-tier data is used to improve Google products).
+    # Costs are 0 on the free tier. If billing is enabled, set the paid input
+    # prices per 1K tokens (2.5 Flash-Lite 0.0001, 2.5 Flash 0.0003; checked 2026-10-25).
     models:
-      default: "gemini-2.0-flash"
-      code: "gemini-2.0-flash"
-      complex: "gemini-2.0-pro-exp-02-05"
+      default: "gemini-2.5-flash-lite"
+      code: "gemini-2.5-flash"
+      complex: "gemini-2.5-pro"
     priority: 5
     cost_per_1k_tokens:
+      flash-lite: 0.0
       flash: 0.0
-      pro: 0.00125
+      pro: 0.0
 
   # Priority 6: Paid Cloud (fallback for complex tasks)
   claude:
     enabled: true
     base_url: "https://api.anthropic.com/v1"
     api_key_env: "CLAUDE_API_KEY"
+    # Current Claude 5.5 family (checked 2026-11-07). Rates are input price per
+    # 1K tokens; output costs 5x more, so the budget is an underestimate.
     models:
-      simple: "claude-3-5-haiku-20241022"
-      balanced: "claude-sonnet-4-20250514"
-      complex: "claude-opus-4-20250514"
+      simple: "claude-haiku-5-5"
+      balanced: "claude-sonnet-5-5"
+      complex: "claude-opus-5-5"
     priority: 6
     cost_per_1k_tokens:
-      haiku: 0.0008
-      sonnet: 0.003
-      opus: 0.015
+      haiku: 0.0001
+      sonnet: 0.002
+      opus: 0.004
     use_only_for:
       - complex_reasoning
       - architecture_decisions
@@ -105,21 +122,26 @@ providers:
     enabled: true  # ChatGPT - uses same OpenAI-compatible format
     base_url: "https://api.openai.com/v1"
     api_key_env: "OPENAI_API_KEY"
+    # gpt-4o and gpt-4o-mini shut down 2027-01-14; OpenAI names gpt-6-luna as
+    # the replacement (checked 2026-11-07). Input price per 1K tokens below.
     models:
-      default: "gpt-4o-mini"
-      complex: "gpt-4o"
+      default: "gpt-6-luna"
+      complex: "gpt-6.1-sol"
     priority: 7
     cost_per_1k_tokens:
-      gpt-4o-mini: 0.00015
-      gpt-4o: 0.005
+      gpt-6-luna: 0.0001
+      gpt-6.1-sol: 0.002
 
   # Aggregator fallback (last resort)
   openrouter:
     enabled: true
     base_url: "https://openrouter.ai/api/v1"
     api_key_env: "OPENROUTER_API_KEY"
+    # Free variants (50 req/day; 1,000/day after a one-time $10 credit purchase).
+    # Free model IDs change often; listed as free on 2026-10-20.
     models:
-      default: "meta-llama/llama-3.3-70b-instruct"
+      default: "nvidia/nemotron-3-ultra-550b-a55b:free"
+      code: "cohere/north-mini-code:free"
     priority: 99
     cost_per_1k_tokens: variable
 
