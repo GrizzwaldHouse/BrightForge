@@ -635,7 +635,7 @@
   <!-- Init Icons -->
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      lucide.createIcons();
+      if (window.lucide) window.lucide.createIcons();
       
       // Icons are initialized once. Dynamic content uses manual SVG injection.
     });

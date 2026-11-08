@@ -7,7 +7,6 @@
  * @author Marcus Daley (GrizzwaldHouse)
  * @date February 14, 2026
  */
-/* global lucide */
 
 import { Forge3DViewer } from './forge3d-viewer.js';
 
@@ -756,7 +755,7 @@ class Forge3DPanel {
       if (data.done) {
         this._eventSource.close();
         this._eventSource = null;
-        if (data.state === 'complete' || data.result) {
+        if (!data.failed) {
           this._onGenerationComplete(sessionId, data);
         } else {
           this._showStatus(`Generation failed: ${data.error || 'Unknown error'}`, 'error');
@@ -2165,7 +2164,10 @@ class Forge3DPanel {
         const data = await res.json();
 
         // Wait for this generation to complete before submitting next
-        await this._waitForSession(data.sessionId);
+        const finalState = await this._waitForSession(data.sessionId);
+        if (finalState !== 'complete') {
+          throw new Error(`session ${data.sessionId} ended ${finalState}`);
+        }
 
         if (dotEl) { dotEl.className = 'batch-item-dot complete'; }
         if (statusEl) { statusEl.textContent = 'complete'; }
@@ -2600,7 +2602,7 @@ class Forge3DPanel {
       content.appendChild(textDiv);
       banner.appendChild(content);
       banner.classList.remove('hidden');
-      lucide.createIcons();
+      if (window.lucide) window.lucide.createIcons();
       return;
     }
 
@@ -2618,7 +2620,7 @@ class Forge3DPanel {
       content.appendChild(textDiv);
       banner.appendChild(content);
       banner.classList.remove('hidden');
-      lucide.createIcons();
+      if (window.lucide) window.lucide.createIcons();
       setTimeout(() => { banner.classList.add('hidden'); }, 3000);
       return;
     }
@@ -2649,7 +2651,7 @@ class Forge3DPanel {
 
     banner.appendChild(cardsDiv);
     banner.classList.remove('hidden');
-    lucide.createIcons();
+    if (window.lucide) window.lucide.createIcons();
   }
 
   /**

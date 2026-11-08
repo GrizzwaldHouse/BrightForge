@@ -60,6 +60,7 @@ import generationQueue from '../../forge3d/generation-queue.js';
 import modelDownloader from '../../forge3d/model-downloader.js';
 import forge3dConfig from '../../forge3d/config-loader.js';
 import forge3dDb from '../../forge3d/database.js';
+import { TERMINAL_STATES, terminalEvent, sseFrame } from '../../forge3d/sse-events.js';
 import { forge3dLimiter } from '../middleware/rate-limit.js';
 
 const router = express.Router();
@@ -108,6 +109,37 @@ async function ensureBridge() {
 
 // --- Generation ---
 
+const GENERATE_TYPES = ['mesh', 'image', 'full'];
+const PROMPT_TYPES = ['image', 'full'];
+
+/**
+ * Validate a /generate request before anything expensive (the Python bridge)
+ * starts. Returns an error message for a 400, or null when the request is valid.
+ * @param {import('express').Request} req
+ * @returns {string|null}
+ */
+export function validateGenerateRequest(req) {
+  const contentType = req.headers['content-type'] || '';
+  if (contentType.includes('application/json')) {
+    const { type, prompt } = req.body || {};
+    if (!type || !GENERATE_TYPES.includes(type)) {
+      return `Invalid type. Must be ${GENERATE_TYPES.join(', ')}.`;
+    }
+    if (prompt !== undefined && prompt !== null && typeof prompt !== 'string') {
+      return 'Prompt must be a string.';
+    }
+    const minPrompt = forge3dConfig.generation.min_prompt_length;
+    if (PROMPT_TYPES.includes(type) && (!prompt || prompt.trim().length < minPrompt)) {
+      return `Prompt required (at least ${minPrompt} characters).`;
+    }
+    return null;
+  }
+  if (contentType.includes('image/')) {
+    return req.body && req.body.length > 0 ? null : 'No image data received.';
+  }
+  return 'Unsupported content type. Use application/json or image/*.';
+}
+
 /**
  * POST /api/forge3d/generate
  * Start a new 3D generation.
@@ -124,6 +156,12 @@ async function ensureBridge() {
  *   projectId: string (optional)
  */
 router.post('/generate', forge3dLimiter, express.raw({ type: 'image/*', limit: forge3dConfig.api.raw_body_limit }), async (req, res) => {
+  // Reject bad input before starting the Python bridge.
+  const invalid = validateGenerateRequest(req);
+  if (invalid) {
+    return res.status(400).json({ error: invalid });
+  }
+
   await ensureBridge();
   console.log('[ROUTE] POST /api/forge3d/generate');
 
@@ -143,15 +181,8 @@ router.post('/generate', forge3dLimiter, express.raw({ type: 'image/*', limit: f
 
     if (contentType.includes('application/json')) {
       // JSON body: text-to-image or text-to-3D
+      // Already validated by validateGenerateRequest().
       const { type, prompt, projectId, options, model } = req.body;
-
-      if (!type || !['mesh', 'image', 'full'].includes(type)) {
-        return res.status(400).json({ error: 'Invalid type. Must be mesh, image, or full.' });
-      }
-
-      if ((type === 'image' || type === 'full') && (!prompt || prompt.trim().length < forge3dConfig.generation.min_prompt_length)) {
-        return res.status(400).json({ error: 'Prompt required (at least 3 characters).' });
-      }
 
       // Every request goes through the generation queue (pause, capacity,
       // ordering, retries, dead letter). The queue owns the history entry.
@@ -207,10 +238,6 @@ router.post('/generate', forge3dLimiter, express.raw({ type: 'image/*', limit: f
     } else if (contentType.includes('image/')) {
       // Raw image upload for mesh generation
       const imageBuffer = req.body;
-
-      if (!imageBuffer || imageBuffer.length === 0) {
-        return res.status(400).json({ error: 'No image data received.' });
-      }
 
       const job = generationQueue.submit({
         type: 'mesh',
@@ -288,21 +315,10 @@ router.get('/stream/:id', (req, res) => {
     // Flush terminal state immediately if the session already finished before the client connected.
     // Without this, the client would hang waiting for events that will never fire.
     const existingStatus = forgeSession.getStatus(sessionId);
-    if (existingStatus) {
-      const terminalStates = ['complete', 'failed'];
-      if (terminalStates.includes(existingStatus.state)) {
-        const isDone = existingStatus.state === 'complete';
-        res.write(`data: ${JSON.stringify({
-          sessionId,
-          state: existingStatus.state,
-          progress: existingStatus.progress,
-          error: existingStatus.error || null,
-          done: isDone,
-          failed: !isDone
-        })}\n\n`);
-        res.end();
-        return;
-      }
+    if (existingStatus && TERMINAL_STATES.includes(existingStatus.state)) {
+      res.write(sseFrame(terminalEvent(sessionId, existingStatus)));
+      res.end();
+      return;
     }
 
     // Heartbeat keepalive every 15s
@@ -312,29 +328,32 @@ router.get('/stream/:id', (req, res) => {
 
     const onProgress = (data) => {
       if (data.sessionId === sessionId) {
-        res.write(`data: ${JSON.stringify(data)}\n\n`);
+        res.write(sseFrame(data));
       }
     };
 
-    const onComplete = (data) => {
-      if (data.sessionId === sessionId) {
-        clearInterval(heartbeat);
-        res.write(`data: ${JSON.stringify({ ...data, done: true })}\n\n`);
-        cleanup();
-        res.end();
-      }
+    const onTerminal = (state) => (data) => {
+      if (data.sessionId !== sessionId) return;
+      const status = forgeSession.getStatus(sessionId) || { state, error: data.error };
+      // Event and stored state agree by construction; fall back to the event's state.
+      const terminal = TERMINAL_STATES.includes(status.state) ? status : { ...status, state, error: data.error };
+      res.write(sseFrame(terminalEvent(sessionId, terminal)));
+      cleanup();
+      res.end();
     };
+    const onComplete = onTerminal('complete');
+    const onFailed = onTerminal('failed');
 
     const cleanup = () => {
       clearInterval(heartbeat);
       forgeSession.off('progress', onProgress);
       forgeSession.off('complete', onComplete);
-      forgeSession.off('failed', onComplete);
+      forgeSession.off('failed', onFailed);
     };
 
     forgeSession.on('progress', onProgress);
     forgeSession.on('complete', onComplete);
-    forgeSession.on('failed', onComplete);
+    forgeSession.on('failed', onFailed);
 
     req.on('close', cleanup);
   } catch (err) {
@@ -887,7 +906,7 @@ router.get('/export', (_req, res) => {
  * Import a JSON dump from exportDump() into the live database.
  * Body: the JSON dump object (application/json, max 50 MB).
  */
-router.post('/import', express.json({ limit: '50mb' }), (req, res) => {
+router.post('/import', express.json({ limit: forge3dConfig.api.import_body_limit }), (req, res) => {
   ensureInit();
   try {
     const result = forge3dDb.importDump(req.body);

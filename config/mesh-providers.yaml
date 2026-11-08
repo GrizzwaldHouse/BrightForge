@@ -28,7 +28,9 @@ providers:
   meshy:
     enabled: false
     type: cloud
-    base_url: "https://api.meshy.ai/v2"
+    # Image to 3D API (docs.meshy.ai/en/api/image-to-3d, checked 2026-11-08):
+    # POST {base_url}/image-to-3d, GET {base_url}/image-to-3d/:id
+    base_url: "https://api.meshy.ai/openapi/v1"
     api_key_env: MESHY_API_KEY
     priority: 10
     cost_per_generation: 0.25

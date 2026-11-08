@@ -54,6 +54,7 @@ queue:
 
 api:
   raw_body_limit: "20mb"
+  import_body_limit: "50mb"   # POST /api/forge3d/import (DB dump)
   history_default_limit: 50
 
 session:

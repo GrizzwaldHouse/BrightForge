@@ -200,7 +200,8 @@ class PlaytestPanel {
       if (!res.ok) return;
       const data = await res.json();
 
-      const runs = data.playtests || data || [];
+      const list = data.runs || data.playtests || data;
+      const runs = Array.isArray(list) ? list : [];
       if (runs.length === 0) {
         while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
         const empty = document.createElement('div');

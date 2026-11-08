@@ -2,17 +2,18 @@ name: BrightForge Tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'repair/**']
   pull_request:
-    branches: [main]
+    branches: [main, 'repair/**']
 
 jobs:
   test:
     runs-on: ubuntu-latest
 
     strategy:
+      # Supported Node lines only (20 reached end of life 2026-04-30).
       matrix:
-        node-version: [18, 20]
+        node-version: [22, 24]
 
     steps:
       - name: Checkout repository
@@ -46,6 +47,12 @@ jobs:
 
       - name: Mesh optimize -> export data flow
         run: npm run test-mesh-flow
+
+      - name: Quality gates fail on missing or unmeasured evidence
+        run: npm run test-quality-gates
+
+      - name: Mesh client guarded dispatch
+        run: npm run test-mesh-client
 
       - name: Frontend/API route alignment
         run: npm run test-frontend-routes
@@ -100,7 +107,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install CPU-only mesh dependencies
-        run: pip install 'trimesh>=4.6.0' numpy pyyaml 'fast-simplification>=0.1.7'
+        run: pip install 'trimesh>=4.6.0' numpy pyyaml 'fast-simplification>=0.1.7' 'xatlas>=0.0.11'
 
       - name: Mesh post-processing tests
         run: python -m unittest discover -s python/tests -v
@@ -116,7 +123,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install Node dependencies
