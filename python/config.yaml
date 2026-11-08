@@ -14,6 +14,10 @@ paths:
 models:
   hunyuan3d:
     repo_id: "tencent/Hunyuan3D-2"
+    # Shape weights are read from <models_dir>/<repo_id>/hunyuan3d-dit-v2-0
+    # (relative to python/; HY3DGEN_MODELS overrides). Fetch only the fp16 file:
+    #   python -c "from huggingface_hub import snapshot_download as s; s('tencent/Hunyuan3D-2', allow_patterns=['hunyuan3d-dit-v2-0/config.yaml','hunyuan3d-dit-v2-0/model.fp16.safetensors'], local_dir='data/models/hy3dgen/tencent/Hunyuan3D-2')"
+    models_dir: "../data/models/hy3dgen"
     required_vram_gb: 12.0
     input_dimensions: [512, 512]
     inference_steps: 50
@@ -71,8 +75,12 @@ validation:
 
 fbx_export:
   enabled: true
-  preferred_backend: "assimp"  # assimp | blender | auto
-  blender_path: null  # auto-detect from PATH if null
+  preferred_backend: "blender"  # blender | assimp | auto. Blender gives the most reliable FBX for Unreal; pyassimp needs a native assimp library
+  blender_path: null  # auto-detect if null (BRIGHTFORGE_BLENDER env, PATH, then the globs below)
+  blender_search_globs:  # standard install locations; newest match wins
+    - "%ProgramFiles%/Blender Foundation/Blender */blender.exe"
+    - "/Applications/Blender.app/Contents/MacOS/Blender"
+    - "/usr/bin/blender"
   scale_factor: 100.0  # meters -> centimeters for Unreal
   coordinate_system: "unreal"  # unreal (Z-up, cm) | default
 

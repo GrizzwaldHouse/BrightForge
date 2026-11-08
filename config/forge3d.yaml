@@ -12,7 +12,14 @@ python_server:
   max_restart_attempts: 3
   restart_cooldown_ms: 5000
   shutdown_grace_ms: 5000
-  command_timeout_ms: 15000
+  command_timeout_ms: 60000  # environment probes import torch/diffusers; a cold first import (fresh install, AV scan) can exceed 15 s
+  # Python interpreter for the inference server. Checked in this order:
+  #   1. BRIGHTFORGE_PYTHON environment variable
+  #   2. python_executable below (absolute, or relative to the project root)
+  #   3. <venv_dir>/Scripts/python.exe (Windows) or <venv_dir>/bin/python, if present
+  #   4. py launcher / python on PATH
+  python_executable: null
+  venv_dir: ".venv"
 
 health_check:
   interval_ms: 10000

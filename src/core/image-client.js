@@ -280,7 +280,8 @@ class ImageClient {
     const apiKey = this.getApiKey('gemini');
     if (!apiKey) throw new Error('GEMINI_API_KEY not found');
 
-    const model = options.model || provider.models?.image_gen || provider.models?.default || 'gemini-2.0-flash-exp';
+    const model = options.model || provider.models?.image_gen || provider.models?.default;
+    if (!model) throw new Error('No Gemini image model configured: set providers.gemini.models.image_gen in config/image-providers.yaml');
     const url = `${provider.base_url}/models/${model}:generateContent?key=${apiKey}`;
 
     const requestBody = {

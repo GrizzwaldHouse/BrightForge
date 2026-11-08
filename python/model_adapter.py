@@ -5,6 +5,7 @@
 #          Extracts model-specific load/generate/unload logic from model_manager.py
 #          so ModelManager only handles VRAM lifecycle, locks, and stats.
 
+import os
 import time
 import logging
 from abc import ABC, abstractmethod
@@ -115,6 +116,17 @@ class HunyuanAdapter(ModelAdapter):
     def load(self, device, dtype):
         repo_id = self._config.get('repo_id', 'tencent/Hunyuan3D-2')
 
+        # hy3dgen looks for weights under $HY3DGEN_MODELS/<repo_id>/<subfolder>
+        # and otherwise downloads every file format in the subfolder (~20 GB).
+        # models_dir (relative to python/) lets a pre-downloaded copy be used.
+        models_dir = self._config.get('models_dir')
+        if models_dir and 'HY3DGEN_MODELS' not in os.environ:
+            base = Path(models_dir)
+            if not base.is_absolute():
+                base = Path(__file__).resolve().parent / base
+            os.environ['HY3DGEN_MODELS'] = str(base)
+            logger.info(f'[MODEL] HY3DGEN_MODELS={base}')
+
         logger.info(f'[MODEL] Loading Hunyuan3D 2.1 on {device} (this may take several minutes on first run)...')
 
         pipeline = None
@@ -163,7 +175,10 @@ class HunyuanAdapter(ModelAdapter):
                 logger.error(f'[MODEL] All Hunyuan3D load methods failed: {fallback_err}')
                 return False
 
-        pipeline = pipeline.to(device)
+        # diffusers pipelines return self from .to(); hy3dgen moves in place and returns None
+        moved = pipeline.to(device)
+        if moved is not None:
+            pipeline = moved
 
         # Memory optimizations on GPU
         if device == 'cuda' and hasattr(pipeline, 'enable_attention_slicing'):
@@ -256,7 +271,17 @@ class HunyuanAdapter(ModelAdapter):
         """
         import trimesh
 
-        # Format 1: result has .meshes attribute (hy3dgen)
+        # Format 0: list/tuple of meshes (hy3dgen shapegen returns [trimesh.Trimesh])
+        if isinstance(result, (list, tuple)) and result:
+            first = result[0]
+            if isinstance(first, (list, tuple)) and first:
+                first = first[0]
+            if hasattr(first, 'export'):
+                first.export(str(output_path))
+                logger.info('[MODEL] Exported via result[0].export()')
+                return
+
+        # Format 1: result has .meshes attribute
         if hasattr(result, 'meshes') and result.meshes:
             mesh_data = result.meshes[0]
             if hasattr(mesh_data, 'export'):

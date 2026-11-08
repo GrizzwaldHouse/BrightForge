@@ -1,17 +1,31 @@
 # ForgePipeline Python Inference Server
 # Standard install (CUDA 12.4, up to sm_90):
 #   pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu124
-# RTX 5080 / Blackwell (sm_120, requires cu128 nightly):
-#   py -3 -m pip install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu128
+# RTX 50-series / Blackwell (sm_120): stable cu128 wheels (verified 2026-11-05
+# with torch 2.11.0+cu128 on an RTX 5080). Install torch first, then the rest:
+#   py -3.11 -m venv .venv
+#   .venv\Scripts\python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+#   .venv\Scripts\python -m pip install -r python/requirements.txt
+# The Node bridge finds <project>/.venv automatically (see config/forge3d.yaml).
 
 # PyTorch - version resolved by install method above
 torch>=2.6.0
 torchvision>=0.21.0
 
 # AI model loading
-diffusers>=0.33.0
-transformers>=4.49.0
+# transformers 5.x renamed the DINOv2 attention weights, so the Hunyuan3D-2
+# checkpoint no longer loads; diffusers 0.36+ needs huggingface-hub 1.x, which
+# transformers 4.x does not accept. Verified pair: diffusers 0.35.2 + transformers 4.57.6.
+diffusers>=0.33.0,<0.36
+transformers>=4.49.0,<5
 accelerate>=1.4.0
+
+# Hunyuan3D shape generation (hy3dgen) is not on PyPI. Install it from the
+# official repo into the same environment (shape only; texturing needs a CUDA
+# toolkit build of its rasterizer):
+#   git clone --depth 1 https://github.com/Tencent-Hunyuan/Hunyuan3D-2.git
+#   .venv\Scripts\python -m pip install --no-deps -e Hunyuan3D-2
+#   .venv\Scripts\python -m pip install opencv-python omegaconf pymeshlab xatlas
 
 # Inference server
 fastapi>=0.115.0
@@ -32,8 +46,9 @@ pygltflib>=1.16
 # Image handling
 Pillow>=11.0.0
 
-# Background removal (required by Hunyuan3D)
-rembg>=2.0.50
+# Background removal (required by Hunyuan3D). The [gpu] extra pulls
+# onnxruntime-gpu; without an extra, rembg cannot be imported at all.
+rembg[gpu]>=2.0.50
 
 # Tensor operations (required by Hunyuan3D)
 einops>=0.7.0
