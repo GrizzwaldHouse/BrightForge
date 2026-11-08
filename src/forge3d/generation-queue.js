@@ -42,12 +42,61 @@ class GenerationQueue extends EventEmitter {
     this.paused = false;
     this.currentJobId = null;
     this._processTimer = null;
+    // In-memory context per job: { sessionId, hooks, waiter }
+    this._jobContext = new Map();
+  }
+
+  /**
+   * The single admission path for generation work. Creates the session that
+   * clients poll, then queues it, so pause, capacity, ordering, retries and
+   * dead-letter handling apply to every request.
+   * @param {Object} params - type, prompt, imageBuffer, filename, options, model, projectId, priority
+   * @param {Object} [hooks] - { onComplete(result, ids), onFailed(error, ids) }
+   * @returns {{ jobId, sessionId, status, position, priority }}
+   * @throws {Error} code QUEUE_FULL when the queue is at capacity
+   */
+  submit(params, hooks = {}) {
+    this.init();
+    const sessionId = forgeSession.create({
+      type: params.type,
+      prompt: params.prompt,
+      imageBuffer: params.imageBuffer,
+      filename: params.filename,
+      options: params.options,
+      model: params.model
+    });
+    let job;
+    try {
+      job = this.enqueue({ ...params, sessionId });
+    } catch (err) {
+      forgeSession.finalizeFailure(sessionId, err.message);
+      throw err;
+    }
+    this._jobContext.set(job.jobId, { ...(this._jobContext.get(job.jobId) || {}), sessionId, hooks });
+    forgeSession.markQueued(sessionId, { jobId: job.jobId, position: job.position });
+    return { ...job, sessionId };
+  }
+
+  /**
+   * Submit and wait for the final outcome (used by pipeline stages).
+   * @returns {Promise<{ jobId, sessionId, result }>} rejects on dead letter or cancel
+   */
+  submitAndWait(params) {
+    return new Promise((resolve, reject) => {
+      const job = this.submit(params, {
+        onComplete: (result, ids) => resolve({ ...ids, result }),
+        onFailed: (error) => reject(error)
+      });
+      return job;
+    });
   }
 
   /**
    * Initialize queue - open database and recover incomplete jobs.
    */
   init() {
+    if (this._initialized) return;
+    this._initialized = true;
     forge3dDb.open();
     this._recoverIncomplete();
     this._cleanupTempFiles();
@@ -116,7 +165,9 @@ class GenerationQueue extends EventEmitter {
     const currentSize = this._getQueuePosition() + (this.processing ? 1 : 0);
     if (currentSize >= forge3dConfig.queue.max_size) {
       console.warn(`[QUEUE] Rejected job — queue at capacity (${currentSize}/${forge3dConfig.queue.max_size})`);
-      throw new Error(`Queue is full (max ${forge3dConfig.queue.max_size} jobs). Try again when current jobs complete.`);
+      const full = new Error(`Queue is full (max ${forge3dConfig.queue.max_size} jobs). Try again when current jobs complete.`);
+      full.code = 'QUEUE_FULL';
+      throw full;
     }
 
     const priorityMap = { urgent: 0, normal: 1, background: 2 };
@@ -130,7 +181,9 @@ class GenerationQueue extends EventEmitter {
       metadata: {
         options: params.options || {},
         filename: params.filename || null,
-        hasImage: !!params.imageBuffer
+        hasImage: !!params.imageBuffer,
+        model: params.model || null,
+        sessionId: params.sessionId || null
       }
     });
 
@@ -183,6 +236,7 @@ class GenerationQueue extends EventEmitter {
         errorMessage: 'Cancelled by user'
       });
       if (this._imageBuffers) this._imageBuffers.delete(jobId);
+      this._settle(jobId, null, new Error('Cancelled by user'));
       console.log(`[QUEUE] Job cancelled: ${jobId}`);
       this.emit('cancelled', { jobId });
       return true;
@@ -342,15 +396,26 @@ class GenerationQueue extends EventEmitter {
       if (job.prompt) sessionParams.prompt = job.prompt;
       if (metadata.options) sessionParams.options = metadata.options;
 
-      // Retrieve image buffer if stored
+      if (metadata.model) sessionParams.model = metadata.model;
+
+      // Retrieve image buffer if stored (kept until the job settles so retries have it)
       if (this._imageBuffers && this._imageBuffers.has(job.id)) {
         sessionParams.imageBuffer = this._imageBuffers.get(job.id);
         sessionParams.filename = metadata.filename || 'upload.png';
-        this._imageBuffers.delete(job.id);
       }
 
-      // Create and run session
-      const sessionId = forgeSession.create(sessionParams);
+      // Run the session the client is already polling; recovered jobs without
+      // one get a fresh session.
+      const ctx = this._jobContext.get(job.id);
+      let sessionId = ctx?.sessionId;
+      const existing = sessionId ? forgeSession.sessions.get(sessionId) : null;
+      if (existing && existing.state === 'failed') {
+        forgeSession.resetForRetry(sessionId, job.retry_count || 0);
+      } else if (!existing) {
+        sessionId = forgeSession.create(sessionParams);
+        forgeSession.markQueued(sessionId, { jobId: job.id });
+        this._jobContext.set(job.id, { ...(ctx || {}), sessionId });
+      }
       const result = await forgeSession.run(sessionId);
 
       // Success
@@ -369,6 +434,7 @@ class GenerationQueue extends EventEmitter {
       });
 
       this.emit('complete', { jobId: job.id, result });
+      this._settle(job.id, result, null);
 
     } catch (err) {
       console.error(`[QUEUE] Job ${job.id} failed: ${err.message}`);
@@ -415,6 +481,7 @@ class GenerationQueue extends EventEmitter {
 
         this.emit('dead_letter', { jobId: job.id, error: err.message, retries: retryCount });
         this.emit('failed', { jobId: job.id, error: err.message, deadLetter: true });
+        this._settle(job.id, null, err);
       }
     }
 
@@ -423,6 +490,25 @@ class GenerationQueue extends EventEmitter {
 
     // Process next job
     this._scheduleProcess();
+  }
+
+  /**
+   * Final outcome for a job: release its buffers, close its session and call
+   * the submitter's hooks. Runs once per job.
+   * @private
+   */
+  _settle(jobId, result, error) {
+    if (this._imageBuffers) this._imageBuffers.delete(jobId);
+    const ctx = this._jobContext.get(jobId);
+    this._jobContext.delete(jobId);
+    if (!ctx) return;
+    const ids = { jobId, sessionId: ctx.sessionId };
+    if (error) {
+      if (ctx.sessionId) forgeSession.finalizeFailure(ctx.sessionId, error.message);
+      try { ctx.hooks?.onFailed?.(error, ids); } catch (hookErr) { console.error(`[QUEUE] onFailed hook error: ${hookErr.message}`); }
+    } else {
+      try { ctx.hooks?.onComplete?.(result, ids); } catch (hookErr) { console.error(`[QUEUE] onComplete hook error: ${hookErr.message}`); }
+    }
   }
 
   /**
@@ -524,6 +610,59 @@ if (isSelfTest(import.meta.url)) {
 
   // Cleanup — cancel remaining
   queue.cancel(job1.jobId);
+
+  // Single admission path (review finding P1, 2026-11-07): submit() must obey
+  // pause, capacity, retries and dead letter. forgeSession.run is stubbed so no
+  // real generation runs.
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const settleMs = forge3dConfig.queue.process_interval_ms * 5;
+  const realRun = forgeSession.run.bind(forgeSession);
+  let runs = 0;
+  let mode = 'ok';
+  forgeSession.run = async (id) => {
+    runs++;
+    const s = forgeSession.sessions.get(id);
+    if (mode === 'fail') { s.state = 'failed'; throw new Error('fixture failure'); }
+    s.state = 'complete';
+    return { generationTime: 1 };
+  };
+  try {
+    queue.pause();
+    const outcomes = [];
+    const a = queue.submit({ type: 'image', prompt: 'paused fixture' }, { onComplete: () => outcomes.push('complete'), onFailed: () => outcomes.push('failed') });
+    await wait(settleMs);
+    console.assert(runs === 0, `Paused queue must not run submitted work, ran ${runs}`);
+    console.assert(forgeSession.getStatus(a.sessionId).state === 'idle', 'Paused job stays idle');
+    console.assert(forge3dDb.getHistoryEntry(a.jobId).status === 'queued', 'Paused job stays queued');
+    queue.resume();
+    await wait(settleMs);
+    console.assert(runs === 1 && outcomes.join() === 'complete', `Resumed job completes once (runs=${runs}, outcomes=${outcomes})`);
+    console.assert(forge3dDb.getHistoryEntry(a.jobId).status === 'complete', 'History marks the job complete');
+
+    mode = 'fail';
+    runs = 0;
+    const failed = [];
+    const b = queue.submit({ type: 'image', prompt: 'failing fixture' }, { onFailed: (e) => failed.push(e.message) });
+    await wait(settleMs * (forge3dConfig.queue.max_retries + 2));
+    console.assert(runs === forge3dConfig.queue.max_retries + 1, `Failing job retried ${forge3dConfig.queue.max_retries} times, ran ${runs}`);
+    console.assert(forge3dDb.getHistoryEntry(b.jobId).status === 'dead_letter', 'Exhausted job is dead-lettered');
+    console.assert(failed.length === 1, `onFailed fires once, fired ${failed.length}`);
+    console.assert(forgeSession.getStatus(b.sessionId).state === 'failed', 'Session ends failed');
+
+    queue.pause();
+    const savedMax = forge3dConfig.queue.max_size;
+    forge3dConfig.queue.max_size = queue._getQueuePosition() + 1;
+    const c = queue.submit({ type: 'image', prompt: 'capacity fixture one' });
+    let fullCode = null;
+    try { queue.submit({ type: 'image', prompt: 'capacity fixture two' }); } catch (e) { fullCode = e.code; }
+    forge3dConfig.queue.max_size = savedMax;
+    console.assert(fullCode === 'QUEUE_FULL', `Capacity limit enforced on submit, got ${fullCode}`);
+    queue.cancel(c.jobId);
+    console.assert(forgeSession.getStatus(c.sessionId).state === 'failed', 'Cancelled queued job closes its session');
+  } finally {
+    forgeSession.run = realRun;
+  }
+
   queue.shutdown();
   forge3dDb.close();
 

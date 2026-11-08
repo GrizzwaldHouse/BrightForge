@@ -775,28 +775,12 @@ async def validate_uvs(
     try:
         logger.info(f'[SERVER] UV validation request: job={job_id}')
 
-        mesh = trimesh.load(str(temp_input))
+        from mesh_quality import uv_report
 
-        # Check for UV coordinates
-        has_uvs = hasattr(mesh, 'visual') and hasattr(mesh.visual, 'uv')
-
-        result = {
-            'success': True,
-            'has_uvs': has_uvs,
-            'overlapping_islands': False,  # Placeholder for actual overlap detection
-            'texel_density': 1.0 if has_uvs else 0.0
-        }
-
-        if has_uvs:
-            # Basic UV coordinate stats
-            uv_coords = mesh.visual.uv
-            result['uv_count'] = len(uv_coords)
-            result['uv_min'] = uv_coords.min(axis=0).tolist()
-            result['uv_max'] = uv_coords.max(axis=0).tolist()
-        else:
-            result['uv_count'] = 0
-
-        return JSONResponse(result)
+        loaded = trimesh.load(str(temp_input))
+        report = uv_report(loaded)
+        # Measured values only; 'unknown' and 'absent' carry a reason (no placeholders)
+        return JSONResponse({'success': True, **report})
 
     except Exception as e:
         logger.error(f'[SERVER] UV validation error: {e}')
@@ -836,21 +820,28 @@ async def auto_unwrap_uvs(
     try:
         logger.info(f'[SERVER] Auto UV unwrap request: job={job_id}')
 
-        # Load mesh
-        mesh = trimesh.load(str(temp_input))
+        from mesh_quality import unwrap, uv_report, UnwrapUnsupported
 
-        # Auto-unwrap using trimesh's built-in unwrapper (if available)
-        # For production, integrate xatlas or similar UV unwrapper
-        # For now, just return the original mesh with a placeholder
-        logger.warning('[SERVER] Auto UV unwrap not fully implemented, returning original mesh')
+        loaded = trimesh.load(str(temp_input))
+        try:
+            unwrapped = unwrap(loaded)
+        except UnwrapUnsupported as unsupported:
+            logger.warning(f'[SERVER] UV unwrap unsupported: {unsupported}')
+            return JSONResponse(status_code=501, content={'success': False, 'supported': False, 'error': str(unsupported)})
 
-        mesh.export(str(temp_output), file_type='glb')
+        unwrapped.export(str(temp_output), file_type='glb')
+
+        # Re-validate what will be returned: success only if every geometry now has UVs
+        verified = uv_report(trimesh.load(str(temp_output)))
+        if not verified.get('has_uvs'):
+            logger.warning('[SERVER] UV unwrap produced no UVs on re-validation')
+            return JSONResponse(status_code=422, content={'success': False, 'supported': True, 'error': 'Unwrap output has no UVs on re-validation', 'report': verified})
 
         return FileResponse(
             str(temp_output),
             media_type='model/gltf-binary',
             filename=f'{job_id}_unwrapped.glb',
-            headers={'X-Job-Id': job_id}
+            headers={'X-Job-Id': job_id, 'X-UV-Verified': 'true'}
         )
 
     except Exception as e:

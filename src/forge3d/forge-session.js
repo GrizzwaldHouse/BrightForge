@@ -214,7 +214,7 @@ class ForgeSession extends EventEmitter {
           generationType: session.type,
           generationTime: result.generationTime || result.totalTime || 0,
           success: true,
-          textured: result.provider === 'hunyuan3d' || false
+          textured: result.textured === true
         });
       }
 
@@ -251,9 +251,60 @@ class ForgeSession extends EventEmitter {
         error: reason
       });
 
-      this.emit('failed', { sessionId, error: reason });
+      // Queue-managed sessions may be retried: the queue announces the final
+      // failure itself (finalizeFailure) so clients do not stop listening early.
+      this.emit(session.deferFailure ? 'attempt_failed' : 'failed', { sessionId, error: reason });
       throw new Error(reason);
     }
+  }
+
+  /**
+   * Mark a session as waiting in the generation queue.
+   * @param {string} sessionId
+   * @param {Object} info - { jobId, position }
+   */
+  markQueued(sessionId, info = {}) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return false;
+    session.deferFailure = true;
+    session.jobId = info.jobId || null;
+    session.progress = { stage: 'queued', percent: 0, position: info.position ?? null };
+    return true;
+  }
+
+  /**
+   * Return a failed queue-managed session to idle so the queue can retry it
+   * under the same session ID (status URLs stay valid).
+   * @param {string} sessionId
+   * @param {number} attempt - retry number about to run
+   */
+  resetForRetry(sessionId, attempt) {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.state !== SESSION_STATES.FAILED) return false;
+    session.state = SESSION_STATES.IDLE;
+    session.error = null;
+    session.result = null;
+    session.startedAt = null;
+    session.completedAt = null;
+    session.progress = { stage: 'queued', percent: 0, retry: attempt };
+    this._persistState(sessionId, SESSION_STATES.IDLE, null);
+    return true;
+  }
+
+  /**
+   * Final failure for a queue-managed session (retries exhausted or cancelled).
+   * @param {string} sessionId
+   * @param {string} reason
+   */
+  finalizeFailure(sessionId, reason) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return false;
+    session.state = SESSION_STATES.FAILED;
+    session.error = reason;
+    session.completedAt = session.completedAt || Date.now();
+    this._persistState(sessionId, SESSION_STATES.FAILED, reason);
+    this.emit('failed', { sessionId, error: reason });
+    return true;
   }
 
   /**

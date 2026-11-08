@@ -3,7 +3,7 @@
 // Date: March 6, 2026
 // Purpose: Pipeline stage handler — generates a 3D mesh via ForgeSession
 
-import forgeSession from '../../forge-session.js';
+import generationQueue from '../../generation-queue.js';
 import modelBridge from '../../model-bridge.js';
 import errorHandler from '../../../core/error-handler.js';
 
@@ -31,14 +31,13 @@ export async function execute(context, stageConfig) {
   }
 
   try {
-    const sessionId = forgeSession.create({
+    // Same admission path as the API: pause, capacity, retries and dead letter apply.
+    const { sessionId, result } = await generationQueue.submitAndWait({
       type,
       prompt: context.prompt,
       imageBuffer: context.imageBuffer || null,
       model: context.model || stageConfig.default_model || 'auto'
     });
-
-    const result = await forgeSession.run(sessionId);
 
     // Pass generated data forward in the pipeline context
     return {
