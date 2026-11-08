@@ -38,6 +38,15 @@ export async function execute(context, stageConfig) {
   try {
     const report = await modelBridge.getMeshReport(meshBuffer);
 
+    // A failed or malformed report is never a pass
+    if (!report || report.success === false) {
+      return {
+        success: false,
+        result: { report, violations: ['Quality report failed'], passed: false },
+        error: `Quality check failed: report unavailable (${report?.error || 'no report'})`
+      };
+    }
+
     // Validate against configured thresholds
     const violations = [];
     const faceCount = report.face_count || report.faceCount || 0;
@@ -51,8 +60,22 @@ export async function execute(context, stageConfig) {
       violations.push(`Face count ${faceCount} below minimum ${stageConfig.min_faces}`);
     }
 
-    if (stageConfig.require_manifold && report.is_manifold === false) {
-      violations.push('Mesh is not manifold (has holes or non-watertight geometry)');
+    // Required measurements must be present and measured; missing evidence fails
+    const topology = report.topology || {};
+    const requireMeasured = (flag, field, failMessage) => {
+      if (!flag) return;
+      if (typeof report[field] !== 'boolean' || topology.status !== 'measured') {
+        violations.push(`${field} was not measured (topology status: ${topology.status || 'missing'})`);
+      } else if (report[field] === false) {
+        violations.push(failMessage);
+      }
+    };
+    requireMeasured(stageConfig.require_manifold, 'is_manifold',
+      `Mesh is not manifold (${topology.non_manifold_edges ?? '?'} edges shared by 3+ faces)`);
+    requireMeasured(stageConfig.require_watertight, 'is_watertight',
+      `Mesh is not watertight (${topology.boundary_edges ?? '?'} open boundary edges)`);
+    if (stageConfig.reject_degenerate && (topology.degenerate_faces || topology.duplicate_faces)) {
+      violations.push(`Mesh has ${topology.degenerate_faces || 0} degenerate and ${topology.duplicate_faces || 0} duplicate faces`);
     }
 
     const passed = violations.length === 0;
@@ -64,6 +87,7 @@ export async function execute(context, stageConfig) {
         faceCount,
         vertexCount,
         isManifold: report.is_manifold,
+        isWatertight: report.is_watertight,
         violations,
         passed
       },

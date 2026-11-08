@@ -90,7 +90,7 @@ class ModelAdapter(ABC):
 
 
 class HunyuanAdapter(ModelAdapter):
-    """Hunyuan3D 2.1 adapter for image-to-3D textured mesh generation."""
+    """Hunyuan3D adapter for image-to-3D shape generation (untextured; paint stage not wired)."""
 
     @property
     def name(self):
@@ -107,8 +107,9 @@ class HunyuanAdapter(ModelAdapter):
     def get_info(self):
         """Return metadata with Hunyuan3D capabilities."""
         info = super().get_info()
-        info['textured'] = True
-        info['capabilities'] = ['text_to_mesh', 'image_to_mesh', 'textured_mesh']
+        # Shape generation only: the paint (texture) stage is not wired in
+        info['textured'] = False
+        info['capabilities'] = ['text_to_mesh', 'image_to_mesh']
         info['input_types'] = ['image', 'text']
         info['output_formats'] = ['glb', 'fbx']
         return info
@@ -189,7 +190,7 @@ class HunyuanAdapter(ModelAdapter):
         return True
 
     def generate(self, params):
-        """Generate a textured 3D mesh from an image.
+        """Generate an untextured 3D mesh (shape) from an image.
 
         Expected params keys:
             image          - PIL Image (already preprocessed by caller)
@@ -260,7 +261,7 @@ class HunyuanAdapter(ModelAdapter):
             'file_size_bytes': output_path.stat().st_size,
             'fbx_size_bytes': fbx_size,
             'model': self.name,
-            'textured': True,
+            'textured': False,
         }
 
     def _export_result(self, result, output_path):

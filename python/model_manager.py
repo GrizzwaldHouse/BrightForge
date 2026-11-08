@@ -662,7 +662,6 @@ class ModelManager:
         """
         try:
             import trimesh
-            import numpy as np
 
             input_path = Path(input_path)
             mesh = trimesh.load(str(input_path), force='mesh')
@@ -697,8 +696,12 @@ class ModelManager:
                         'target_faces': target,
                     }
 
-            is_watertight = bool(mesh.is_watertight)
-            is_manifold = bool(np.all(mesh.edges_unique_length > 0)) if len(mesh.edges_unique_length) > 0 else False
+            # Measured topology (edge incidence, degenerate and duplicate faces);
+            # see python/mesh_quality.py for the definitions.
+            from mesh_quality import topology_report
+            topology = topology_report(trimesh.load(str(input_path)))
+            is_watertight = bool(topology.get('is_watertight'))
+            is_manifold = bool(topology.get('is_manifold'))
 
             logger.info(
                 f'[MODEL] Quality report: {vertex_count} verts, {face_count} faces, '
@@ -718,7 +721,10 @@ class ModelManager:
                 'estimated_vram_mb': round(estimated_vram_mb, 2),
                 'is_watertight': is_watertight,
                 'is_manifold': is_manifold,
+                'topology': topology,
+                # Face budgets only; not a statement that the mesh is game-ready
                 'recommendations': recommendations,
+                'recommendations_basis': 'face_count_only',
             }
 
         except Exception as e:

@@ -59,8 +59,10 @@ export async function execute(context, stageConfig) {
         result: {
           has_uvs: true,
           uv_count: validation.uv_count,
-          overlapping_islands: validation.overlapping_islands,
-          texel_density: validation.texel_density
+          // Measured, or { status: 'unknown' | 'absent', reason } (never a placeholder)
+          overlap: validation.overlap,
+          geometries: validation.geometries,
+          status: validation.status
         }
       };
     }
@@ -74,6 +76,12 @@ export async function execute(context, stageConfig) {
 
       try {
         const unwrappedBuffer = await modelBridge.autoUnwrapUVs(context.meshBuffer);
+
+        // Never trust the unwrap response alone: re-validate the returned mesh
+        const recheck = await modelBridge.validateUVs(unwrappedBuffer);
+        if (!recheck?.has_uvs) {
+          throw new Error('Auto-unwrap returned a mesh without UVs on re-validation');
+        }
         context.meshBuffer = unwrappedBuffer;
         context.uvValid = true;
 
@@ -91,7 +99,9 @@ export async function execute(context, stageConfig) {
           result: {
             has_uvs: true,
             auto_unwrapped: true,
-            message: 'UV coordinates generated automatically'
+            uv_count: recheck.uv_count,
+            overlap: recheck.overlap,
+            message: 'UV coordinates generated automatically and re-validated'
           }
         };
       } catch (unwrapErr) {

@@ -153,68 +153,54 @@ router.post('/generate', forge3dLimiter, express.raw({ type: 'image/*', limit: f
         return res.status(400).json({ error: 'Prompt required (at least 3 characters).' });
       }
 
-      sessionId = forgeSession.create({ type, prompt, options, model });
+      // Every request goes through the generation queue (pause, capacity,
+      // ordering, retries, dead letter). The queue owns the history entry.
+      const job = generationQueue.submit({ type, prompt, options, model, projectId: projectId || null }, {
+        onComplete: (result, ids) => {
+          // Get the actual model used from the session
+          const session = forgeSession.sessions.get(ids.sessionId);
+          const actualModel = session?.actualModel || model || null;
+          projectManager.updateGeneration(ids.jobId, { model: actualModel });
 
-      // Record in history
-      const histId = projectManager.recordGeneration({
-        projectId: projectId || null,
-        type,
-        prompt,
-        status: 'processing'
-      });
+          // Auto-save to project if specified
+          if (projectId && result) {
+            try {
+              const assetData = {
+                name: prompt ? prompt.slice(0, 40).replace(/[<>:"/\\|?*]/g, '_') : `gen_${ids.sessionId}`,
+                type,
+                metadata: { prompt, sessionId: ids.sessionId, generationTime: result.generationTime || result.totalTime }
+              };
 
-      // Run generation async
-      forgeSession.run(sessionId).then(async (result) => {
-        // Get the actual model used from the session
-        const session = forgeSession.sessions.get(sessionId);
-        const actualModel = session?.actualModel || model || null;
-
-        projectManager.updateGeneration(histId, {
-          status: 'complete',
-          generationTime: result.generationTime || result.totalTime || 0,
-          model: actualModel
-        });
-
-        // Auto-save to project if specified
-        if (projectId && result) {
-          try {
-            const assetData = {
-              name: prompt ? prompt.slice(0, 40).replace(/[<>:"/\\|?*]/g, '_') : `gen_${sessionId}`,
-              type,
-              metadata: { prompt, sessionId, generationTime: result.generationTime || result.totalTime }
-            };
-
-            if (result.meshBuffer) {
-              projectManager.saveAsset(projectId, {
-                ...assetData,
-                buffer: result.meshBuffer,
-                fbxBuffer: result.fbxBuffer || null,
-                thumbnailBuffer: result.thumbnailBuffer || null,
-                extension: '.glb'
-              });
-            } else if (result.imageBuffer) {
-              projectManager.saveAsset(projectId, {
-                ...assetData,
-                buffer: result.imageBuffer,
-                extension: '.png'
-              });
+              if (result.meshBuffer) {
+                projectManager.saveAsset(projectId, {
+                  ...assetData,
+                  buffer: result.meshBuffer,
+                  fbxBuffer: result.fbxBuffer || null,
+                  thumbnailBuffer: result.thumbnailBuffer || null,
+                  extension: '.glb'
+                });
+              } else if (result.imageBuffer) {
+                projectManager.saveAsset(projectId, {
+                  ...assetData,
+                  buffer: result.imageBuffer,
+                  extension: '.png'
+                });
+              }
+            } catch (saveErr) {
+              console.error(`[ROUTE] Auto-save failed: ${saveErr.message}`);
             }
-          } catch (saveErr) {
-            console.error(`[ROUTE] Auto-save failed: ${saveErr.message}`);
           }
         }
-      }).catch((err) => {
-        projectManager.updateGeneration(histId, {
-          status: 'failed',
-          errorMessage: err.message
-        });
       });
+      sessionId = job.sessionId;
 
       endTimer({ sessionId, type });
       return res.status(202).json({
         sessionId,
+        jobId: job.jobId,
         type,
-        status: 'processing',
+        status: 'queued',
+        position: job.position,
         statusUrl: `/api/forge3d/status/${sessionId}`
       });
 
@@ -226,22 +212,25 @@ router.post('/generate', forge3dLimiter, express.raw({ type: 'image/*', limit: f
         return res.status(400).json({ error: 'No image data received.' });
       }
 
-      sessionId = forgeSession.create({
+      const job = generationQueue.submit({
         type: 'mesh',
         imageBuffer: Buffer.from(imageBuffer),
         filename: 'upload.png'
+      }, {
+        onFailed: (err, ids) => {
+          console.error(`[ROUTE] Image mesh generation failed: ${err.message}`);
+          errorHandler.report('forge3d_error', err, { endpoint: 'generate', sessionId: ids.sessionId, type: 'mesh' });
+        }
       });
-
-      forgeSession.run(sessionId).catch((err) => {
-        console.error(`[ROUTE] Image mesh generation failed: ${err.message}`);
-        errorHandler.report('forge3d_error', err, { endpoint: 'generate', sessionId, type: 'mesh' });
-      });
+      sessionId = job.sessionId;
 
       endTimer({ sessionId, type: 'mesh' });
       return res.status(202).json({
         sessionId,
+        jobId: job.jobId,
         type: 'mesh',
-        status: 'processing',
+        status: 'queued',
+        position: job.position,
         statusUrl: `/api/forge3d/status/${sessionId}`
       });
 
@@ -252,6 +241,10 @@ router.post('/generate', forge3dLimiter, express.raw({ type: 'image/*', limit: f
     }
 
   } catch (err) {
+    if (err.code === 'QUEUE_FULL') {
+      endTimer({ error: 'queue_full' });
+      return res.status(429).json({ error: err.message });
+    }
     console.error(`[ROUTE] Generate error: ${err.message}`);
     errorHandler.report('forge3d_error', err, { endpoint: 'generate' });
     endTimer({ error: err.message });

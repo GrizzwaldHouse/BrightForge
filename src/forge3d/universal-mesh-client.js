@@ -51,6 +51,10 @@ class UniversalMeshClient {
       generations: 0
     };
 
+    // Cost reserved by dispatches still in flight, so concurrent requests
+    // cannot jointly exceed the daily budget.
+    this.reservedUsd = 0;
+
     // Cloud client loaded lazily to avoid circular dependency
     this._cloudClient = null;
 
@@ -70,9 +74,17 @@ class UniversalMeshClient {
    * @returns {Promise<Object>} { glbBuffer, fbxBuffer, metadata, provider, routingLog }
    */
   async generateMesh(imageBuffer, filename, jobId, options = {}) {
-    // If a specific model is requested, try it directly
+    // An explicitly requested provider goes through the same guards as the
+    // chain (enabled, availability, budget, cancellation, usage tracking).
+    // It does not fall back: the caller asked for this provider by name.
     if (options.model && this.providers[options.model]) {
-      return this._callProvider(options.model, imageBuffer, filename, jobId, options);
+      const routingLog = [];
+      const outcome = await this._guardedDispatch(options.model, imageBuffer, filename, jobId, options, routingLog, { explicit: true });
+      if (outcome.ok) return outcome.result;
+      const refused = new Error(`Requested mesh provider ${options.model} not used: ${outcome.reason}`);
+      refused.routingLog = routingLog;
+      refused.code = outcome.code;
+      throw refused;
     }
 
     const task = options.task || 'default';
@@ -105,77 +117,23 @@ class UniversalMeshClient {
       console.warn(`[MESH-CLIENT] Router consultation failed (proceeding with default): ${routerErr.message}`);
     }
 
-    // Try preferred providers in order
-    for (const providerName of preferList) {
-      // Check cancellation
-      if (options.signal?.aborted) {
+    // Try preferred providers in order, then the fallback, all through the same guards
+    const fallback = routing.fallback;
+    const attempts = [
+      ...preferList.map((name) => ({ name, fallback: false })),
+      ...(fallback ? [{ name: fallback, fallback: true }] : [])
+    ];
+
+    for (const attempt of attempts) {
+      const outcome = await this._guardedDispatch(attempt.name, imageBuffer, filename, jobId, options, routingLog, { fallback: attempt.fallback, task, endTimer });
+      if (outcome.ok) return outcome.result;
+      if (outcome.code === 'CANCELLED') {
         const cancelError = new Error('Mesh generation cancelled');
+        cancelError.code = 'CANCELLED';
         cancelError.routingLog = routingLog;
         throw cancelError;
       }
-
-      if (!this.isProviderAvailable(providerName)) {
-        routingLog.push({ provider: providerName, status: 'skipped', reason: 'Not available' });
-        errors.push({ provider: providerName, error: 'Not available' });
-        continue;
-      }
-
-      const budgetCheck = this.checkBudget(providerName);
-      if (!budgetCheck.allowed) {
-        routingLog.push({ provider: providerName, status: 'skipped', reason: budgetCheck.reason });
-        errors.push({ provider: providerName, error: budgetCheck.reason });
-        continue;
-      }
-
-      try {
-        console.log(`[MESH-CLIENT] Trying ${providerName}...`);
-        const result = await this._callProvider(providerName, imageBuffer, filename, jobId, options);
-
-        const cost = this.calculateCost(providerName);
-        this.trackUsage(providerName, cost);
-
-        routingLog.push({ provider: providerName, status: 'success', cost });
-        console.log(`[MESH-CLIENT] Success with ${providerName}, cost: $${cost.toFixed(4)}`);
-        endTimer({ provider: providerName, status: 'success', cost });
-
-        return { ...result, provider: providerName, routingLog };
-
-      } catch (error) {
-        console.warn(`[MESH-CLIENT] ${providerName} failed: ${error.message}`);
-        routingLog.push({ provider: providerName, status: 'failed', error: error.message });
-        errorHandler.report('forge3d_error', error, {
-          provider: providerName,
-          task,
-          severity: 'warning'
-        });
-        endTimer({ provider: providerName, status: 'failed', error: error.message });
-        errors.push({ provider: providerName, error: error.message });
-        continue;
-      }
-    }
-
-    // Try fallback provider
-    const fallback = routing.fallback;
-    if (fallback && this.isProviderAvailable(fallback)) {
-      const budgetCheck = this.checkBudget(fallback);
-      if (budgetCheck.allowed) {
-        try {
-          console.log(`[MESH-CLIENT] Trying fallback: ${fallback}...`);
-          const result = await this._callProvider(fallback, imageBuffer, filename, jobId, options);
-
-          const cost = this.calculateCost(fallback);
-          this.trackUsage(fallback, cost);
-
-          routingLog.push({ provider: fallback, status: 'success', cost, fallback: true });
-          console.log(`[MESH-CLIENT] Fallback ${fallback} succeeded, cost: $${cost.toFixed(4)}`);
-
-          return { ...result, provider: fallback, routingLog };
-
-        } catch (error) {
-          routingLog.push({ provider: fallback, status: 'failed', error: error.message, fallback: true });
-          errors.push({ provider: fallback, error: error.message });
-        }
-      }
+      errors.push({ provider: attempt.name, error: outcome.reason });
     }
 
     // All providers failed
@@ -183,6 +141,48 @@ class UniversalMeshClient {
     const finalError = new Error(`All mesh providers failed: ${allErrors}`);
     finalError.routingLog = routingLog;
     throw finalError;
+  }
+
+  // -- Guarded dispatch -----------------------------------------------------
+
+  /**
+   * The only path that calls a provider. Checks cancellation, enabled state
+   * and availability, reserves the cost against the daily budget, dispatches,
+   * then records usage on success or releases the reservation on failure.
+   * @returns {Promise<{ok: true, result: Object}|{ok: false, code: string, reason: string}>}
+   * @private
+   */
+  async _guardedDispatch(providerName, imageBuffer, filename, jobId, options, routingLog, meta = {}) {
+    const tag = meta.fallback ? { fallback: true } : {};
+    const refuse = (code, reason) => {
+      routingLog.push({ provider: providerName, status: 'skipped', reason, ...tag });
+      return { ok: false, code, reason };
+    };
+
+    if (options.signal?.aborted) return refuse('CANCELLED', 'Cancelled before dispatch');
+    if (!this.isProviderAvailable(providerName)) return refuse('UNAVAILABLE', 'Not available (disabled, no API key, or bridge not running)');
+    const budgetCheck = this.checkBudget(providerName);
+    if (!budgetCheck.allowed) return refuse('BUDGET', budgetCheck.reason);
+
+    const cost = this.calculateCost(providerName);
+    this.reservedUsd += cost;
+    try {
+      console.log(`[MESH-CLIENT] Trying ${meta.fallback ? 'fallback ' : ''}${providerName}...`);
+      const result = await this._callProvider(providerName, imageBuffer, filename, jobId, options);
+      this.trackUsage(providerName, cost);
+      routingLog.push({ provider: providerName, status: 'success', cost, ...tag, ...(meta.explicit ? { explicit: true } : {}) });
+      console.log(`[MESH-CLIENT] Success with ${providerName}, cost: $${cost.toFixed(4)}`);
+      meta.endTimer?.({ provider: providerName, status: 'success', cost });
+      return { ok: true, result: { ...result, provider: providerName, routingLog } };
+    } catch (error) {
+      console.warn(`[MESH-CLIENT] ${providerName} failed: ${error.message}`);
+      routingLog.push({ provider: providerName, status: 'failed', error: error.message, ...tag });
+      errorHandler.report('forge3d_error', error, { provider: providerName, task: meta.task, severity: 'warning' });
+      meta.endTimer?.({ provider: providerName, status: 'failed', error: error.message });
+      return { ok: false, code: 'FAILED', reason: error.message };
+    } finally {
+      this.reservedUsd = Math.max(0, this.reservedUsd - cost);
+    }
   }
 
   // -- Provider dispatch ----------------------------------------------------
@@ -290,12 +290,13 @@ class UniversalMeshClient {
       };
     }
 
-    if (this.dailyUsage.cost_usd >= this.budget.daily_limit_usd) {
+    const committed = this.dailyUsage.cost_usd + (this.reservedUsd || 0);
+    if (committed >= this.budget.daily_limit_usd) {
       return { allowed: false, reason: 'Daily budget exceeded' };
     }
 
-    // Check if this single generation would exceed the budget
-    const projectedCost = this.dailyUsage.cost_usd + provider.cost_per_generation;
+    // Check if this single generation would exceed the budget (in-flight reservations included)
+    const projectedCost = committed + provider.cost_per_generation;
     if (projectedCost > this.budget.daily_limit_usd) {
       return { allowed: false, reason: 'Would exceed daily budget' };
     }
@@ -553,6 +554,40 @@ if (isSelfTest(import.meta.url)) {
   const resetCheck = client.checkBudget('test-cloud');
   console.assert(resetCheck.allowed === true, 'Budget should reset on new day');
   console.assert(client.dailyUsage.cost_usd === 0, 'Cost should reset to 0');
+
+  // Guarded dispatch: no path may reach a provider that is disabled, over
+  // budget or cancelled (review finding P1, 2026-11-07).
+  const guardCfg = {
+    providers: {
+      'paid-disabled': { enabled: false, type: 'cloud', api_key_env: 'GUARD_TEST_KEY', cost_per_generation: 0.25 },
+      'paid-enabled': { enabled: true, type: 'cloud', api_key_env: 'GUARD_TEST_KEY', cost_per_generation: 0.25 }
+    },
+    task_routing: { default: { prefer: ['paid-enabled'], fallback: 'paid-disabled' } },
+    budget: { daily_limit_usd: 0 }
+  };
+  const savedKey = process.env.GUARD_TEST_KEY;
+  process.env.GUARD_TEST_KEY = 'fixture-key';
+  try {
+    const guard = new UniversalMeshClient(guardCfg);
+    let dispatched = 0;
+    guard._callProvider = async () => { dispatched++; return { glbBuffer: Buffer.from('x'), metadata: {} }; };
+    const refusedCode = async (fn) => { try { await fn(); return 'NOT_REFUSED'; } catch (e) { return e.code || e.message; } };
+
+    console.assert(await refusedCode(() => guard.generateMesh(Buffer.from('i'), 'i.png', 'j1', { model: 'paid-disabled' })) === 'UNAVAILABLE', 'Explicit disabled provider must be refused');
+    console.assert(await refusedCode(() => guard.generateMesh(Buffer.from('i'), 'i.png', 'j2', { model: 'paid-enabled' })) === 'BUDGET', 'Explicit provider over budget must be refused');
+    const aborted = AbortSignal.abort();
+    console.assert(await refusedCode(() => guard.generateMesh(Buffer.from('i'), 'i.png', 'j3', { model: 'paid-enabled', signal: aborted })) === 'CANCELLED', 'Explicit provider with aborted signal must be refused');
+    console.assert((await refusedCode(() => guard.generateMesh(Buffer.from('i'), 'i.png', 'j4', {}))).includes('All mesh providers failed'), 'Chain plus disabled fallback must be refused');
+    console.assert(dispatched === 0, `No provider may be dispatched, got ${dispatched}`);
+
+    guard.budget = { daily_limit_usd: 0.25 };
+    const ok = await guard.generateMesh(Buffer.from('i'), 'i.png', 'j5', { model: 'paid-enabled' });
+    console.assert(dispatched === 1 && ok.provider === 'paid-enabled', 'Allowed explicit provider dispatches once');
+    console.assert(guard.dailyUsage.cost_usd === 0.25 && guard.reservedUsd === 0, 'Explicit success is tracked and reservation released');
+    console.assert(await refusedCode(() => guard.generateMesh(Buffer.from('i'), 'i.png', 'j6', { model: 'paid-enabled' })) === 'BUDGET', 'Budget spent by an explicit call blocks the next one');
+  } finally {
+    if (savedKey === undefined) delete process.env.GUARD_TEST_KEY; else process.env.GUARD_TEST_KEY = savedKey;
+  }
 
   console.log('[MESH-CLIENT] Self-test passed');
   process.exit(0);
