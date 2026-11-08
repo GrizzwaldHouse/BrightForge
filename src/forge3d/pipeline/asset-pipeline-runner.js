@@ -26,9 +26,15 @@ import orchestrator from '../../orchestration/index.js';
 import errorHandler from '../../core/error-handler.js';
 import telemetryBus from '../../core/telemetry-bus.js';
 import selfHealingOrchestrator from '../../core/self-healing-orchestrator.js';
+import { summarizeBinary } from '../../core/binary-summary.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// Stage results and context in status responses and events carry buffer
+// sizes, not buffers: a status response used to hold every mesh as a JSON
+// number array (~100 MB for one Hunyuan shape).
+export const summarizeForStatus = summarizeBinary;
 
 // Pipeline execution states
 const PIPELINE_STATES = {
@@ -193,7 +199,7 @@ class AssetPipelineRunner extends EventEmitter {
         error: s.error,
         startedAt: s.startedAt,
         completedAt: s.completedAt,
-        result: s.result
+        result: summarizeForStatus(s.result)
       })),
       startedAt: exec.startedAt,
       completedAt: exec.completedAt,
@@ -288,6 +294,7 @@ class AssetPipelineRunner extends EventEmitter {
           nextAction: `Execute stage: ${exec.stages[0]?.name || 'none'}`
         });
         orchTaskId = task.task_id;
+        exec.orchTaskId = orchTaskId;
       } catch (err) {
         // Orchestration is optional — continue without it
         console.warn('[PIPELINE] Orchestration task creation failed (non-fatal):', err.message);
@@ -566,10 +573,14 @@ class AssetPipelineRunner extends EventEmitter {
 
         const orchEventType = orchEventMap[eventType];
         if (orchEventType) {
+          // Orchestration events reference task_states(task_id): use the
+          // orchestration task created for this run, not the pipeline ID
+          // (that failed every event with FOREIGN KEY constraint failed).
+          const orchTaskId = this.activePipelines.get(data.pipelineId)?.orchTaskId || null;
           orchestrator.eventBus.emit(orchEventType, {
             agent: 'Claude',
-            taskId: data.pipelineId,
-            payload: data
+            taskId: orchTaskId,
+            payload: summarizeBinary(data)
           });
         }
       } catch (_e) {
@@ -583,12 +594,7 @@ class AssetPipelineRunner extends EventEmitter {
    * @private
    */
   _sanitizeContext(context) {
-    const safe = { ...context };
-    delete safe.imageBuffer;
-    delete safe.meshBuffer;
-    delete safe.optimizedBuffer;
-    delete safe.fbxBuffer;
-    return safe;
+    return summarizeForStatus(context);
   }
 }
 

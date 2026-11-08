@@ -36,6 +36,21 @@ def _cfg(section, key, default=None):
     """Get a config value with fallback to default."""
     return CONFIG.get(section, {}).get(key, default)
 
+
+BYTES_PER_MB = 1024 * 1024
+HTTP_PAYLOAD_TOO_LARGE = 413
+# Fallbacks when config.yaml lacks the keys. Input images and meshes have
+# separate limits: a Hunyuan3D shape is ~28 MB, larger than any input image.
+DEFAULT_IMAGE_UPLOAD_BYTES = 20 * BYTES_PER_MB
+DEFAULT_MESH_UPLOAD_BYTES = 256 * BYTES_PER_MB
+
+
+def _check_mesh_upload(contents):
+    """Reject a mesh upload above generation.max_mesh_upload_size_bytes with 413."""
+    limit = _cfg('generation', 'max_mesh_upload_size_bytes', DEFAULT_MESH_UPLOAD_BYTES)
+    if len(contents) > limit:
+        raise HTTPException(HTTP_PAYLOAD_TOO_LARGE, f'Mesh file too large. Maximum {limit // BYTES_PER_MB} MB.')
+
 # MEDIUM SECURITY: Sanitize error messages for HTTP responses
 # Removes file paths, stack traces, and internal implementation details
 def sanitize_error(error):
@@ -204,10 +219,10 @@ async def generate_mesh(
         raise HTTPException(400, f'Unsupported image type: {image.content_type}. Use PNG, JPG, or WebP.')
 
     # Validate file size
-    max_upload_bytes = _cfg('generation', 'max_upload_size_bytes', 20 * 1024 * 1024)
+    max_upload_bytes = _cfg('generation', 'max_upload_size_bytes', DEFAULT_IMAGE_UPLOAD_BYTES)
     contents = await image.read()
     if len(contents) > max_upload_bytes:
-        raise HTTPException(400, 'Image too large. Maximum 20 MB.')
+        raise HTTPException(HTTP_PAYLOAD_TOO_LARGE, f'Image too large. Maximum {max_upload_bytes // BYTES_PER_MB} MB.')
 
     # Save upload to temp
     temp_image = TEMP_DIR / f'{job_id}_input.png'
@@ -459,9 +474,7 @@ async def convert_glb_to_fbx(
         raise HTTPException(503, 'FBX conversion not available. Install pyassimp or Blender.')
 
     contents = await file.read()
-    max_upload_bytes = _cfg('generation', 'max_upload_size_bytes', 20 * 1024 * 1024)
-    if len(contents) > max_upload_bytes:
-        raise HTTPException(400, 'File too large. Maximum 20 MB.')
+    _check_mesh_upload(contents)
 
     temp_glb = TEMP_DIR / f'{job_id}_convert.glb'
     temp_glb.write_bytes(contents)
@@ -518,9 +531,7 @@ async def extract_materials(
         raise HTTPException(503, 'Material extraction not available. Install pygltflib.')
 
     contents = await file.read()
-    max_upload_bytes = _cfg('generation', 'max_upload_size_bytes', 20 * 1024 * 1024)
-    if len(contents) > max_upload_bytes:
-        raise HTTPException(400, 'File too large. Maximum 20 MB.')
+    _check_mesh_upload(contents)
 
     job_id = generate_job_id()
     temp_glb = TEMP_DIR / f'{job_id}_material.glb'
@@ -604,9 +615,7 @@ async def postprocess_optimize(
         raise HTTPException(400, 'Target faces must be at least 4')
 
     contents = await file.read()
-    max_upload_bytes = _cfg('generation', 'max_upload_size_bytes', 20 * 1024 * 1024)
-    if len(contents) > max_upload_bytes:
-        raise HTTPException(400, 'File too large. Maximum 20 MB.')
+    _check_mesh_upload(contents)
 
     temp_input = TEMP_DIR / f'{job_id}_optimize_input.glb'
     temp_input.write_bytes(contents)
@@ -653,9 +662,7 @@ async def postprocess_lod(
     logger.info(f'[SERVER] LOD request: job={job_id}')
 
     contents = await file.read()
-    max_upload_bytes = _cfg('generation', 'max_upload_size_bytes', 20 * 1024 * 1024)
-    if len(contents) > max_upload_bytes:
-        raise HTTPException(400, 'File too large. Maximum 20 MB.')
+    _check_mesh_upload(contents)
 
     temp_input = TEMP_DIR / f'{job_id}_lod_input.glb'
     temp_input.write_bytes(contents)
@@ -699,9 +706,7 @@ async def postprocess_report(
     Returns: JSON with vertex/face counts, bounding box, recommendations
     """
     contents = await file.read()
-    max_upload_bytes = _cfg('generation', 'max_upload_size_bytes', 20 * 1024 * 1024)
-    if len(contents) > max_upload_bytes:
-        raise HTTPException(400, 'File too large. Maximum 20 MB.')
+    _check_mesh_upload(contents)
 
     job_id = generate_job_id()
     temp_input = TEMP_DIR / f'{job_id}_report_input.glb'
@@ -764,9 +769,7 @@ async def validate_uvs(
     if len(contents) > max_mesh_size:
         raise HTTPException(400, f'File too large. Maximum {max_mesh_size // (1024 * 1024)} MB.')
 
-    max_upload_bytes = _cfg('generation', 'max_upload_size_bytes', 20 * 1024 * 1024)
-    if len(contents) > max_upload_bytes:
-        raise HTTPException(400, 'File too large. Maximum 20 MB.')
+    _check_mesh_upload(contents)
 
     job_id = generate_job_id()
     temp_input = TEMP_DIR / f'{job_id}_uv_validate.glb'
@@ -808,9 +811,7 @@ async def auto_unwrap_uvs(
     if len(contents) > max_mesh_size:
         raise HTTPException(400, f'File too large. Maximum {max_mesh_size // (1024 * 1024)} MB.')
 
-    max_upload_bytes = _cfg('generation', 'max_upload_size_bytes', 20 * 1024 * 1024)
-    if len(contents) > max_upload_bytes:
-        raise HTTPException(400, 'File too large. Maximum 20 MB.')
+    _check_mesh_upload(contents)
 
     job_id = generate_job_id()
     temp_input = TEMP_DIR / f'{job_id}_unwrap_input.glb'
@@ -872,9 +873,7 @@ async def generate_textures(
         raise HTTPException(400, 'Resolution must be between 512 and 4096')
 
     contents = await file.read()
-    max_upload_bytes = _cfg('generation', 'max_upload_size_bytes', 20 * 1024 * 1024)
-    if len(contents) > max_upload_bytes:
-        raise HTTPException(400, 'File too large. Maximum 20 MB.')
+    _check_mesh_upload(contents)
 
     job_id = generate_job_id()
     temp_input = TEMP_DIR / f'{job_id}_texture_input.glb'

@@ -52,6 +52,7 @@ async function main() {
   process.env.BRIGHTFORGE_STATE_ROOT = work;
 
   const { terminalEvent } = await import('../forge3d/sse-events.js');
+  const { summarizeForStatus } = await import('../forge3d/pipeline/asset-pipeline-runner.js');
   const { default: modelBridge } = await import('../forge3d/model-bridge.js');
   const { createServer } = await import('../api/server.js');
   const { app } = createServer({ sessionsDir: join(work, 'sessions') });
@@ -74,7 +75,24 @@ async function main() {
     r = await post(base, '/api/memory', JSON.stringify({ category: 'code', text: 'x'.repeat(OVERSIZE_BYTES) }));
     check(r.status === HTTP_PAYLOAD_TOO_LARGE && r.json?.error === 'Request body too large', `oversize JSON -> 413 (${r.status} ${r.json?.error})`);
 
-    console.log('\n[3] SSE terminal event shape');
+    console.log('\n[3] Retired placeholder pipeline routes say where the real API is');
+    let g = await new Promise((resolve, reject) => {
+      request(`${base}/api/forge3d/pipelines/abc`, { agent: false }, (res) => { let raw = ''; res.on('data', (c) => { raw += c; }); res.on('end', () => resolve({ status: res.statusCode, json: JSON.parse(raw) })); }).on('error', reject).end();
+    });
+    check(g.status === 410 && g.json?.status === 'GET /api/pipelines/:id', `GET /api/forge3d/pipelines/:id -> 410 (${g.status})`);
+    g = await post(base, '/api/forge3d/pipelines/run', JSON.stringify({ pipeline: 'x', prompt: 'y' }));
+    check(g.status === 410 && g.json?.run === 'POST /api/pipelines/run', `POST /api/forge3d/pipelines/run -> 410 (${g.status})`);
+
+    console.log('\n[4] Pipeline status carries buffer sizes, not buffers');
+    const summary = summarizeForStatus({ meshBuffer: Buffer.alloc(1000), lods: [{ buf: new Uint8Array(5), faces: 10 }], n: 1, s: 'x', z: null });
+    check(summary.meshBuffer?.bytes === 1000 && summary.lods[0].buf.bytes === 5 && summary.lods[0].faces === 10, 'buffers become { bytes }');
+    check(summary.n === 1 && summary.s === 'x' && summary.z === null, 'other values unchanged');
+    const { default: telemetryBus } = await import('../core/telemetry-bus.js');
+    telemetryBus.emit('forge3d_contract_probe', { result: { meshBuffer: Buffer.alloc(2048) } });
+    const kept = telemetryBus.ringBuffers.forge3d[telemetryBus.ringBuffers.forge3d.length - 1];
+    check(kept?.result?.meshBuffer?.bytes === 2048 && !Buffer.isBuffer(kept.result.meshBuffer), 'telemetry ring buffer keeps sizes, not buffers');
+
+    console.log('\n[5] SSE terminal event shape');
     const done = terminalEvent('s1', { state: 'complete', progress: { percent: 100 }, hasResult: true, result: { meshBuffer: Buffer.alloc(8) } });
     const fail = terminalEvent('s2', { state: 'failed', error: 'boom' });
     check(done.done === true && done.failed === false && done.error === null, 'complete: done, not failed, no error');

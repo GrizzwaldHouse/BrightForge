@@ -22,6 +22,14 @@ const __dirname = dirname(__filename);
 const isQuick = process.argv.includes('--quick');
 const DURATION = isQuick ? 60 : 780; // seconds
 const CHECKPOINT_INTERVAL = 30; // seconds
+// The server under test. Memory and error checks read the SERVER's numbers;
+// they used to read this test process's own memory and error buffer, so a
+// leaking or failing server still passed every checkpoint.
+const BASE_URL = process.env.BRIGHTFORGE_URL || 'http://localhost:3847';
+const HTTP_TIMEOUT_MS = 3000;
+const MAX_HEAP_GROWTH_MB = 50;
+const MAX_RSS_GROWTH_MB = 100;
+const MAX_NEW_SERVER_ERRORS = 50;
 const MAX_CHECKPOINTS = Math.floor(DURATION / CHECKPOINT_INTERVAL);
 
 console.log('\n[STABILITY] BrightForge Stability Run');
@@ -29,8 +37,8 @@ console.log(`[STABILITY] Mode: ${isQuick ? 'QUICK (60s)' : 'FULL (13 min)'}`);
 console.log(`[STABILITY] Checkpoints: ${MAX_CHECKPOINTS} (every ${CHECKPOINT_INTERVAL}s)`);
 console.log('');
 
-// Baseline measurements
-const baseline = process.memoryUsage();
+// Server memory baseline, taken at the first checkpoint that reaches the server.
+let baseline = null;
 const startTime = Date.now();
 const startedAt = new Date().toISOString();
 
@@ -45,7 +53,7 @@ async function checkServerHealth() {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 3000);
 
-    const response = await fetch('http://localhost:3847/api/health', {
+    const response = await fetch(`${BASE_URL}/api/health`, {
       signal: controller.signal
     });
 
@@ -61,44 +69,52 @@ async function checkServerHealth() {
   }
 }
 
-/**
- * Check memory growth from baseline.
- */
-function checkMemory() {
-  const current = process.memoryUsage();
-  const heapGrowthMb = (current.heapUsed - baseline.heapUsed) / (1024 * 1024);
-  const rssGrowthMb = (current.rss - baseline.rss) / (1024 * 1024);
+async function getServerJson(path) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), HTTP_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${BASE_URL}${path}`, { signal: controller.signal });
+    return res.ok ? await res.json() : null;
+  } catch (_e) {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
+const SKIPPED = Object.freeze({ pass: null, value: 'Server metrics unavailable (skipped)' });
+
+/**
+ * Check the server's memory growth from the first reading (GET /api/metrics).
+ */
+async function checkMemory() {
+  const metrics = await getServerJson('/api/metrics');
+  const heap = parseFloat(metrics?.memory?.heapUsed);
+  const rss = parseFloat(metrics?.memory?.rss);
+  if (Number.isNaN(heap) || Number.isNaN(rss)) return { heapGrowth: SKIPPED, rssGrowth: SKIPPED };
+  if (!baseline) baseline = { heap, rss };
+  const heapGrowthMb = heap - baseline.heap;
+  const rssGrowthMb = rss - baseline.rss;
   return {
-    heapGrowth: {
-      pass: heapGrowthMb < 50,
-      value: `+${heapGrowthMb.toFixed(1)}MB`
-    },
-    rssGrowth: {
-      pass: rssGrowthMb < 100,
-      value: `+${rssGrowthMb.toFixed(1)}MB`
-    }
+    heapGrowth: { pass: heapGrowthMb < MAX_HEAP_GROWTH_MB, value: `+${heapGrowthMb.toFixed(1)}MB (server heap ${heap}MB)` },
+    rssGrowth: { pass: rssGrowthMb < MAX_RSS_GROWTH_MB, value: `+${rssGrowthMb.toFixed(1)}MB (server rss ${rss}MB)` }
   };
 }
 
 /**
- * Check error handler for excessive errors.
+ * Count server errors reported since this run started (GET /api/errors/recent).
  */
 async function checkErrorRate() {
-  try {
-    const errorHandler = (await import('../core/error-handler.js')).default;
-    const ringBuffer = errorHandler.ringBuffer || [];
-    const errorCount = ringBuffer.length;
-    // Fail if more than 50 errors accumulated during run
-    const pass = errorCount < 50;
-    return { pass, value: `${errorCount} errors` };
-  } catch (_err) {
-    return { pass: true, value: '0 errors (handler not initialized)' };
-  }
+  const data = await getServerJson('/api/errors/recent');
+  if (!data || !Array.isArray(data.errors)) return SKIPPED;
+  const since = Date.parse(startedAt);
+  const fresh = data.errors.filter((e) => Date.parse(e.timestamp) >= since);
+  return { pass: fresh.length < MAX_NEW_SERVER_ERRORS, value: `${fresh.length} server errors since start` };
 }
 
 /**
- * Check event bus latency by emitting and receiving a test event.
+ * In-process self-check of the orchestration event bus (a fresh bus with mock
+ * storage in this process, not the server's bus).
  */
 async function checkEventBusLatency() {
   try {
@@ -144,7 +160,7 @@ async function checkEventBusLatency() {
  */
 async function runCheckpoint(number, elapsed) {
   const serverHealth = await checkServerHealth();
-  const memory = checkMemory();
+  const memory = await checkMemory();
   const errorRate = await checkErrorRate();
   const eventLatency = await checkEventBusLatency();
 

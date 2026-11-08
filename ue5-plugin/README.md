@@ -40,6 +40,10 @@ Open the Output Log (Window > Developer Tools > Output Log), switch to the Pytho
 # Import the module
 import brightforge_import
 
+# Point at another server (default http://localhost:3847, or the
+# BRIGHTFORGE_URL environment variable set before the editor starts)
+brightforge_import.set_server_url("http://192.168.1.20:3847")
+
 # Check server connection
 brightforge_import.check_connection()
 
@@ -64,6 +68,12 @@ assets = brightforge_import.get_assets("project-id-here")
 
 Assets are imported as Static Meshes with materials and textures into
 `/Game/BrightForge/Generated` by default.
+
+Verified 2026-11-08 on UE 5.7 (headless `UnrealEditor-Cmd`): the plugin
+compiles with `RunUAT BuildPlugin`, and `import_latest()` imports a generated
+FBX as a Static Mesh at the expected size (a 2 m Hunyuan3D shape measures
+~200 cm). Generated meshes are untextured and unoptimized (about 2 million
+triangles); run the optimize stage before using them in a level.
 
 ---
 

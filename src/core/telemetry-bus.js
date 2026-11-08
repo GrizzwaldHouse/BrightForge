@@ -16,6 +16,7 @@
 import { EventEmitter } from 'events';
 import { randomUUID } from 'crypto';
 import { isSelfTest } from './is-main-module.js';
+import { summarizeBinary } from './binary-summary.js';
 
 class TelemetryBus extends EventEmitter {
   constructor() {
@@ -61,11 +62,12 @@ class TelemetryBus extends EventEmitter {
   emit(category, data) {
     const eventId = randomUUID().slice(0, 12);
 
+    // Ring buffers outlive the request: never let them hold mesh/image buffers.
     const event = {
       id: eventId,
       timestamp: new Date().toISOString(),
       category,
-      ...data
+      ...summarizeBinary(data)
     };
 
     // 1. Route to appropriate ring buffer

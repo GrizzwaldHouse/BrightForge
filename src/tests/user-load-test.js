@@ -251,6 +251,9 @@ class Metrics {
 
   error(step, userId, message) {
     this.errors.push({ step, userId, message, ts: Date.now() });
+    // A thrown step (timeout, connection error) is a failed step, not a
+    // separate counter: it used to leave the pass rate at 100%.
+    this.results.push({ step, userId, ms: 0, status: 0, ok: false, detail: message, ts: Date.now() });
     if (VERBOSE) {
       process.stdout.write(`\n  [U${String(userId).padStart(4,'0')}] ERR ${step}: ${message}`);
     }
@@ -484,7 +487,7 @@ async function simulateUser(userId, metrics, stopSignal, semaphore) {
 
     const turnRes = await httpRequest('POST', `${BASE_URL}/api/chat/turn`, {
       message: task,
-      projectPath: DEFAULT_PROJECT_PATH
+      projectRoot: DEFAULT_PROJECT_PATH // the route reads projectRoot; projectPath was ignored
     });
 
     if (turnRes.status !== 202) {
@@ -647,7 +650,10 @@ async function run() {
   console.log(`  Elapsed:         ${(elapsed / 1000).toFixed(1)}s`);
   console.log(`  Throughput:      ${(totalSteps / (elapsed / 1000)).toFixed(1)} steps/sec`);
 
-  const VERDICT = overallRate >= 90 ? 'PASS' : overallRate >= 70 ? 'WARN' : 'FAIL';
+  // A step type that never succeeded is a broken feature, whatever the overall rate.
+  const deadSteps = rows.filter((r) => r.count > 0 && r.pass === 0).map((r) => r.step);
+  if (deadSteps.length) console.log(`  Never passed:    ${deadSteps.join(', ')}`);
+  const VERDICT = deadSteps.length ? 'FAIL' : overallRate >= 90 ? 'PASS' : overallRate >= 70 ? 'WARN' : 'FAIL';
   console.log(`\n  ${VERDICT === 'PASS' ? '✓' : VERDICT === 'WARN' ? '⚠' : '✗'} VERDICT: ${VERDICT}\n`);
 
   // ─── Write JSON report ─────────────────────────────────────────────────────
