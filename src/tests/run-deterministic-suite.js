@@ -16,13 +16,19 @@
  */
 
 import { spawn } from 'child_process';
-import { readFileSync, mkdirSync, writeFileSync } from 'fs';
+import { readFileSync, mkdirSync, writeFileSync, mkdtempSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
 const TIMEOUT_MS = Number.parseInt(process.env.SUITE_TIMEOUT_MS || '300000', 10);
+
+// Scripts write runtime state (.claude/*, .brightforge/memory.json) into a
+// throwaway directory so a suite run leaves tracked repo files unchanged.
+const STATE_DIR = mkdtempSync(join(tmpdir(), 'bf-suite-state-'));
+const CHILD_ENV = { ...process.env, BRIGHTFORGE_STATE_ROOT: STATE_DIR };
 
 // Not deterministic in a CPU-only, offline container (reason recorded in the report)
 const EXCLUDED = {
@@ -49,7 +55,7 @@ function runScript(name) {
     const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
     // Windows: Node refuses to spawn .cmd files without a shell (EINVAL since
     // the CVE-2024-27980 fix). Script names come from package.json, not users.
-    const child = spawn(npm, ['run', '-s', name], { cwd: ROOT, env: process.env, stdio: ['ignore', 'pipe', 'pipe'], shell: process.platform === 'win32' });
+    const child = spawn(npm, ['run', '-s', name], { cwd: ROOT, env: CHILD_ENV, stdio: ['ignore', 'pipe', 'pipe'], shell: process.platform === 'win32' });
     let out = '';
     child.stdout.on('data', (d) => { out += d; });
     child.stderr.on('data', (d) => { out += d; });
@@ -109,6 +115,7 @@ async function main() {
     console.log(`[SUITE] Could not write report: ${err.message}`);
   }
   console.log(`[SUITE] ${report.passed}/${report.total} passed, ${report.failed} failed`);
+  rmSync(STATE_DIR, { recursive: true, force: true });
   process.exit(failed.length === 0 ? 0 : 1);
 }
 

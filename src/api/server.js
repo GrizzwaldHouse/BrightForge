@@ -54,6 +54,20 @@ import './ws-event-bus.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Fallback when agent-config.yaml has no security.body_limits section.
+const DEFAULT_BODY_LIMITS = Object.freeze({ json_default: '1mb', json_route_parsed_paths: [] });
+
+// body-parser error types that are the client's fault, mapped to responses.
+const HTTP_PAYLOAD_TOO_LARGE = 413;
+const HTTP_BAD_REQUEST = 400;
+const CLIENT_ERROR_TYPES = Object.freeze({
+  'entity.too.large': { status: HTTP_PAYLOAD_TOO_LARGE, message: 'Request body too large' },
+  'entity.parse.failed': { status: HTTP_BAD_REQUEST, message: 'Malformed JSON body' },
+  'encoding.unsupported': { status: HTTP_BAD_REQUEST, message: 'Unsupported body encoding' },
+  'charset.unsupported': { status: HTTP_BAD_REQUEST, message: 'Unsupported body charset' },
+  'request.aborted': { status: HTTP_BAD_REQUEST, message: 'Request aborted' }
+});
+
 export function createServer(options = {}) {
   const app = express();
   const store = new SessionStore({ timeoutMs: options.sessionTimeout || 30 * 60 * 1000 });
@@ -93,12 +107,16 @@ export function createServer(options = {}) {
 
   // Load security config for CORS origins
   let allowedOrigins = ['http://localhost:3847'];
+  let bodyLimits = { ...DEFAULT_BODY_LIMITS };
   try {
     const configPath = join(__dirname, '../../config/agent-config.yaml');
     const raw = readFileSync(configPath, 'utf8');
     const config = parse(raw);
     if (config.security?.cors_origins) {
       allowedOrigins = config.security.cors_origins;
+    }
+    if (config.security?.body_limits) {
+      bodyLimits = { ...bodyLimits, ...config.security.body_limits };
     }
   } catch (_e) {
     // Use defaults
@@ -110,8 +128,11 @@ export function createServer(options = {}) {
     crossOriginEmbedderPolicy: false
   }));
 
-  // 2. Body parser
-  app.use(express.json({ limit: '1mb' }));
+  // 2. Body parser. Routes listed in json_route_parsed_paths parse their own
+  // body with a larger limit, so the global parser must not reject them first.
+  const jsonParser = express.json({ limit: bodyLimits.json_default });
+  const routeParsed = new Set(bodyLimits.json_route_parsed_paths || []);
+  app.use((req, res, next) => (routeParsed.has(req.path) ? next() : jsonParser(req, res, next)));
 
   // 3. CORS — config-driven allowed origins
   app.use((req, res, next) => {
@@ -189,6 +210,11 @@ export function createServer(options = {}) {
 
   // Error handling middleware (sanitized — no stack traces in response)
   app.use((err, req, res, _next) => {
+    // Client errors raised by body parsers keep their status instead of becoming 500.
+    const clientError = CLIENT_ERROR_TYPES[err.type];
+    if (clientError) {
+      return res.status(clientError.status).json({ error: clientError.message });
+    }
     console.error(`[SERVER] Error: ${err.message}`);
     const errorId = errorHandler.report('server_error', err, {
       method: req.method,

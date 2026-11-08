@@ -39,6 +39,7 @@ import { execFileSync } from 'child_process';
 import telemetryBus from './telemetry-bus.js';
 import errorHandler from './error-handler.js';
 import { isSelfTest } from './is-main-module.js';
+import { stateRoot } from './state-root.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -47,9 +48,11 @@ const PROJECT_ROOT = join(__dirname, '../..');
 const CLAUDE_DIR = join(PROJECT_ROOT, '.claude');
 const SKILLS_DIR = join(CLAUDE_DIR, 'skills');
 const TEMP_CACHE_DIR = join(CLAUDE_DIR, 'skills_temp');
-const REGISTRY_PATH = join(CLAUDE_DIR, 'skill_registry.json');
-const USAGE_LOG_PATH = join(CLAUDE_DIR, 'skill_usage.md');
-const HANDOFF_PATH = join(CLAUDE_DIR, 'HANDOFF.md');
+// Runtime state files; redirected by BRIGHTFORGE_STATE_ROOT (see state-root.js).
+const STATE_DIR = join(stateRoot(PROJECT_ROOT), '.claude');
+const REGISTRY_PATH = join(STATE_DIR, 'skill_registry.json');
+const USAGE_LOG_PATH = join(STATE_DIR, 'skill_usage.md');
+const HANDOFF_PATH = join(STATE_DIR, 'HANDOFF.md');
 const COWORK_SKILLS_DIR = join(CLAUDE_DIR, 'cowork-skills', 'skills');
 
 const MAX_ACTIVE_SKILLS = 15;
@@ -88,7 +91,7 @@ class SkillOrchestrator extends EventEmitter {
     console.log(`${LOG_PREFIX} Initializing skill orchestrator...`);
 
     // Ensure directories
-    for (const dir of [SKILLS_DIR, TEMP_CACHE_DIR]) {
+    for (const dir of [SKILLS_DIR, TEMP_CACHE_DIR, STATE_DIR]) {
       if (!existsSync(dir)) {
         mkdirSync(dir, { recursive: true });
         console.log(`${LOG_PREFIX} Created directory: ${relative(PROJECT_ROOT, dir)}`);

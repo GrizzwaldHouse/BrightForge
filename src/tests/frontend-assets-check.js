@@ -103,11 +103,19 @@ async function main() {
       check(rev && locked && locked.split('.')[1] === rev, `served REVISION ${rev} matches locked ${locked}`);
     }
   } finally {
-    srv.child.kill('SIGTERM');
+    // Wait for the server to exit so its sockets are gone before we do.
+    // process.exit() with keep-alive fetch sockets still closing aborts Node on
+    // Windows (UV_HANDLE_CLOSING, 0xC0000409) after every check has passed.
+    const alive = srv.child.exitCode === null && srv.child.signalCode === null;
+    if (alive) {
+      const exited = new Promise((resolve) => srv.child.once('exit', resolve));
+      srv.child.kill('SIGTERM');
+      await exited;
+    }
   }
 
   console.log(`\n[FRONTEND-ASSETS] ${passed} passed, ${failed} failed`);
-  process.exit(failed === 0 ? 0 : 1);
+  process.exitCode = failed === 0 ? 0 : 1;
 }
 
 main().catch((err) => {

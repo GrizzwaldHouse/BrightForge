@@ -39,6 +39,8 @@
     "test-bridge": "node src/forge3d/model-bridge.js --test",
     "test-mesh-client": "node src/forge3d/universal-mesh-client.js --test",
     "test-quality-gates": "node src/tests/quality-gates.js",
+    "test-api-contract": "node src/tests/api-contract.js",
+    "test-cloud-mesh": "node src/forge3d/cloud-mesh-client.js --test",
     "test-forge-session": "node src/forge3d/forge-session.js --test",
     "test-forge-db": "node src/forge3d/database.js --test",
     "test-project-manager": "node src/forge3d/project-manager.js --test",
@@ -158,6 +160,6 @@
     "eslint": "^8.56.0"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.0.0"
   }
 }

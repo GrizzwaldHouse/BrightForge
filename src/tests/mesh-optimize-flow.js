@@ -65,6 +65,16 @@ function startFakeInferenceServer({ includeDownloadPath = true } = {}) {
   });
 }
 
+// Close the fake server and its keep-alive sockets before the process ends.
+// Exiting while libuv is still closing those handles aborts Node on Windows
+// (0xC0000409) even after every check passed.
+function closeServer(server) {
+  return new Promise((resolve) => {
+    server.close(() => resolve());
+    server.closeAllConnections();
+  });
+}
+
 async function runFlow(server) {
   const { port } = server.address();
   modelBridge.baseUrl = `http://127.0.0.1:${port}`;
@@ -100,7 +110,7 @@ async function main() {
     check(Boolean(savedBuffer) && sha(savedBuffer) === sha(optimizedGlb), `exported bytes are the optimized bytes (${savedBuffer ? sha(savedBuffer) : 'none'} vs ${sha(optimizedGlb)})`);
     check(Boolean(savedBuffer) && sha(savedBuffer) !== sha(inputGlb), 'exported bytes are not the unoptimized input');
   } finally {
-    server.close();
+    await closeServer(server);
   }
 
   console.log('\n[2] Missing download path fails the stage instead of exporting the input');
@@ -110,11 +120,12 @@ async function main() {
     check(opt.success === false, `optimize stage fails (${opt.error})`);
     check(savedBuffer === null, 'nothing is exported');
   } finally {
-    server.close();
+    await closeServer(server);
   }
 
   console.log(`\n[MESH-FLOW] ${passed} passed, ${failed} failed`);
-  process.exit(failed === 0 ? 0 : 1);
+  // exitCode instead of exit(): let pending handle closes finish first.
+  process.exitCode = failed === 0 ? 0 : 1;
 }
 
 main().catch((err) => {

@@ -12,6 +12,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join, extname } from 'path';
 import { isSelfTest } from './is-main-module.js';
+import { stateRoot } from './state-root.js';
 
 const MAX_CONVENTIONS = 50;
 const MAX_CORRECTIONS = 100;
@@ -45,7 +46,7 @@ class ProjectMemory {
    */
   load(projectRoot) {
     this.projectRoot = projectRoot;
-    this.memoryPath = join(projectRoot, '.brightforge', 'memory.json');
+    this.memoryPath = join(stateRoot(projectRoot), '.brightforge', 'memory.json');
 
     try {
       if (existsSync(this.memoryPath)) {
@@ -74,7 +75,7 @@ class ProjectMemory {
     }
 
     try {
-      const dir = join(this.projectRoot, '.brightforge');
+      const dir = join(stateRoot(this.projectRoot), '.brightforge');
       if (!existsSync(dir)) {
         mkdirSync(dir, { recursive: true });
       }

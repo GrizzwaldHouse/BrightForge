@@ -12,6 +12,13 @@
 import telemetryBus from '../core/telemetry-bus.js';
 import { isSelfTest } from '../core/is-main-module.js';
 
+// Meshy Image to 3D API (docs.meshy.ai/en/api/image-to-3d, checked 2026-11-08).
+// config/mesh-providers.yaml base_url overrides the default.
+const MESHY_DEFAULT_BASE_URL = 'https://api.meshy.ai/openapi/v1';
+const MESHY_SUCCEEDED = 'SUCCEEDED';
+// Terminal failure states. EXPIRED is kept for older task records.
+const MESHY_FAILED_STATES = Object.freeze(['FAILED', 'CANCELED', 'EXPIRED']);
+
 class CloudMeshClient {
   constructor() {
     // Request timeout for individual API calls (not polling loops)
@@ -39,15 +46,15 @@ class CloudMeshClient {
     }
   }
 
-  // -- Meshy.ai v2 ----------------------------------------------------------
+  // -- Meshy.ai Image to 3D (openapi/v1) ------------------------------------
 
   /**
-   * Generate mesh via Meshy.ai v2 API.
+   * Generate mesh via the Meshy Image to 3D API.
    * Workflow: upload image -> create task -> poll status -> download GLB.
    */
   async _callMeshy(imageBuffer, options) {
     const config = options.providerConfig || {};
-    const baseUrl = config.base_url || 'https://api.meshy.ai/v2';
+    const baseUrl = config.base_url || MESHY_DEFAULT_BASE_URL;
     const apiKey = process.env[config.api_key_env || 'MESHY_API_KEY'];
 
     if (!apiKey) {
@@ -153,7 +160,7 @@ class CloudMeshClient {
 
       const statusData = await statusRes.json();
 
-      if (statusData.status === 'SUCCEEDED') {
+      if (statusData.status === MESHY_SUCCEEDED) {
         const glbUrl = statusData.model_urls?.glb;
         if (!glbUrl) {
           throw new Error('Meshy task succeeded but no GLB URL in response');
@@ -161,7 +168,7 @@ class CloudMeshClient {
         return glbUrl;
       }
 
-      if (statusData.status === 'FAILED' || statusData.status === 'EXPIRED') {
+      if (MESHY_FAILED_STATES.includes(statusData.status)) {
         throw new Error(`Meshy task ${statusData.status}: ${statusData.task_error?.message || 'unknown'}`);
       }
 
@@ -371,6 +378,45 @@ if (isSelfTest(import.meta.url)) {
   } catch (e) {
     console.assert(e.message.includes('not configured'), `Expected API key error, got: ${e.message}`);
   }
+
+  // Meshy contract against a stubbed fetch (fixtures follow the documented shapes)
+  const realFetch = globalThis.fetch;
+  const calls = [];
+  const reply = (status, body) => ({ ok: status < 400, status, json: async () => body, text: async () => JSON.stringify(body), arrayBuffer: async () => body });
+  const runMeshy = async (finalStatus) => {
+    calls.length = 0;
+    globalThis.fetch = async (url, init = {}) => {
+      calls.push({ url, method: init.method || 'GET', body: init.body ? JSON.parse(init.body) : null });
+      if (init.method === 'POST') return reply(202, { result: 'task-123' });
+      if (url.endsWith('/image-to-3d/task-123')) {
+        return reply(200, finalStatus === MESHY_SUCCEEDED
+          ? { id: 'task-123', status: MESHY_SUCCEEDED, model_urls: { glb: 'https://assets.example/model.glb' } }
+          : { id: 'task-123', status: finalStatus, task_error: { message: 'fixture failure' } });
+      }
+      if (url === 'https://assets.example/model.glb') return reply(200, new Uint8Array([103, 108, 84, 70]).buffer);
+      return reply(404, {});
+    };
+    process.env.MESHY_SELFTEST_KEY = 'test-key';
+    try {
+      return await client.generate('meshy', Buffer.from('img'), { filename: 'a.png', providerConfig: { api_key_env: 'MESHY_SELFTEST_KEY', poll_interval_ms: 1 } });
+    } finally {
+      globalThis.fetch = realFetch;
+      delete process.env.MESHY_SELFTEST_KEY;
+    }
+  };
+  const must = (cond, label) => { if (!cond) throw new Error(`[CLOUD-MESH] contract: ${label}`); };
+
+  const ok = await runMeshy(MESHY_SUCCEEDED);
+  must(calls[0].method === 'POST' && calls[0].url === `${MESHY_DEFAULT_BASE_URL}/image-to-3d`, `create URL ${calls[0].url}`);
+  must(calls[0].body.image_url.startsWith('data:image/png;base64,'), 'image sent as data URI');
+  must(calls[1].url === `${MESHY_DEFAULT_BASE_URL}/image-to-3d/task-123`, `poll URL ${calls[1].url}`);
+  must(ok.glbBuffer.length === 4 && ok.metadata.taskId === 'task-123', 'GLB downloaded from model_urls.glb');
+  for (const state of ['FAILED', 'CANCELED']) {
+    let msg = null;
+    try { await runMeshy(state); } catch (e) { msg = e.message; }
+    must(msg && msg.includes(state) && msg.includes('fixture failure'), `${state} is terminal (${msg})`);
+  }
+  console.log('[CLOUD-MESH] Meshy contract checks passed');
 
   console.log('[CLOUD-MESH] Self-test passed');
   process.exit(0);
