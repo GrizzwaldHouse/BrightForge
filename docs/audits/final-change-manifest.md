@@ -50,7 +50,7 @@ Commit identity: the repository's configured identity. Commit messages carry no 
 
 ## Unresolved items
 
-1. **MSI/PowerSpec machine evidence.** Not collected. Possible local-only commit `7abd9c6` / tag `v4.2.0-reconciled`. See `branch-reconciliation-report.md` section 6.
+1. **Machine evidence.** PowerSpec (`GrizzieWorkShop`, `D:\BrightForge`) holds local-only commits `7abd9c6`, `e8cc1a9` and tag `v4.2.0-reconciled`, not yet pushed. The MSI laptop has not been inspected. See `branch-reconciliation-report.md` section 8.
 2. **Recovery tags.** Created locally; the push was refused (HTTP 403). Commands for the owner are in `branch-reconciliation-report.md` section 7.
 3. **Unmerged branches.** `claude/mcp-deepseek-integration-1ymcK` and `claude/brightforge-master-execution-UYu2k` hold unique work with no decision yet.
 4. **Security risks R1–R8.** See `security-and-repository-hygiene.md`.

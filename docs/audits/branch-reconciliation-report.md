@@ -47,7 +47,14 @@ Interpretation:
 
 ### 2.3 Mapping to MSI and PowerSpec
 
-**Not establishable from the repository.** Git records no host names, and both copies commit as the same author. The C: and D: copies could be on the same computer or on different ones. The project notes mention an RTX 5080 and the use of `D:` storage, which hints that the D: copy is on the GPU desktop, but that is an inference, not evidence.
+Git records no host names, so the mapping comes from the owner (2026-11-10):
+
+| Computer | Machine | BrightForge copy | Evidence |
+|---|---|---|---|
+| `GrizzieWorkShop` | **PowerSpec** (desktop) | `D:\BrightForge` | Owner's command output (section 8) |
+| (laptop) | **MSI** | Not yet inspected | Section 6 commands still to run |
+
+The owner's output also covered `C:\Users\daley\Projects\BrightForge`. Which computer that copy is on was not stated.
 
 ### 2.4 Unrelated early history (`v4.0.0-alpha`)
 
@@ -153,7 +160,7 @@ Decisions:
 
 Owner decisions:
 - **Approved:** repair on `16c98f2`, and push the recovery references plus the repair branch. Never push to `main`.
-- **Not answered:** the MSI/PowerSpec mapping and the machine evidence (section 6). These remain open.
+- **Answered later (2026-11-10):** GrizzieWorkShop is the PowerSpec; the MSI is the laptop. See sections 2.3 and 8.
 
 | Action | Result |
 |---|---|
@@ -177,3 +184,29 @@ git push origin 'refs/tags/recovery/2026-10-30/*'
 Still required before merging the repair branch: run section 6 on both computers.
 - If any machine has commits that exist only locally (in particular `7abd9c6` / `v4.2.0-reconciled`), push them to a new branch `machine/<computer>-<date>`.
 - Then merge them into the repair branch with a normal merge. Rebase is not an option because the repair branch is already pushed.
+
+## 8. Machine evidence (2026-11-10)
+
+Summarised from command output the owner ran and pasted. No values were copied beyond what is listed.
+
+| Copy | Machine | Branch state | Local-only work |
+|---|---|---|---|
+| `D:\BrightForge` | PowerSpec (`GrizzieWorkShop`) | `main` 2 commits behind `origin/main` | **Commits `7abd9c6` and `e8cc1a9`; tag `v4.2.0-reconciled` points at `e8cc1a9`.** Many uncommitted changes, plus untracked `python/shap_e_model_cache`, `AgentForge.zip`, `generated/`, `.omc/` |
+| `C:\Users\daley\Projects\BrightForge` | Not stated | `feat/migrate-d-drive-untracked-work`, in sync with the remote | No local-only commits. Uncommitted new work: `core/`, `workflows/`, `test-manager/`, `config/{blueprint,event_schemas,runtime_contract,workflow_dsl}.json`, `docs/{CONSOLIDATION_PLAN,PHASE_STATUS,PR1_BUILD_RUBRIC,REPO_MAP}.md`, `planning/testing/`, and edits to `CLAUDE.md`, `README.md`, `.env.example`, `.gitignore` |
+| MSI (laptop) | MSI | **Not inspected** | Unknown. Run the section 6 commands there |
+
+This resolves the open question in section 2.2: `7abd9c6` / `v4.2.0-reconciled` exist, but only on the PowerSpec D: copy.
+
+Status on 2026-11-10: `machine/grizzieworkshop-d-reconciled` and `machine/grizzieworkshop-d-worktree` are **not on the remote yet**. To preserve the work without merging anything, run on the PowerSpec in `D:\BrightForge`:
+
+```powershell
+git push origin e8cc1a9:refs/heads/machine/grizzieworkshop-d-reconciled
+git push origin v4.2.0-reconciled
+git switch -c machine/grizzieworkshop-d-worktree
+git add -A -- . ':!python/shap_e_model_cache' ':!AgentForge.zip' ':!generated' ':!.omc'
+git status --short        # review before committing; nothing secret, no .env files
+git commit -m "chore: snapshot uncommitted D: worktree on PowerSpec"
+git push -u origin machine/grizzieworkshop-d-worktree
+```
+
+Nothing on these branches is merged until it has been compared with the repair branch and the owner approves.
