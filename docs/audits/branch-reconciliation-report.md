@@ -52,9 +52,10 @@ Git records no host names, so the mapping comes from the owner (2026-11-10):
 | Computer | Machine | BrightForge copy | Evidence |
 |---|---|---|---|
 | `GrizzieWorkShop` | **PowerSpec** (desktop) | `D:\BrightForge` | Owner's command output (section 8) |
+| `GrizzieWorkShop` | **PowerSpec** | `C:\Users\daley\Projects\BrightForge` | Same PowerShell session as the D: output (2026-11-11) |
 | (laptop) | **MSI** | Not yet inspected | Section 6 commands still to run |
 
-The owner's output also covered `C:\Users\daley\Projects\BrightForge`. Which computer that copy is on was not stated.
+Both BrightForge copies are on the PowerSpec. The second inventory (2026-11-11) ran on one machine that has both paths and reports `NVIDIA GeForce RTX 5080` (desktop part).
 
 ### 2.4 Unrelated early history (`v4.0.0-alpha`)
 
@@ -192,7 +193,7 @@ Summarised from command output the owner ran and pasted. No values were copied b
 | Copy | Machine | Branch state | Local-only work |
 |---|---|---|---|
 | `D:\BrightForge` | PowerSpec (`GrizzieWorkShop`) | `main` 2 commits behind `origin/main` | **Commits `7abd9c6` and `e8cc1a9`; tag `v4.2.0-reconciled` points at `e8cc1a9`.** Many uncommitted changes, plus untracked `python/shap_e_model_cache`, `AgentForge.zip`, `generated/`, `.omc/` |
-| `C:\Users\daley\Projects\BrightForge` | Not stated | `feat/migrate-d-drive-untracked-work`, in sync with the remote | No local-only commits. Uncommitted new work: `core/`, `workflows/`, `test-manager/`, `config/{blueprint,event_schemas,runtime_contract,workflow_dsl}.json`, `docs/{CONSOLIDATION_PLAN,PHASE_STATUS,PR1_BUILD_RUBRIC,REPO_MAP}.md`, `planning/testing/`, and edits to `CLAUDE.md`, `README.md`, `.env.example`, `.gitignore` |
+| `C:\Users\daley\Projects\BrightForge` | PowerSpec (`GrizzieWorkShop`) | `feat/migrate-d-drive-untracked-work`, in sync with the remote | No local-only commits. Uncommitted new work: `core/`, `workflows/`, `test-manager/`, `config/{blueprint,event_schemas,runtime_contract,workflow_dsl}.json`, `docs/{CONSOLIDATION_PLAN,PHASE_STATUS,PR1_BUILD_RUBRIC,REPO_MAP}.md`, `planning/testing/`, and edits to `CLAUDE.md`, `README.md`, `.env.example`, `.gitignore` |
 | MSI (laptop) | MSI | **Not inspected** | Unknown. Run the section 6 commands there |
 
 This resolves the open question in section 2.2: `7abd9c6` / `v4.2.0-reconciled` exist, but only on the PowerSpec D: copy.
@@ -210,3 +211,19 @@ git push -u origin machine/grizzieworkshop-d-worktree
 ```
 
 Nothing on these branches is merged until it has been compared with the repair branch and the owner approves.
+
+### 8.1 Second inventory (2026-11-11, PowerSpec)
+
+| Item | Result |
+|---|---|
+| `D:\BrightForge` HEAD | `c558f47` on `main`, 2 behind `origin/main`; tracked changes in `.agentforge/audit_result.json`, `.claude/skill_registry.json`, `SESSION_HANDOFF.md`, `STATUS.md` |
+| D: local-only commits | **Only `7abd9c6` and `e8cc1a9` (tag `v4.2.0-reconciled`).** Checked against GitHub: neither exists there |
+| D: worktrees | 3 locked agent worktrees at `b5fb686` and `claude/pedantic-hodgkin-7c1335` at `c558f47`. Both commits are already on GitHub. A stale entry for `C:/.../.claude/worktrees/zen-goodall` (`e8183ab`, on GitHub) is marked prunable |
+| `C:\...\BrightForge` HEAD | `16c98f2` on `feat/migrate-d-drive-untracked-work`, in sync; no local-only commits; tracked changes in `.claude/cowork-skills`, `.env.example`, `.gitignore`, `.omc/project-memory.json` |
+| C: worktrees | One detached agent worktree at `be12e20` (the `engine/` branch tip, on GitHub) |
+| Stashes | None in either copy |
+| Docker | Server 29.9.3, WSL 2 backend (`docker-desktop` distribution) |
+| Hyper-V | Not determined (query needs an elevated prompt) |
+| GPU | NVIDIA GeForce RTX 5080, driver 610.88 |
+
+Conclusion: the only work that exists nowhere else is `7abd9c6`, `e8cc1a9` and the uncommitted changes in both copies. The section 8 push commands preserve the commits; nothing else needs recovering from git.
