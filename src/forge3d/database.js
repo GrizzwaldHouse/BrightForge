@@ -409,6 +409,13 @@ const MIGRATIONS = [
       CREATE INDEX IF NOT EXISTS idx_history_created ON generation_history(created_at);
       CREATE INDEX IF NOT EXISTS idx_history_priority ON generation_history(priority, status, created_at);
     `
+  },
+  {
+    version: 12,
+    description: 'Add thumbnail column to generation_history (history gallery previews)',
+    sql: `
+      ALTER TABLE generation_history ADD COLUMN thumbnail TEXT;
+    `
   }
 ];
 

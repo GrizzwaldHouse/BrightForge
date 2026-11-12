@@ -262,7 +262,10 @@ class FbxConverter:
             'error': None,
         }
 
-        scale = _cfg('fbx_export', 'scale_factor', 100.0)
+        # No manual scale here: Blender works in meters and FBX_SCALE_ALL
+        # already converts to the FBX centimeter unit. Pre-scaling by
+        # fbx_export.scale_factor as well made assets 100x too large in Unreal
+        # (a 2 m Hunyuan shape imported as 199 m, verified 2026-11-08 in UE 5.7).
         coord_system = _cfg('fbx_export', 'coordinate_system', 'unreal')
 
         # Build Blender Python script for import/export
@@ -278,12 +281,6 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 
 # Import GLB
 bpy.ops.import_scene.gltf(filepath=r'{glb_path}')
-
-# Scale for Unreal (meters -> centimeters)
-for obj in bpy.context.scene.objects:
-    obj.scale = ({scale}, {scale}, {scale})
-    bpy.context.view_layer.objects.active = obj
-    bpy.ops.object.transform_apply(scale=True)
 
 # Export FBX
 bpy.ops.export_scene.fbx(

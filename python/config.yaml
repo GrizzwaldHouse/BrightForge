@@ -51,7 +51,10 @@ generation:
     - "image/png"
     - "image/jpeg"
     - "image/webp"
-  max_upload_size_bytes: 20971520  # 20 MB
+  max_upload_size_bytes: 20971520  # 20 MB, input images
+  # Mesh files sent to optimize, LOD, report, UV, convert, material and
+  # texture endpoints. Hunyuan3D shapes are ~28 MB before optimization.
+  max_mesh_upload_size_bytes: 268435456  # 256 MB
   max_image_dimension: 4096
   min_image_dimension: 512
   min_steps: 10

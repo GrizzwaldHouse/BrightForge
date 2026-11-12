@@ -36,3 +36,6 @@ qa-reports/
 logs/
 output/
 live_validation_report.json
+
+# Runtime project memory written into example projects by chat sessions
+examples/**/.brightforge/

@@ -8,7 +8,8 @@
  * @date February 10, 2026
  */
 
-import { readFileSync, existsSync, readdirSync, statSync } from 'fs';
+import { readFileSync, existsSync, statSync } from 'fs';
+import { readdir } from 'fs/promises';
 import { parse as parseYaml } from 'yaml';
 import { fileURLToPath } from 'url';
 import { dirname, join, relative, extname } from 'path';
@@ -128,56 +129,35 @@ class FileContext {
       return { files: [], totalTokensEstimate: 0 };
     }
 
+    // Walk asynchronously and never descend into ignored directories. The old
+    // readdirSync({ recursive: true }) listed node_modules, .venv and data/
+    // before filtering and read every file before applying maxFiles, which
+    // blocked the event loop ~2.8 s per chat turn on this repo (Phase 3 load
+    // test: 20 concurrent turns all timed out).
+    let candidates;
     try {
-      // Recursively scan directory
-      const entries = readdirSync(projectRoot, { recursive: true, withFileTypes: true });
-
-      for (const entry of entries) {
-        if (!entry.isFile()) continue;
-
-        const fullPath = join(entry.path || entry.parentPath || projectRoot, entry.name);
-        const relativePath = relative(projectRoot, fullPath);
-
-        // Skip ignored patterns
-        if (this.shouldIgnore(relativePath)) {
-          continue;
-        }
-
-        // Skip binary files
-        if (this.isBinary(fullPath)) {
-          continue;
-        }
-
-        // Skip non-allowed extensions
-        if (!this.isAllowedExtension(fullPath)) {
-          continue;
-        }
-
-        // Read file content
-        const content = this.readFileSafe(fullPath, maxFileSize);
-        if (content === null) continue;
-
-        files.push({
-          path: relativePath.replace(/\\/g, '/'), // Normalize path separators
-          content,
-          size: content.length
-        });
-      }
+      candidates = await this._listCandidates(projectRoot);
     } catch (error) {
       console.warn(`[CONTEXT] Error scanning directory: ${error.message}`);
       return { files: [], totalTokensEstimate: 0 };
     }
 
     // Sort by relevance: shorter paths first (closer to root), then alphabetical
-    files.sort((a, b) => {
+    candidates.sort((a, b) => {
       const depthA = a.path.split('/').length;
       const depthB = b.path.split('/').length;
       if (depthA !== depthB) return depthA - depthB;
       return a.path.localeCompare(b.path);
     });
 
-    // Limit number of files
-    const limitedFiles = files.slice(0, maxFiles);
+    // Read only as many files as will be returned
+    for (const candidate of candidates) {
+      if (files.length >= maxFiles) break;
+      const content = this.readFileSafe(candidate.fullPath, maxFileSize);
+      if (content === null) continue;
+      files.push({ path: candidate.path, content, size: content.length });
+    }
+    const limitedFiles = files;
 
     // Estimate tokens (rough estimate: 1 token ≈ 4 characters)
     const totalChars = limitedFiles.reduce((sum, f) => sum + f.size, 0);
@@ -187,6 +167,32 @@ class FileContext {
       files: limitedFiles,
       totalTokensEstimate
     };
+  }
+
+  /**
+   * List readable source files under projectRoot, pruning ignored directories.
+   * @param {string} projectRoot
+   * @returns {Promise<Array<{path: string, fullPath: string}>>}
+   * @private
+   */
+  async _listCandidates(projectRoot) {
+    const out = [];
+    const pending = [projectRoot];
+    while (pending.length > 0) {
+      const dir = pending.pop();
+      const entries = await readdir(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = join(dir, entry.name);
+        const relativePath = relative(projectRoot, fullPath).replace(/\\/g, '/');
+        if (this.shouldIgnore(relativePath)) continue;
+        if (entry.isDirectory()) {
+          pending.push(fullPath);
+        } else if (entry.isFile() && !this.isBinary(fullPath) && this.isAllowedExtension(fullPath)) {
+          out.push({ path: relativePath, fullPath });
+        }
+      }
+    }
+    return out;
   }
 
   /**

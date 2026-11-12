@@ -35,6 +35,8 @@ master_agent:
       - .vscode
       - .idea
       - __pycache__
+      - .venv
+      - venv
       - "*.pyc"
       - .DS_Store
       - thumbs.db

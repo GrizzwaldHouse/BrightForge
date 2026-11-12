@@ -8,6 +8,11 @@ Usage in UE5:
   1. Enable "Python Editor Scripting" plugin in UE5
   2. Open Output Log -> Python console
   3. Run: import brightforge_import; brightforge_import.import_latest()
+
+Server address:
+  Defaults to http://localhost:3847. Override with the BRIGHTFORGE_URL
+  environment variable (set before the editor starts) or at runtime with
+  brightforge_import.set_server_url("http://host:port").
 """
 
 import unreal
@@ -17,8 +22,31 @@ import tempfile
 import urllib.request
 import urllib.error
 
-# Default BrightForge API endpoint
-BRIGHTFORGE_API = "http://localhost:3847/api/forge3d"
+# Server address. BRIGHTFORGE_URL overrides the default; set_server_url()
+# changes it for the running editor session.
+DEFAULT_SERVER_URL = "http://localhost:3847"
+SERVER_URL_ENV = "BRIGHTFORGE_URL"
+FORGE3D_API_PATH = "/api/forge3d"
+HTTP_TIMEOUT_S = 10
+DOWNLOAD_TIMEOUT_S = 60
+EXTRACT_TIMEOUT_S = 30
+
+
+def _api_base(server_url):
+    return server_url.rstrip("/") + FORGE3D_API_PATH
+
+
+BRIGHTFORGE_API = _api_base(os.environ.get(SERVER_URL_ENV) or DEFAULT_SERVER_URL)
+
+
+def set_server_url(server_url):
+    """Point the importer at another BrightForge server, e.g. http://192.168.1.20:3847."""
+    global BRIGHTFORGE_API
+    if not server_url or not server_url.startswith(("http://", "https://")):
+        raise ValueError("server_url must start with http:// or https://")
+    BRIGHTFORGE_API = _api_base(server_url)
+    unreal.log("BrightForge API set to {}".format(BRIGHTFORGE_API))
+    return BRIGHTFORGE_API
 
 
 def _api_get(endpoint):
@@ -27,7 +55,7 @@ def _api_get(endpoint):
     try:
         req = urllib.request.Request(url)
         req.add_header("Accept", "application/json")
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT_S) as resp:
             return json.loads(resp.read().decode("utf-8"))
     except urllib.error.URLError as e:
         unreal.log_error("BrightForge API error ({}): {}".format(url, e))
@@ -42,7 +70,7 @@ def _api_download(endpoint, destination_path):
     url = BRIGHTFORGE_API + endpoint
     try:
         req = urllib.request.Request(url)
-        with urllib.request.urlopen(req, timeout=60) as resp:
+        with urllib.request.urlopen(req, timeout=DOWNLOAD_TIMEOUT_S) as resp:
             data = resp.read()
             with open(destination_path, "wb") as f:
                 f.write(data)
@@ -134,7 +162,7 @@ def download_material_manifest(asset_id, destination_dir=None):
         data = json.dumps({"preset": "ue5-standard"}).encode("utf-8")
         req = urllib.request.Request(url, data=data, method="POST")
         req.add_header("Content-Type", "application/json")
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=EXTRACT_TIMEOUT_S) as resp:
             result = json.loads(resp.read().decode("utf-8"))
     except (urllib.error.URLError, json.JSONDecodeError) as e:
         unreal.log_warning("Material extraction failed for {}: {}".format(asset_id, e))

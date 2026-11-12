@@ -244,6 +244,11 @@ router.post('/generate', forge3dLimiter, express.raw({ type: 'image/*', limit: f
         imageBuffer: Buffer.from(imageBuffer),
         filename: 'upload.png'
       }, {
+        onComplete: (_result, ids) => {
+          // Record the engine that actually ran (the JSON path does the same).
+          const actualModel = forgeSession.sessions.get(ids.sessionId)?.actualModel || null;
+          if (actualModel) projectManager.updateGeneration(ids.jobId, { model: actualModel });
+        },
         onFailed: (err, ids) => {
           console.error(`[ROUTE] Image mesh generation failed: ${err.message}`);
           errorHandler.report('forge3d_error', err, { endpoint: 'generate', sessionId: ids.sessionId, type: 'mesh' });
@@ -1488,72 +1493,24 @@ router.get('/pipelines', (_req, res) => {
   }
 });
 
-/**
- * POST /api/forge3d/pipelines/run
- * Start pipeline execution.
- * Body: { pipeline: string, prompt: string, projectId: string, options: {...} }
- * Returns: 202 with executionId
- */
-// MEDIUM SECURITY: Rate limit on pipeline endpoint
-router.post('/pipelines/run', forge3dLimiter, async (req, res) => {
-  ensureInit();
-  const { pipeline, prompt } = req.body;
-
-  if (!pipeline || !prompt) {
-    return res.status(400).json({ error: 'pipeline and prompt are required' });
-  }
-
-  console.log(`[ROUTE:FORGE3D] POST /api/forge3d/pipelines/run pipeline=${pipeline}`);
-  const endTimer = telemetryBus.startTimer('forge3d_api_pipeline_run');
-
-  try {
-    // For now, return placeholder response
-    // Full pipeline orchestration will be implemented in a future phase
-    const executionId = `exec_${Date.now()}`;
-
-    endTimer({ success: true, pipeline });
-    return res.status(202).json({
-      executionId,
-      pipeline,
-      status: 'queued',
-      statusUrl: `/api/forge3d/pipelines/${executionId}`
-    });
-
-  } catch (err) {
-    console.error(`[ROUTE:FORGE3D] Pipeline run error: ${err.message}`);
-    errorHandler.report('forge3d_error', err, { endpoint: 'run_pipeline', pipeline });
-    endTimer({ error: err.message });
-    res.status(500).json({ error: sanitizeError(err) });
-  }
+// The pipeline runner lives at /api/pipelines (routes/pipelines.js). These two
+// routes used to answer with placeholders: run returned 202 "queued" without
+// running anything, and status returned "complete" for any ID. They now say
+// where the real endpoints are instead of reporting work that never happened.
+const PIPELINES_MOVED = Object.freeze({
+  error: 'Moved: use the asset pipeline API',
+  run: 'POST /api/pipelines/run',
+  status: 'GET /api/pipelines/:id',
+  stream: 'GET /api/pipelines/stream/:id'
 });
+const HTTP_GONE = 410;
 
 /**
- * GET /api/forge3d/pipelines/:id
- * Get pipeline execution status.
+ * POST /api/forge3d/pipelines/run and GET /api/forge3d/pipelines/:id
+ * Gone: see PIPELINES_MOVED.
  */
-// MEDIUM SECURITY: Rate limit on pipeline status endpoint
-router.get('/pipelines/:id', forge3dLimiter, (req, res) => {
-  ensureInit();
-  const executionId = req.params.id;
-
-  console.log(`[ROUTE:FORGE3D] GET /api/forge3d/pipelines/${executionId}`);
-
-  try {
-    // Placeholder response
-    // Full pipeline tracking will be implemented in a future phase
-    res.json({
-      executionId,
-      status: 'complete',
-      stages: [],
-      completedAt: new Date().toISOString()
-    });
-
-  } catch (err) {
-    console.error(`[ROUTE:FORGE3D] Pipeline status error: ${err.message}`);
-    errorHandler.report('forge3d_error', err, { endpoint: 'pipeline_status', executionId });
-    res.status(500).json({ error: sanitizeError(err) });
-  }
-});
+router.post('/pipelines/run', (_req, res) => res.status(HTTP_GONE).json(PIPELINES_MOVED));
+router.get('/pipelines/:id', (_req, res) => res.status(HTTP_GONE).json(PIPELINES_MOVED));
 
 // --- Thumbnails ---
 
@@ -1581,11 +1538,14 @@ router.post('/sessions/:id/thumbnail', (req, res) => {
   console.log(`[ROUTE:FORGE3D] POST /api/forge3d/sessions/${sessionId}/thumbnail`);
 
   try {
-    // Store thumbnail in generation_history
-    forge3dDb.db.prepare(
-      'UPDATE generation_history SET thumbnail = ? WHERE id = ?'
-    ).run(thumbnail, sessionId);
+    // History rows are keyed by job ID; the session ID is in metadata.
+    const info = forge3dDb.db.prepare(
+      "UPDATE generation_history SET thumbnail = ? WHERE id = ? OR json_extract(metadata, '$.sessionId') = ?"
+    ).run(thumbnail, sessionId, sessionId);
 
+    if (info.changes === 0) {
+      return res.status(404).json({ error: 'No generation history entry for this session' });
+    }
     res.json({ saved: true });
   } catch (err) {
     console.error(`[ROUTE:FORGE3D] Thumbnail save error: ${err.message}`);
