@@ -107,7 +107,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install CPU-only mesh dependencies
-        run: pip install 'trimesh>=4.6.0' numpy pyyaml 'fast-simplification>=0.1.7' 'xatlas>=0.0.11'
+        run: pip install 'trimesh>=4.6.0' numpy pyyaml 'fast-simplification>=0.1.7' 'xatlas>=0.0.11' 'Pillow>=11.0.0'
 
       - name: Mesh post-processing tests
         run: python -m unittest discover -s python/tests -v
