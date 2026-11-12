@@ -66,7 +66,7 @@ const fexists = (p) => { try { sh('exec', 'bf-server', 'test', '-e', p); return 
   mode('ok'); sh('exec', 'bf-server', 'mkdir', '-p', '/tmp/a', '/tmp/b');
   const [ra, rb] = await Promise.all(['/tmp/a', '/tmp/b'].map((p) => req('POST', '/api/chat/turn?sync=true', { body: { message: `task for ${p}`, projectRoot: p }, timeout: 30000 })));
   await Promise.all([ra, rb].map((x) => approve(x.json)));
-  const ha = ra.json?.history?.map((h) => h.content).join('|') || ''; 
+  const ha = ra.json?.history?.map((h) => h.content).join('|') || '';
   rec('session', 'two concurrent sessions', 'distinct ids, files in own roots, no history mixing', `ids differ=${ra.json?.sessionId !== rb.json?.sessionId} a=${fexists('/tmp/a/hello.txt')} b=${fexists('/tmp/b/hello.txt')} mix=${ha.includes('/tmp/b')}`, ra.json?.sessionId !== rb.json?.sessionId && fexists('/tmp/a/hello.txt') && fexists('/tmp/b/hello.txt') && !ha.includes('/tmp/b'));
 
   // 6. Rate limits (without the test header)
