@@ -1,0 +1,351 @@
+{
+  "load": {
+    "api": [
+      "GET /api/design/styles 200",
+      "GET /api/design/styles 200",
+      "GET /api/config 200",
+      "GET /api/health 200",
+      "GET /api/sessions 200",
+      "GET /api/memory 200",
+      "GET /api/cost/summary 200",
+      "GET /api/errors/recent 200"
+    ],
+    "consoleErrors": [
+      "The Cross-Origin-Opener-Policy header has been ignored, because the URL's origin was untrustworthy. It was defined either in the final response or a redirect. Please deliver the response using the HTT",
+      "Failed to load resource: net::ERR_FAILED",
+      "Failed to load resource: net::ERR_FAILED"
+    ],
+    "pageErrors": []
+  },
+  "chat": {
+    "api": [
+      "GET /api/errors/recent 200"
+    ],
+    "consoleErrors": [],
+    "pageErrors": [],
+    "panelId": "tab-panel active",
+    "textLen": 85,
+    "sample": "Welcome to BrightForge Your hybrid AI creative studio. Describe a task to begin. 📁",
+    "errorText": []
+  },
+  "design": {
+    "api": [],
+    "consoleErrors": [],
+    "pageErrors": [],
+    "panelId": "tab-panel active",
+    "textLen": 160,
+    "sample": "AI Design Generation Generate complete HTML designs with AI-powered images and layouts Design Brief Style Blue Glass Dark Industrial Default Generate Design",
+    "errorText": []
+  },
+  "forge3d": {
+    "api": [
+      "GET /api/forge3d/config 200",
+      "GET /api/forge3d/models/available 200",
+      "GET /api/forge3d/providers 200",
+      "GET /api/forge3d/projects 200",
+      "GET /api/forge3d/stats 200",
+      "GET /api/forge3d/models 200",
+      "GET /api/forge3d/history 200",
+      "GET /api/forge3d/bridge 200",
+      "GET /api/forge3d/bridge 200",
+      "GET /api/pipelines/templates 200",
+      "GET /api/errors/recent 200"
+    ],
+    "consoleErrors": [],
+    "pageErrors": [],
+    "panelId": "tab-panel active",
+    "textLen": 842,
+    "sample": "GPU not available 3D generation requires CUDA GPU. GPU / VRAM Server offline GENERATE Type Text to 3D (Full Pipeline) Text to Image (SDXL) Image to Mesh Model Auto (default) Prompt Quick Prompts WEAPONS Medieval Sword Sci-Fi Blaster FURNITURE Wooden Chair Modern Desk NATURE Oak Tree Rock Formation V",
+    "errorText": [
+      "not available",
+      "offline"
+    ]
+  },
+  "scene": {
+    "api": [
+      "GET /api/scene/list 200"
+    ],
+    "consoleErrors": [],
+    "pageErrors": [],
+    "panelId": "tab-panel active",
+    "textLen": 124,
+    "sample": "GENERATE SCENE Scene Prompt Generate Scene RECENT SCENES Refresh No scenes yet. Generate one! Select a scene to view details",
+    "errorText": []
+  },
+  "world": {
+    "api": [
+      "GET /api/world/list 200",
+      "GET /api/errors/recent 200"
+    ],
+    "consoleErrors": [],
+    "pageErrors": [],
+    "panelId": "tab-panel active",
+    "textLen": 219,
+    "sample": "GENERATE WORLD Prompt Biome (optional) Auto-detect from prompt Forest Desert Ocean Mountain Tundra Volcanic Swamp Plains Cave Urban Space Generate World WORLDS No worlds yet. Generate one! Select a world to view details",
+    "errorText": []
+  },
+  "gameplay": {
+    "api": [
+      "GET /api/prototype/list 200",
+      "GET /api/forge3d/bridge 200"
+    ],
+    "consoleErrors": [],
+    "pageErrors": [],
+    "panelId": "tab-panel active",
+    "textLen": 242,
+    "sample": "Gameplay Prototyping Generate gameplay prototypes with NPCs, quests, and interactions GENERATE PROTOTYPE Prompt World (optional) Generate Prototype PROTOTYPES Refresh No prototypes yet. Generate one above! Select a prototype to view details",
+    "errorText": []
+  },
+  "playtest": {
+    "api": [
+      "GET /api/prototype/list 200",
+      "GET /api/playtest/list 200",
+      "GET /api/errors/recent 200"
+    ],
+    "consoleErrors": [],
+    "pageErrors": [],
+    "panelId": "tab-panel active",
+    "textLen": 139,
+    "sample": "Run Playtest Prototype Select a prototype... Run Playtest Recent Playtests No playtest runs yet Report Select a playtest to view its report",
+    "errorText": []
+  },
+  "debug": {
+    "api": [
+      "GET /api/debug/pipeline 200"
+    ],
+    "consoleErrors": [],
+    "pageErrors": [],
+    "panelId": "tab-panel active",
+    "textLen": 205,
+    "sample": "SYSTEM STATS 0 TOTAL RUNS 0% SUCCESS RATE 0ms AVG DURATION 0 ACTIVE PIPELINES MEMORY Heap: 20.3 MB / 24.3 MB RSS: 76.5 MB ACTIVE PIPELINES No active pipelines RECENT COMPLETED No recent completed pipelines",
+    "errorText": []
+  },
+  "security": {
+    "api": [
+      "GET /api/security/status 200",
+      "GET /api/security/alerts 200",
+      "GET /api/security/audit 200",
+      "GET /api/debug/pipeline 200",
+      "GET /api/errors/recent 200"
+    ],
+    "consoleErrors": [],
+    "pageErrors": [],
+    "panelId": "tab-panel active",
+    "textLen": 222,
+    "sample": "Security Monitor File watcher, credential detection, and audit logging Stopped 0 FILES TRACKED 0 ALERTS 0 EVENTS None DIRECTORY Manual Scan Dismiss All ACTIVE ALERTS No active alerts RECENT AUDIT LOG No audit entries yet",
+    "errorText": []
+  },
+  "pipeline": {
+    "api": [
+      "GET /api/agents/pipeline/status 200",
+      "GET /api/debug/pipeline 200",
+      "GET /api/forge3d/bridge 200",
+      "GET /api/security/status 200",
+      "GET /api/security/alerts 200",
+      "GET /api/security/audit 200"
+    ],
+    "consoleErrors": [],
+    "pageErrors": [],
+    "panelId": "tab-panel active",
+    "textLen": 204,
+    "sample": "Agent Pipeline Start Pipeline Cancel Planner idle Builder idle Tester idle Reviewer idle Survey Recorder Pipeline Status idle STATUS - CURRENT AGENT - STARTED - DURATION Subtasks No subtasks yet Event Log",
+    "errorText": []
+  },
+  "recorder": {
+    "api": [
+      "GET /api/agents/recorder/status 200",
+      "GET /api/errors/recent 200",
+      "GET /api/debug/pipeline 200",
+      "GET /api/health 200",
+      "GET /api/agents/pipeline/status 200"
+    ],
+    "consoleErrors": [],
+    "pageErrors": [],
+    "panelId": "tab-panel active",
+    "textLen": 113,
+    "sample": "OBS Recorder Disconnected Start Recording Stop Recording 00:00:00 idle STATUS No RECORDING Live MODE 0 RECONNECTS",
+    "errorText": []
+  },
+  "stability": {
+    "api": [
+      "GET /api/agents/recorder/status 200",
+      "GET /api/debug/pipeline 200",
+      "GET /api/security/status 200",
+      "GET /api/security/alerts 200",
+      "GET /api/security/audit 200"
+    ],
+    "consoleErrors": [],
+    "pageErrors": [],
+    "panelId": "tab-panel active",
+    "textLen": 138,
+    "sample": "13-Minute Stability Run Start Stability Run 0 / 26 checkpoints (0:00 / 13:00) Metrics Run stability test to see metrics Checkpoint History",
+    "errorText": []
+  },
+  "agents": {
+    "api": [
+      "GET /api/health/agents 200",
+      "GET /api/health/queue-priorities 200",
+      "GET /api/health/diagnostics 200",
+      "GET /api/errors/recent 200",
+      "GET /api/agents/recorder/status 200",
+      "GET /api/debug/pipeline 200",
+      "GET /api/agents/pipeline/status 200"
+    ],
+    "consoleErrors": [],
+    "pageErrors": [],
+    "panelId": "tab-panel active",
+    "textLen": 349,
+    "sample": "Agent & Provider Health Real-time provider states, performance metrics, and queue priorities PROVIDER STATES No provider activity yet. Send a chat message to activate providers. QUEUE PRIORITIES Queue empty Urgent: 0 Normal: 0 Background: 0 SYSTEM DIAGNOSTICS 52s UPTIME 77MB MEMORY (RSS) 21MB HEAP U",
+    "errorText": [
+      "ERRORS"
+    ]
+  },
+  "health": {
+    "api": [
+      "GET /api/metrics 200",
+      "GET /api/metrics/stream 429",
+      "GET /api/agents/recorder/status 429",
+      "GET /api/forge3d/bridge 429",
+      "GET /api/security/status 429",
+      "GET /api/security/alerts 429",
+      "GET /api/security/audit 429",
+      "GET /api/debug/pipeline 429",
+      "GET /api/health/agents 429",
+      "GET /api/health/queue-priorities 429",
+      "GET /api/health/diagnostics 429"
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 429 (Too Many Requests)",
+      "[HEALTH] SSE connection error: Event",
+      "Failed to load resource: the server responded with a status of 429 (Too Many Requests)",
+      "Failed to load resource: the server responded with a status of 429 (Too Many Requests)",
+      "Failed to load resource: the server responded with a status of 429 (Too Many Requests)",
+      "Failed to load resource: the server responded with a status of 429 (Too Many Requests)",
+      "Failed to load resource: the server responded with a status of 429 (Too Many Requests)",
+      "Failed to load resource: the server responded with a status of 429 (Too Many Requests)",
+      "Failed to load resource: the server responded with a status of 429 (Too Many Requests)",
+      "Failed to load resource: the server responded with a status of 429 (Too Many Requests)",
+      "Failed to load resource: the server responded with a status of 429 (Too Many Requests)"
+    ],
+    "pageErrors": [],
+    "panelId": "tab-panel active",
+    "textLen": 261,
+    "sample": "No provider metrics available Latency Percentiles LLM P50 0ms P95 0ms P99 0ms APPLY P50 0ms P95 0ms P99 0ms PLAN P50 0ms P95 0ms P99 0ms System Statistics UPTIME N/A MEMORY N/A TOTAL REQUESTS 0 TOTAL ERRORS 0 ACTIVE SESSIONS 0 Recent Activity No recent activity",
+    "errorText": [
+      "ERRORS"
+    ]
+  },
+  "sessions": {
+    "api": [
+      "GET /api/errors/recent 429",
+      "GET /api/agents/recorder/status 429",
+      "GET /api/agents/pipeline/status 429",
+      "GET /api/metrics 429"
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 429 (Too Many Requests)",
+      "Failed to load resource: the server responded with a status of 429 (Too Many Requests)",
+      "Failed to load resource: the server responded with a status of 429 (Too Many Requests)",
+      "Failed to load resource: the server responded with a status of 429 (Too Many Requests)",
+      "[HEALTH] Failed to fetch metrics: Error: HTTP 429\n    at SystemHealthPanel.fetchMetrics (http://172.18.0.2:8080/js/system-health.js:57:15)\n    at async http://172.18.0.2:8080/js/system-health.js:372:9",
+      "[HEALTH] Polling error: Error: HTTP 429\n    at SystemHealthPanel.fetchMetrics (http://172.18.0.2:8080/js/system-health.js:57:15)\n    at async http://172.18.0.2:8080/js/system-health.js:372:9"
+    ],
+    "pageErrors": [],
+    "panelId": "tab-panel active",
+    "textLen": 65,
+    "sample": "Session Management Session history and management coming soon...",
+    "errorText": []
+  },
+  "orchestration": {
+    "api": [
+      "GET /api/orchestration/status 429",
+      "GET /api/orchestration/agents 429",
+      "GET /api/orchestration/tasks 429",
+      "GET /api/debug/pipeline 429",
+      "GET /api/security/status 200",
+      "GET /api/security/alerts 200",
+      "GET /api/security/audit 200",
+      "GET /api/agents/recorder/status 200",
+      "GET /api/health/agents 200",
+      "GET /api/health/queue-priorities 200",
+      "GET /api/health/diagnostics 200"
+    ],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 429 (Too Many Requests)",
+      "Failed to load resource: the server responded with a status of 429 (Too Many Requests)",
+      "[ORCH-PANEL] Failed to load agents: TypeError: this.agents.map is not a function\n    at OrchestrationPanel.renderAgents (http://172.18.0.2:8080/js/orchestration-panel.js:138:34)\n    at OrchestrationPa",
+      "Failed to load resource: the server responded with a status of 429 (Too Many Requests)",
+      "[ORCH-PANEL] Failed to load tasks: TypeError: this.tasks.map is not a function\n    at OrchestrationPanel.renderTasks (http://172.18.0.2:8080/js/orchestration-panel.js:172:33)\n    at OrchestrationPanel",
+      "Failed to load resource: the server responded with a status of 429 (Too Many Requests)"
+    ],
+    "pageErrors": [],
+    "panelId": "tab-panel active",
+    "textLen": 329,
+    "sample": "Orchestration Runtime Refresh Create Task Runtime Status Initialized: No Tasks: 0 Events: 0 Audits: 0 Registered Agents Failed to load agents Active Tasks All Statuses Active Paused Completed Failed All Agents Claude Ollama Failed to load tasks Handoff Control From: Claude From: Ollama To: Ollama To",
+    "errorText": [
+      "Failed to load agents",
+      "Failed",
+      "Failed to load tasks"
+    ]
+  },
+  "pipeline-tasks": {
+    "api": [
+      "GET /api/agents/pipeline/status 200",
+      "GET /api/errors/recent 200",
+      "GET /api/debug/pipeline 200",
+      "GET /api/agents/pipeline/status 200",
+      "GET /api/metrics 200",
+      "GET /api/agents/recorder/status 200"
+    ],
+    "consoleErrors": [],
+    "pageErrors": [],
+    "panelId": "tab-panel active",
+    "textLen": 86,
+    "sample": "Pipeline Tasks Refreshconnected No active tasks. Run a pipeline to populate this view.",
+    "errorText": []
+  },
+  "integrations": {
+    "api": [
+      "GET /api/integrations/firecrawl/providers 200",
+      "GET /api/integrations/firecrawl/status 200",
+      "GET /api/forge3d/bridge 200",
+      "GET /api/debug/pipeline 200",
+      "GET /api/security/status 200",
+      "GET /api/security/alerts 200",
+      "GET /api/security/audit 200",
+      "GET /api/health/agents 200",
+      "GET /api/health/queue-priorities 200",
+      "GET /api/health/diagnostics 200",
+      "GET /api/errors/recent 200"
+    ],
+    "consoleErrors": [],
+    "pageErrors": [],
+    "panelId": "tab-panel active",
+    "textLen": 392,
+    "sample": "Integrations Firecrawl No response received while trying to scrape URL. This may be a network error or the server is unreachable. Web scraping integration for model knowledge sync. Requires FIRECRAWL_API_KEY. Configured Providers No providers configured. Model Knowledge Sync Manually trigger a Firec",
+    "errorText": [
+      "error or the server is unreachable."
+    ]
+  },
+  "models": {
+    "api": [
+      "GET /api/agents/recorder/status 200",
+      "GET /api/models/inventory 200",
+      "GET /api/debug/pipeline 200",
+      "GET /api/agents/pipeline/status 200",
+      "GET /api/metrics 200",
+      "GET /api/orchestration/status 200",
+      "GET /api/orchestration/tasks 200"
+    ],
+    "consoleErrors": [],
+    "pageErrors": [],
+    "panelId": "tab-panel active",
+    "textLen": 295,
+    "sample": "Model Intelligence Scan Now Deep Scan 0 MODELS 0 RUNTIMES 0 VOLUMES Never LAST SCAN NAME FORMAT SIZE SOURCE QUANTIZATION No models found. Run a scan to discover models. RUNTIMES No runtimes detected STORAGE No storage volumes detected SCAN LOG No scan log entries yet. Run a scan to see results.",
+    "errorText": []
+  },
+  "__external_blocked": [
+    "fonts.googleapis.com",
+    "ui-avatars.com"
+  ]
+}

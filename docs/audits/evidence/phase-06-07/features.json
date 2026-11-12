@@ -1,0 +1,57 @@
+{
+  "scene": {
+    "start": 202,
+    "id": "9d318cc6-172",
+    "startBody": "{\"sceneId\":\"9d318cc6-172\",\"pipelineId\":\"9cbc275d-db0\",\"status\":\"analyzing\",\"statusUrl\":\"/api/scene/9d318cc6-172\",\"streamUrl\":\"/api/scene/9d318cc6-172/stream\"}",
+    "final": "{\"scene\":{\"id\":\"9d318cc6-172\",\"project_id\":null,\"name\":\"a small medieval market square\",\"scene_type\":\"outdoor\",\"prompt\":\"a small medieval market square\",\"status\":\"analyzing\",\"pipeline_id\":\"9cbc275d-db0\",\"asset_count\":0,\"scene_graph\":{},\"assembled_path\":null,\"assembled_size\":0,\"descriptor_path\":null,\"generation_time\":null,\"error\":null,\"metadata\":{},\"created_at\":\"2026-11-12 08:39:42\",\"completed_at\":null},\"assets\":[],\"pipelineStatus\":{\"id\":\"9cbc275d-db0\",\"pipelineName\":\"generate_scene\",\"description\":\"Scene generation: analyze prompt, generate assets, assemble multi-node GLB, export\",\"status\":\"fai",
+    "status": "analyzing"
+  },
+  "world": {
+    "start": 202,
+    "id": "d00cf4f7-ce2",
+    "startBody": "{\"worldId\":\"d00cf4f7-ce2\",\"pipelineId\":\"458a6c6e-bf2\",\"status\":\"generating\",\"statusUrl\":\"/api/world/d00cf4f7-ce2\",\"streamUrl\":\"/api/world/d00cf4f7-ce2/stream\"}",
+    "final": "{\"world\":{\"id\":\"d00cf4f7-ce2\",\"project_id\":null,\"name\":\"a forest village\",\"world_type\":\"open_world\",\"prompt\":\"a forest village\",\"pipeline_id\":\"458a6c6e-bf2\",\"world_size\":\"small\",\"status\":\"generating\",\"region_count\":0,\"world_graph\":{},\"export_path\":null,\"export_size\":0,\"streaming_manifest\":{},\"generation_time\":null,\"error\":null,\"metadata\":{},\"created_at\":\"2026-11-12 08:41:12\",\"completed_at\":null},\"regions\":[],\"pipelineStatus\":{\"id\":\"458a6c6e-bf2\",\"pipelineName\":\"generate_world\",\"description\":\"World generation: analyze prompt, map regions, generate scenes, optimize assets, build graph, streaming",
+    "status": "generating"
+  },
+  "prototype": {
+    "start": 202,
+    "id": "7d6df674-f7e",
+    "startBody": "{\"prototypeId\":\"7d6df674-f7e\",\"pipelineId\":\"dfb865c7-ffc\",\"status\":\"generating\",\"statusUrl\":\"/api/prototype/7d6df674-f7e\",\"streamUrl\":\"/api/prototype/7d6df674-f7e/stream\"}",
+    "final": "{\"error\":\"forge3dDb.getPrototypeNPCs is not a function\"}"
+  },
+  "playtest": {
+    "start": 400,
+    "startBody": "{\"error\":\"Prototype is not complete (status: generating)\"}",
+    "final": null
+  },
+  "agent-pipeline": {
+    "start": 202,
+    "startBody": "{\"status\":\"started\",\"startedAt\":\"2026-11-12T08:44:13.324Z\"}",
+    "final": null
+  },
+  "design": {
+    "status": 500,
+    "body": "{\"error\":\"this.llmClient.generate is not a function\"}"
+  },
+  "models-scan": {
+    "status": 202,
+    "body": "{\"status\":\"started\",\"type\":\"instant\",\"message\":\"instant scan started. Use GET /api/models/scan/history or /api/models/stream to track progress.\"}"
+  },
+  "security-scan": {
+    "status": 400,
+    "body": "{\"error\":\"directory is required\"}"
+  },
+  "forge3d-generate": {
+    "status": 503,
+    "body": "{\"error\":\"Python server is not running (state: Missing Python packages (need: fastapi, diffusers, trimesh, Pillow, pynvml))\"}"
+  },
+  "orchestration-agents": {
+    "status": 200,
+    "body": "[{\"name\":\"Builder\",\"type\":\"pipeline\",\"capabilities\":{\"implementation\":true,\"orchestration\":true},\"status\":\"available\",\"last_active_at\":\"2026-11-12 08:39:41\",\"registered_at\":\"2026-11-12 08:39:41\"},{\"name\":\"Claude\",\"type\":\"cloud\",\"capabilities\":{\"planning\":true,\"architecture\":true,\"code_review\":true,\"implementation\":true},\"status\":\"available\",\"last_active_at\":\"2026-11-12 08:39:41\",\"registered_at\":\"2"
+  },
+  "sessions": {
+    "status": 200,
+    "body": "{\"sessions\":[],\"count\":0,\"limit\":10}"
+  },
+  "models-status": "{\"initialized\":true,\"lastScan\":{\"id\":\"9a22e729-a2a\",\"type\":\"instant\",\"status\":\"completed\",\"started_at\":\"2026-11-12 08:44:15\",\"completed_at\":\"2026-11-12 08:44:15\",\"files_found\":1,\"runtimes_found\":0,\"errors\":0,\"metadata\":{}},\"stats\":{\"totalFiles\":1,\"totalRuntimes\":0,\"totalVolumes\":0,\"totalScans\":1,\"co"
+}

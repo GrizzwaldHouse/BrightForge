@@ -1,0 +1,78 @@
+{
+  "api": [
+    "1794472355649 GET /api/design/styles 200",
+    "1794472355654 GET /api/design/styles 200",
+    "1794472355667 GET /api/config 200",
+    "1794472355667 GET /api/health 200",
+    "1794472355675 GET /api/sessions 200",
+    "1794472355684 GET /api/memory 200",
+    "1794472355702 GET /api/cost/summary 200",
+    "1794472357555 GET /api/errors/recent 200",
+    "1794472357725 GET /api/metrics 200",
+    "1794472360557 GET /api/errors/recent 200",
+    "1794472362733 GET /api/metrics 200",
+    "1794472365558 GET /api/errors/recent 200",
+    "1794472367733 GET /api/metrics 200",
+    "1794472370559 GET /api/errors/recent 200",
+    "1794472372732 GET /api/metrics 200",
+    "1794472375559 GET /api/errors/recent 200",
+    "1794472377732 GET /api/metrics 200",
+    "1794472380556 GET /api/errors/recent 200",
+    "1794472382730 GET /api/metrics 200",
+    "1794472385555 GET /api/errors/recent 200",
+    "1794472385713 GET /api/health 200",
+    "1794472387730 GET /api/metrics 200",
+    "1794472390556 GET /api/errors/recent 200",
+    "1794472392731 GET /api/metrics 200",
+    "1794472395556 GET /api/errors/recent 200",
+    "1794472397739 GET /api/metrics 200",
+    "1794472400556 GET /api/errors/recent 200",
+    "1794472402732 GET /api/metrics 200",
+    "1794472405556 GET /api/errors/recent 200",
+    "1794472407731 GET /api/metrics 200",
+    "1794472410555 GET /api/errors/recent 200",
+    "1794472412732 GET /api/metrics 200",
+    "1794472415557 GET /api/errors/recent 200",
+    "1794472415714 GET /api/cost/summary 200",
+    "1794472415717 GET /api/health 200",
+    "1794472417730 GET /api/metrics 200",
+    "1794472420557 GET /api/errors/recent 200",
+    "1794472422732 GET /api/metrics 200",
+    "1794472425556 GET /api/errors/recent 200",
+    "1794472427737 GET /api/metrics 200",
+    "1794472430558 GET /api/errors/recent 200",
+    "1794472432731 GET /api/metrics 200",
+    "1794472435557 GET /api/errors/recent 200",
+    "1794472437731 GET /api/metrics 200",
+    "1794472440556 GET /api/errors/recent 200",
+    "1794472442730 GET /api/metrics 200",
+    "1794472445556 GET /api/errors/recent 200",
+    "1794472445710 GET /api/health 200",
+    "1794472447730 GET /api/metrics 200"
+  ],
+  "errors": [],
+  "idle": {
+    "seconds": 90,
+    "requests": 40,
+    "perMinute": 26.7,
+    "status429": 0,
+    "byPath": [
+      [
+        "/api/errors/recent",
+        18
+      ],
+      [
+        "/api/metrics",
+        18
+      ],
+      [
+        "/api/health",
+        3
+      ],
+      [
+        "/api/cost/summary",
+        1
+      ]
+    ]
+  }
+}

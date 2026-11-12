@@ -1,0 +1,22 @@
+{
+  "api": [
+    "1794472180712 GET /api/design/styles 200",
+    "1794472180718 GET /api/design/styles 200",
+    "1794472180727 GET /api/config 200",
+    "1794472180729 GET /api/health 200",
+    "1794472180743 GET /api/sessions 200",
+    "1794472180757 GET /api/memory 200",
+    "1794472180774 GET /api/cost/summary 200",
+    "1794472182611 GET /api/errors/recent 200",
+    "1794472182822 POST /api/chat/pipeline/detect 200",
+    "1794472182840 POST /api/chat/turn 202",
+    "1794472182853 GET /api/sessions 200",
+    "1794472182857 GET /api/chat/stream/338afebd-445c-4632-960d-a85fdab1dced 200",
+    "1794472182918 GET /api/cost/summary 200",
+    "1794472183754 POST /api/chat/approve 200",
+    "1794472185611 GET /api/errors/recent 200"
+  ],
+  "errors": [],
+  "planShown": true,
+  "bodyTail": "3D Scene World Gameplay Playtest Debug Security Pipeline Recorder Stability Agents Health All Sessions Orchestration Tasks Integrations Models Welcome to BrightForge Your hybrid AI creative studio. Describe a task to begin. U create a hello file A Plan generated. Review the changes below and approve or reject. $0.0000 Upgrade 08:29 AM APPLIED 1 file(s) modified ollama/fake:1b · $0.0000 Rollback 📁"
+}

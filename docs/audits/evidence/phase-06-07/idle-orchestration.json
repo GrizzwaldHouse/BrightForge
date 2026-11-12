@@ -1,0 +1,84 @@
+{
+  "api": [
+    "1794472451269 GET /api/design/styles 200",
+    "1794472451274 GET /api/design/styles 200",
+    "1794472451287 GET /api/config 200",
+    "1794472451291 GET /api/health 200",
+    "1794472451299 GET /api/sessions 200",
+    "1794472451315 GET /api/memory 200",
+    "1794472451342 GET /api/cost/summary 200",
+    "1794472453090 GET /api/errors/recent 200",
+    "1794472453362 GET /api/orchestration/status 200",
+    "1794472453370 GET /api/orchestration/agents 200",
+    "1794472453382 GET /api/orchestration/tasks 200",
+    "1794472456088 GET /api/errors/recent 200",
+    "1794472461089 GET /api/errors/recent 200",
+    "1794472463386 GET /api/orchestration/status 200",
+    "1794472463393 GET /api/orchestration/tasks 200",
+    "1794472466089 GET /api/errors/recent 200",
+    "1794472471091 GET /api/errors/recent 200",
+    "1794472473386 GET /api/orchestration/status 200",
+    "1794472473393 GET /api/orchestration/tasks 200",
+    "1794472476090 GET /api/errors/recent 200",
+    "1794472481089 GET /api/errors/recent 200",
+    "1794472481341 GET /api/health 200",
+    "1794472483386 GET /api/orchestration/status 200",
+    "1794472483392 GET /api/orchestration/tasks 200",
+    "1794472486088 GET /api/errors/recent 200",
+    "1794472491091 GET /api/errors/recent 200",
+    "1794472493387 GET /api/orchestration/status 200",
+    "1794472493394 GET /api/orchestration/tasks 200",
+    "1794472496089 GET /api/errors/recent 200",
+    "1794472501090 GET /api/errors/recent 200",
+    "1794472503386 GET /api/orchestration/status 200",
+    "1794472503392 GET /api/orchestration/tasks 200",
+    "1794472506089 GET /api/errors/recent 200",
+    "1794472511089 GET /api/errors/recent 200",
+    "1794472511350 GET /api/cost/summary 200",
+    "1794472511350 GET /api/health 200",
+    "1794472513389 GET /api/orchestration/status 200",
+    "1794472513397 GET /api/orchestration/tasks 200",
+    "1794472516089 GET /api/errors/recent 200",
+    "1794472521089 GET /api/errors/recent 200",
+    "1794472523387 GET /api/orchestration/status 200",
+    "1794472523393 GET /api/orchestration/tasks 200",
+    "1794472526089 GET /api/errors/recent 200",
+    "1794472531092 GET /api/errors/recent 200",
+    "1794472533387 GET /api/orchestration/status 200",
+    "1794472533393 GET /api/orchestration/tasks 200",
+    "1794472536091 GET /api/errors/recent 200",
+    "1794472541088 GET /api/errors/recent 200",
+    "1794472541352 GET /api/health 200",
+    "1794472543387 GET /api/orchestration/status 200",
+    "1794472543394 GET /api/orchestration/tasks 200"
+  ],
+  "errors": [],
+  "idle": {
+    "seconds": 90,
+    "requests": 40,
+    "perMinute": 26.7,
+    "status429": 0,
+    "byPath": [
+      [
+        "/api/errors/recent",
+        18
+      ],
+      [
+        "/api/orchestration/status",
+        9
+      ],
+      [
+        "/api/orchestration/tasks",
+        9
+      ],
+      [
+        "/api/health",
+        3
+      ],
+      [
+        "/api/cost/summary",
+        1
+      ]
+    ]
+  }
+}
