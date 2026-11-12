@@ -9,7 +9,19 @@
  */
 
 import { readFileSync, writeFileSync, unlinkSync, mkdirSync, existsSync, copyFileSync } from 'fs';
-import { join, dirname } from 'path';
+import { join, dirname, resolve, sep } from 'path';
+
+/**
+ * Resolve a plan file path against the project root, or return null when the
+ * result would land outside it (e.g. "../x"). Absolute plan paths are treated
+ * as relative to the root, matching how they were joined before.
+ */
+function resolveInsideRoot(projectRoot, filePath) {
+  if (typeof filePath !== 'string' || filePath.length === 0) return null;
+  const root = resolve(projectRoot);
+  const target = resolve(join(root, filePath));
+  return target.startsWith(root + sep) ? target : null;
+}
 import { fileURLToPath } from 'url';
 import errorHandler from './error-handler.js';
 import telemetryBus from './telemetry-bus.js';
@@ -51,7 +63,13 @@ export class DiffApplier {
     }
 
     for (const operation of plan.operations) {
-      const filePath = join(projectRoot, operation.filePath);
+      const filePath = resolveInsideRoot(projectRoot, operation.filePath);
+      if (!filePath) {
+        console.error(`[APPLY] Refused: "${operation.filePath}" is outside the project root`);
+        results.failed++;
+        results.errors.push(`Refused: "${operation.filePath}" is outside the project root`);
+        continue;
+      }
       const backupPath = `${filePath}.brightforge-backup`;
 
       try {
@@ -176,7 +194,11 @@ export class DiffApplier {
     // Process operations in reverse order
     for (let i = plan.operations.length - 1; i >= 0; i--) {
       const operation = plan.operations[i];
-      const filePath = join(projectRoot, operation.filePath);
+      const filePath = resolveInsideRoot(projectRoot, operation.filePath);
+      if (!filePath) {
+        results.errors.push(`Refused: "${operation.filePath}" is outside the project root`);
+        continue;
+      }
       const backupPath = `${filePath}.brightforge-backup`;
 
       try {

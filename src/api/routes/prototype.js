@@ -103,6 +103,18 @@ router.post('/generate', forge3dLimiter, (req, res) => {
       status: 'generating'
     });
 
+    // Record a failed pipeline on the prototype so it does not stay 'generating' forever
+    const onPipelineEnd = (evt) => {
+      if (!evt || evt.pipelineId !== pipelineId) return;
+      assetPipelineRunner.off('pipeline_failed', onPipelineEnd);
+      assetPipelineRunner.off('pipeline_complete', onPipelineEnd);
+      if (evt.error !== undefined || evt.reason !== undefined || evt.failedStage !== undefined) {
+        forge3dDb.updatePrototype(prototype.id, { status: 'failed', error: String(evt.error || evt.reason || 'Pipeline failed') });
+      }
+    };
+    assetPipelineRunner.on('pipeline_failed', onPipelineEnd);
+    assetPipelineRunner.on('pipeline_complete', onPipelineEnd);
+
     endTimer({ prototypeId: prototype.id, pipelineId });
 
     return res.status(202).json({
@@ -164,9 +176,9 @@ router.get('/:id', (req, res) => {
       return res.status(404).json({ error: 'Prototype not found' });
     }
 
-    const npcs = forge3dDb.getPrototypeNPCs(prototypeId);
-    const quests = forge3dDb.getPrototypeQuests(prototypeId);
-    const interactions = forge3dDb.getPrototypeInteractions(prototypeId);
+    const npcs = forge3dDb.getNPCsByPrototype(prototypeId);
+    const quests = forge3dDb.getQuestsByPrototype(prototypeId);
+    const interactions = forge3dDb.getInteractionsByPrototype(prototypeId);
 
     // Include pipeline status if active
     let pipelineStatus = null;

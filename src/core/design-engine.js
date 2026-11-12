@@ -190,10 +190,10 @@ Generate a complete HTML page that implements this design using the provided sty
 `;
 
     // Call LLM
-    const response = await this.llmClient.generate(userPrompt, {
-      systemPrompt,
-      taskType: 'generate_code'
-    });
+    const response = await this.llmClient.chat([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt }
+    ], { task: 'generate_code' });
 
     // Extract HTML from response (may be wrapped in markdown code block)
     const html = this._extractHTML(response.content);
