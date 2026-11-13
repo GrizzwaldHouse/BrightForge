@@ -21,6 +21,9 @@
  * Run: node src/tests/clean-room-fixes.js
  */
 
+// The test header only bypasses rate limits under NODE_ENV=test (set before any request).
+process.env.NODE_ENV = 'test';
+
 import { mkdtempSync, mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { tmpdir } from 'os';

@@ -4,6 +4,8 @@
 // Purpose: Multi-user load test that simulates realistic BrightForge user sessions concurrently.
 //   Covers: health check, WebSocket connect, chat turn + SSE stream, memory read/write,
 //   project memory, agent list, forge3d queue, skills, metrics, cost, design, pipeline detect.
+//   NOTE: the target server must be started with NODE_ENV=test, otherwise the
+//   x-brightforge-test header is ignored and the rate limiters apply.
 //   Run: node src/tests/user-load-test.js [--users N] [--delay MS] [--verbose] [--scenario SCENARIO]
 //   Scenarios: smoke (3u/30s), load (20u/2min), stress (50u/2min), soak (10u/5min), massive (1000u/5min)
 //

@@ -228,7 +228,8 @@ security:
     forge3d: 2
     design: 5
     general: 60               # remote peers
-    general_loopback: 600     # loopback peers (local dashboard)
+    general_loopback: 600     # loopback peers (local dashboard). Behind a same-host reverse proxy
+                              # (nginx/tunnel on 127.0.0.1) every client looks loopback: set this equal to general.
   log_rotation:
     max_size: "10M"
     max_files: 30

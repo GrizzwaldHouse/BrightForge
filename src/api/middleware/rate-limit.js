@@ -8,6 +8,9 @@
  *   generalLimiter: 60 req/min for remote peers (reads, status checks, config);
  *                   loopback peers (the local dashboard) get general_loopback
  *
+ * Deployments behind a same-host reverse proxy see every client as loopback;
+ * set general_loopback equal to general there.
+ *
  * Config-driven: rates loaded from config/agent-config.yaml security section.
  *
  * @author Marcus Daley (GrizzwaldHouse)
@@ -49,6 +52,7 @@ function createLimiter(maxRequests, label, options = {}) {
   return rateLimit({
     windowMs: 60 * 1000,
     max: (req) => (isLoopbackPeer(req) ? loopbackMax : maxRequests),
+    ...(options.validate !== undefined ? { validate: options.validate } : {}),
     standardHeaders: true,
     legacyHeaders: false,
     // The test header bypasses limits only under NODE_ENV=test and only from loopback.

@@ -15,6 +15,9 @@
  */
 
 import http from 'http';
+import { spawn } from 'child_process';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import express from 'express';
 import * as rateLimitModule from '../api/middleware/rate-limit.js';
 import * as serverModule from '../api/server.js';
@@ -90,7 +93,7 @@ async function testRateLimitPeers() {
   await close(remote.server);
 
   // X-Forwarded-For must not make a remote peer look local
-  const spoof = await limitedApp(createLimiter(3, 'Test', { loopbackMax: 10 }), '203.0.113.5');
+  const spoof = await limitedApp(createLimiter(3, 'Test', { loopbackMax: 10, validate: { xForwardedForHeader: false } }), '203.0.113.5');
   const limited = await burst(spoof.port, 5, { 'x-forwarded-for': '127.0.0.1' });
   check(limited === 2, 'remote peer spoofing X-Forwarded-For stays on the base limit');
   await close(spoof.server);
@@ -174,12 +177,40 @@ async function testGracefulShutdown() {
   stuckReq.destroy();
 }
 
+async function testServerSigterm() {
+  console.log('[FIX-A] R-A3 real server exits 0 on SIGTERM');
+  if (process.platform === 'win32') { console.log('  SKIP: signals not supported on win32'); return; }
+  const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
+  const port = 20000 + Math.floor(Math.random() * 20000);
+  const child = spawn(process.execPath, ['bin/brightforge-server.js'], {
+    cwd: root, stdio: 'ignore', env: { ...process.env, NODE_ENV: 'test', PORT: String(port) }
+  });
+  const exited = new Promise((resolve) => child.on('exit', (code, sig) => resolve({ code, sig })));
+  let up = false;
+  for (let i = 0; i < 60 && !up; i++) {
+    await new Promise((r) => setTimeout(r, 250));
+    try {
+      const res = await new Promise((resolve, reject) => {
+        http.get({ host: '127.0.0.1', port, path: '/api/health', agent: false }, (r) => { r.resume(); resolve(r.statusCode); }).on('error', reject);
+      });
+      up = res > 0;
+    } catch (_e) { /* not up yet */ }
+  }
+  check(up, 'server answers /api/health');
+  if (!up) { child.kill('SIGKILL'); return; }
+  child.kill('SIGTERM');
+  const result = await Promise.race([exited, new Promise((r) => setTimeout(() => r({ code: 'timeout' }), 15000))]);
+  if (result.code === 'timeout') child.kill('SIGKILL');
+  check(result.code === 0, `child exits with code 0 on SIGTERM (got ${result.code})`);
+}
+
 async function main() {
   console.log('[FIX-A] Workstream A acceptance tests...');
   try {
     await testRateLimitPeers();
     await testTestHeader();
     await testGracefulShutdown();
+    await testServerSigterm();
   } catch (err) {
     check(false, `suite threw: ${err.stack || err.message}`);
   }

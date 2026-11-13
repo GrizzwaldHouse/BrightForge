@@ -9,7 +9,7 @@ docker run -d --name bf-server --network bf-int --read-only --user node \
   --tmpfs /tmp:size=512m,mode=1777 --tmpfs /app/data:size=256m,uid=1000,gid=1000 \
   --tmpfs /app/sessions:size=64m,uid=1000,gid=1000 --tmpfs /app/logs:size=64m,uid=1000,gid=1000 \
   --tmpfs /app/output:size=64m,uid=1000,gid=1000 --tmpfs /app/.claude:size=16m,uid=1000,gid=1000 \
-  -e OLLAMA_TIMEOUT_MS=8000 -e OLLAMA_MODEL=fake:1b -e OLLAMA_BASE_URL=http://127.0.0.1:11434 $EXTRA_ENV \
+  -e NODE_ENV=test -e OLLAMA_TIMEOUT_MS=8000 -e OLLAMA_MODEL=fake:1b -e OLLAMA_BASE_URL=http://127.0.0.1:11434 $EXTRA_ENV \
   brightforge-test:local node bin/brightforge-server.js >/dev/null
 docker run -d --name bf-sidecar --network container:bf-server --read-only --user node \
   --cap-drop ALL --security-opt no-new-privileges:true --memory 256m \
