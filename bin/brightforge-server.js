@@ -27,7 +27,7 @@ const __dirname = dirname(__filename);
 config({ path: join(__dirname, '../.env.local') });
 
 // Import server factory
-import { createServer } from '../src/api/server.js';
+import { createServer, createGracefulShutdown } from '../src/api/server.js';
 import { UniversalLLMClient } from '../src/core/llm-client.js';
 import errorHandler from '../src/core/error-handler.js';
 import wsEventBus from '../src/api/ws-event-bus.js';
@@ -144,23 +144,19 @@ async function main() {
     }
   });
 
-  // Graceful shutdown
-  const shutdown = () => {
-    console.log('\n  [SERVER] Shutting down...');
-    wsEventBus.detach();
-    try { orchestrator.shutdown(); } catch (_e) { /* best-effort */ }
-    try { modelIntelligence.shutdown(); } catch (_e) { /* best-effort */ }
-    try { forgeDb.close(); } catch (_e) { /* best-effort */ }
-    server.close(() => {
+  // Graceful shutdown: stop accepting, let in-flight requests finish (10s), exit 0
+  const shutdown = createGracefulShutdown(server, {
+    onClosing: () => wsEventBus.detach(),
+    onClosed: () => {
+      try { orchestrator.shutdown(); } catch (_e) { /* best-effort */ }
+      try { modelIntelligence.shutdown(); } catch (_e) { /* best-effort */ }
+      try { forgeDb.close(); } catch (_e) { /* best-effort */ }
       store.destroy();
-      process.exit(0);
-    });
-    // Fallback exit if server.close hangs
-    setTimeout(() => process.exit(0), 1000);
-  };
+    }
+  });
 
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 }
 

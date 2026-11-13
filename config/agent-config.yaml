@@ -227,7 +227,8 @@ security:
     chat: 10                  # req/min
     forge3d: 2
     design: 5
-    general: 60
+    general: 60               # remote peers
+    general_loopback: 600     # loopback peers (local dashboard)
   log_rotation:
     max_size: "10M"
     max_files: 30

@@ -232,4 +232,45 @@ export function createServer(options = {}) {
   return { app, store };
 }
 
+const SHUTDOWN_TIMEOUT_MS = 10000;
+
+/**
+ * Build a graceful shutdown function for an HTTP server.
+ * Stops accepting connections, lets in-flight requests finish for up to
+ * timeoutMs, runs onClosed (resource cleanup), then exits 0. Idempotent.
+ */
+export function createGracefulShutdown(server, options = {}) {
+  const {
+    timeoutMs = SHUTDOWN_TIMEOUT_MS,
+    onClosing = () => {},
+    onClosed = () => {},
+    exit = (code) => process.exit(code)
+  } = options;
+  let started = false;
+
+  return function shutdown(signal = 'shutdown') {
+    if (started) return;
+    started = true;
+    console.log(`[SERVER] ${signal} received, draining requests (max ${timeoutMs}ms)...`);
+    try { onClosing(); } catch (_e) { /* best-effort */ }
+
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      try { onClosed(); } catch (_e) { /* best-effort */ }
+      exit(0);
+    };
+    const timer = setTimeout(() => {
+      console.warn('[SERVER] Drain timeout reached, closing remaining connections');
+      server.closeAllConnections?.();
+      finish();
+    }, timeoutMs);
+
+    server.close(finish);
+    server.closeIdleConnections?.();
+  };
+}
+
 export default createServer;
