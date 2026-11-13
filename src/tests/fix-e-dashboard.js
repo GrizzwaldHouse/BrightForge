@@ -147,9 +147,9 @@ async function testSessionRefreshTriggers() {
   try { App.prototype._connectStream.call(t.self, 's1'); } catch (_e) { /* constructor of SSEClient may be unavailable */ }
   if (handlers.complete) {
     handlers.complete({ data: '{}' });
-    check(t.calls.load === 1, 'SSE complete reloads sessions');
+    check(t.calls.load === 0, 'SSE complete does not reload sessions (R2-I2)');
   } else {
-    check(/on\('complete'[\s\S]{0,400}loadSessions\(\)/.test(readFileSync(join(ROOT, 'public', 'js', 'app.js'), 'utf8')), 'SSE complete handler reloads sessions (source check)');
+    check(!/on\('complete'[\s\S]{0,400}loadSessions\(\)/.test(readFileSync(join(ROOT, 'public', 'js', 'app.js'), 'utf8')), 'SSE complete handler does not reload sessions (source check, R2-I2)');
   }
 
   // Click binding: list is read-only

@@ -52,6 +52,7 @@ router.post('/generate', designLimiter, async (req, res) => {
     res.json({
       success: true,
       sessionId,
+      imagesRequested: design.imagesRequested || 0,
       imagesFailed: design.imagesFailed || 0,
       warnings: design.warnings || [],
       preview: {
@@ -73,7 +74,7 @@ router.post('/generate', designLimiter, async (req, res) => {
     console.error(`[ROUTE] Design generation error: ${error.message}`);
     errorHandler.report('design_api_error', error, { prompt, sessionId });
     endTimer({ status: 'failed', error: error.message });
-    const status = error.code === 'ALL_IMAGES_FAILED' ? 502 : 500;
+    const status = error.code === 'LAYOUT_FAILED' ? 502 : 500;
     res.status(status).json({ success: false, error: error.message });
   }
 });

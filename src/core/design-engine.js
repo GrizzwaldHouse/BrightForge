@@ -53,14 +53,18 @@ class DesignEngine {
       const { images, failures } = await this._generateImagesDetailed(imageSpecs);
       console.log(`[DESIGN] Generated ${images.length} images (${failures.length} failed)`);
       if (images.length === 0 && imageSpecs.length > 0) {
-        const reason = failures[0] || 'unknown error';
-        const allFailed = new Error(`All ${imageSpecs.length} image generations failed: ${reason}`);
-        allFailed.code = 'ALL_IMAGES_FAILED';
-        throw allFailed;
+        // Local-first: a text-only design must still work offline
+        console.warn(`[DESIGN] All ${imageSpecs.length} image generations failed; producing a text-only layout`);
       }
 
       // 4. Generate HTML layout with LLM
-      const layoutResult = await this.generateLayout(prompt, images, style);
+      let layoutResult;
+      try {
+        layoutResult = await this.generateLayout(prompt, images, style);
+      } catch (layoutError) {
+        layoutError.code = 'LAYOUT_FAILED';
+        throw layoutError;
+      }
       const layout = layoutResult.html || layoutResult;
       const llmCost = layoutResult.cost || 0;
       console.log(`[DESIGN] Generated HTML layout (${layout.length} chars), LLM cost: $${llmCost.toFixed(4)}`);
@@ -81,6 +85,7 @@ class DesignEngine {
         layout,
         style: styleName,
         cost: totalCost,
+        imagesRequested: imageSpecs.length,
         imagesFailed: failures.length,
         warnings: failures.map(f => `Image generation failed: ${f}`),
         timestamp: new Date().toISOString()

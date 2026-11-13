@@ -20,6 +20,7 @@ import { parse as parseYaml } from 'yaml';
 import { UniversalLLMClient } from '../core/llm-client.js';
 import { PlanEngine } from '../core/plan-engine.js';
 import { FileContext } from '../core/file-context.js';
+import { resolveInsideRoot } from '../core/diff-applier.js';
 import { LocalAgent } from './local-agent.js';
 import { CloudAgent } from './cloud-agent.js';
 import telemetryBus from '../core/telemetry-bus.js';
@@ -181,8 +182,17 @@ export class MasterAgent {
 
     // 6. For 'modify' operations, load original file content and generate diffs
     for (const op of plan.operations) {
+      // Never read (or diff) a file outside the project root because of a plan path
+      const fullPath = resolveInsideRoot(projectRoot, op.filePath);
+      if (!fullPath) {
+        op.refused = true;
+        op.refusalReason = `"${op.filePath}" is outside the project root`;
+        op.original = null;
+        op.diff = `Refused: ${op.refusalReason}`;
+        console.warn(`[MASTER] Refused operation: ${op.refusalReason}`);
+        continue;
+      }
       if (op.type === 'modify') {
-        const fullPath = join(projectRoot, op.filePath);
         try {
           op.original = readFileSync(fullPath, 'utf8');
           op.diff = this.planEngine.generateDiff(op.original, op.modified, op.filePath);
@@ -198,7 +208,6 @@ export class MasterAgent {
           op.diff = this.planEngine.generateDiff('', op.modified, op.filePath);
         }
       } else if (op.type === 'delete') {
-        const fullPath = join(projectRoot, op.filePath);
         try {
           op.original = readFileSync(fullPath, 'utf8');
           op.diff = this.planEngine.generateDiff(op.original, '', op.filePath);

@@ -582,7 +582,7 @@ class App {
       this._showCancelButton(false);
       this._handlePlanResult(data);
       this._reenableInput();
-      this.sessionManager.loadSessions();
+      // Sessions are written only on approve/reject, so nothing new exists yet
     });
 
     this._sseClient.on('failed', (e) => {

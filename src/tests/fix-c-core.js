@@ -91,11 +91,12 @@ async function testPartialFailure() {
   designEngine.llmClient = fakeLlm(calls);
   const server = await startApp();
   try {
-    // Engine level: all fail -> throws
+    // Engine level: all fail -> still produces the layout (R2-I1 amends R-C1)
     designEngine.imageClient = fakeImageClient(0);
     let err = null;
-    try { await designEngine.generateDesign('a landing page', { imageCount: 2 }); } catch (e) { err = e; }
-    check(err !== null && /image/i.test(err.message), `engine throws a clear error when all images fail${err ? ` (${err.message})` : ''}`);
+    let allFailed = null;
+    try { allFailed = await designEngine.generateDesign('a landing page', { imageCount: 2 }); } catch (e) { err = e; }
+    check(err === null && allFailed?.imagesFailed === 2 && allFailed?.warnings?.length > 0, `engine returns a text-only design with warnings when all images fail${err ? ` (${err.message})` : ''}`);
 
     // Engine level: some fail -> warnings + imagesFailed
     designEngine.imageClient = fakeImageClient(1);
@@ -106,11 +107,11 @@ async function testPartialFailure() {
     check(design?.images?.length === 1 && design?.imagesFailed === 2, `engine reports imagesFailed=2 (got ${design?.imagesFailed})`);
     check(Array.isArray(design?.warnings) && design.warnings.length > 0, 'engine reports warnings');
 
-    // Route level: all fail -> 502
+    // Route level: all fail -> 200 with warnings (R2-I1 amends R-C1)
     designEngine.imageClient = fakeImageClient(0);
     let r = await post(server, '/api/design/generate', { prompt: 'a landing page', options: { imageCount: 2 } });
-    check(r.status === 502, `route answers 502 when all images fail (got ${r.status})`);
-    check(r.json?.success !== true && typeof r.json?.error === 'string' && r.json.error.length > 0, 'route body carries a clear error and no success:true');
+    check(r.status === 200, `route answers 200 when all images fail (got ${r.status})`);
+    check(r.json?.success === true && r.json?.imagesFailed === 2 && r.json?.warnings?.length > 0, 'route body carries imagesFailed and warnings');
 
     // Route level: partial -> 200 + warnings
     designEngine.imageClient = fakeImageClient(1);
@@ -118,11 +119,11 @@ async function testPartialFailure() {
     check(r.status === 200 && r.json?.success === true, `route answers 200 on partial failure (got ${r.status})`);
     check(r.json?.imagesFailed === 2 && Array.isArray(r.json?.warnings) && r.json.warnings.length > 0, 'route response includes imagesFailed and warnings');
 
-    // Route level: non-image failure (LLM throws) -> 500, not 502
+    // Route level: layout (LLM) failure -> 502 (R2-I1: the only 502)
     designEngine.imageClient = fakeImageClient(5);
     designEngine.llmClient = { chat: async () => { throw new Error('fake llm down'); } };
     r = await post(server, '/api/design/generate', { prompt: 'a landing page', options: { imageCount: 1 } });
-    check(r.status === 500 && r.json?.success !== true, `route answers 500 on non-image failure (got ${r.status})`);
+    check(r.status === 502 && r.json?.success !== true, `route answers 502 on layout failure (got ${r.status})`);
   } finally {
     designEngine.imageClient = originalImage;
     designEngine.llmClient = originalLlm;

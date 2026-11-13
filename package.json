@@ -100,6 +100,7 @@
     "test-fix-c": "node src/tests/fix-c-core.js",
     "test-fix-d": "node src/tests/fix-d-pipeline-status.js",
     "test-fix-e": "node src/tests/fix-e-dashboard.js",
+    "test-fix-r2-p1": "node src/tests/fix-r2-p1-core.js && node src/tests/fix-r2-p1-dashboard.js",
     "test-frontend-routes": "node src/tests/frontend-routes-check.js",
     "test-llm-contract": "node src/tests/llm-provider-contract.js",
     "test-ollama-live": "node src/tests/llm-provider-contract.js --live",

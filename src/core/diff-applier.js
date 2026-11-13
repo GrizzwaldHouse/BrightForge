@@ -16,11 +16,13 @@ import { join, dirname, resolve, sep } from 'path';
  * result would land outside it (e.g. "../x"). Absolute plan paths are treated
  * as relative to the root, matching how they were joined before.
  */
-function resolveInsideRoot(projectRoot, filePath) {
+export function resolveInsideRoot(projectRoot, filePath) {
   if (typeof filePath !== 'string' || filePath.length === 0) return null;
   const root = resolve(projectRoot);
   const target = resolve(join(root, filePath));
-  return target.startsWith(root + sep) ? target : null;
+  // A filesystem root ('/', 'C:\\') already ends with the separator
+  const prefix = root.endsWith(sep) ? root : root + sep;
+  return target.startsWith(prefix) ? target : null;
 }
 import { fileURLToPath } from 'url';
 import errorHandler from './error-handler.js';
@@ -46,12 +48,28 @@ export class DiffApplier {
     const results = {
       applied: 0,
       failed: 0,
+      refused: 0,
       errors: []
     };
 
     if (!plan.operations || plan.operations.length === 0) {
       console.log('[APPLY] No operations to apply');
       endTimer({ status: 'skipped', operations: 0 });
+      return results;
+    }
+
+    // Every operation escapes the project root: refuse the whole plan before
+    // any checkpoint or write, so there is nothing to roll back.
+    const escaping = plan.operations.filter(op => !resolveInsideRoot(projectRoot, op.filePath));
+    if (escaping.length === plan.operations.length) {
+      for (const op of escaping) {
+        console.error(`[APPLY] Refused: "${op.filePath}" is outside the project root`);
+        results.errors.push(`Refused: "${op.filePath}" is outside the project root`);
+      }
+      results.failed = escaping.length;
+      results.refused = escaping.length;
+      plan.status = 'refused';
+      endTimer({ status: 'refused', operations: 0, failed: results.failed });
       return results;
     }
 
@@ -67,6 +85,7 @@ export class DiffApplier {
       if (!filePath) {
         console.error(`[APPLY] Refused: "${operation.filePath}" is outside the project root`);
         results.failed++;
+        results.refused++;
         results.errors.push(`Refused: "${operation.filePath}" is outside the project root`);
         continue;
       }

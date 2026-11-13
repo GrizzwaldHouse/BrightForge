@@ -11,11 +11,10 @@
 import { randomUUID } from 'crypto';
 import { EventEmitter } from 'events';
 import { MasterAgent } from '../agents/master-agent.js';
-import { DiffApplier } from '../core/diff-applier.js';
+import { DiffApplier, resolveInsideRoot } from '../core/diff-applier.js';
 import { SessionLog } from '../core/session-log.js';
 import { MessageHistory } from '../core/message-history.js';
 import { MultiStepPlanner } from '../core/multi-step-planner.js';
-import { resolve, join as pathJoin, sep } from 'path';
 import errorHandler from '../core/error-handler.js';
 import telemetryBus from '../core/telemetry-bus.js';
 import planEngine from '../core/plan-engine.js';
@@ -265,10 +264,13 @@ export class WebSession extends EventEmitter {
     try {
       const result = await this.diffApplier.apply(this.pendingPlan, this.projectRoot);
 
-      this.pendingPlan.status = result.failed > 0 ? 'partial' : 'applied';
+      const allRefused = this.pendingPlan.status === 'refused';
+      if (!allRefused) {
+        this.pendingPlan.status = result.failed > 0 ? 'partial' : 'applied';
 
-      // Log session
-      await this.sessionLog.record(this.pendingPlan, this.sessionsDir);
+        // Log session (a refused plan changed nothing, so it gets no rollback entry)
+        await this.sessionLog.record(this.pendingPlan, this.sessionsDir);
+      }
 
       const plan = this.pendingPlan;
       this.pendingPlan = null;
@@ -311,7 +313,7 @@ export class WebSession extends EventEmitter {
     try {
       if (mode === 'plan') {
         const parsed = planEngine.parse(planText);
-        planEngine.validate(parsed);
+        planEngine.validate(parsed, this.projectRoot);
         const result = await this.diffApplier.apply(parsed, this.projectRoot);
         const filesChanged = (parsed.operations || []).map(op => op.filePath).filter(Boolean);
         telemetryBus.emit('plan_approved', { sessionId: this.id, taskId, mode, filesChanged });
@@ -328,12 +330,11 @@ export class WebSession extends EventEmitter {
       const { blocks, skipped } = this._parseDirectBlocks(planText);
       const filesChanged = [];
       const errors = [...skipped];
-      const root = resolve(this.projectRoot);
 
       for (const block of blocks) {
         try {
-          const abs = resolve(pathJoin(this.projectRoot, block.path));
-          if (!abs.startsWith(root + sep)) {
+          const abs = resolveInsideRoot(this.projectRoot, block.path);
+          if (!abs) {
             errors.push(`${block.path}: path traversal rejected`);
             continue;
           }
@@ -448,7 +449,9 @@ export class WebSession extends EventEmitter {
         action: op.type,
         file: op.filePath,
         content: op.modified,
-        original: op.original
+        original: op.original,
+        refused: op.refused === true,
+        refusalReason: op.refusalReason || null
       })),
       risks: plan.risks || [],
       status: plan.status || 'pending_approval'
