@@ -147,7 +147,7 @@ async function testDesignChat() {
   check(msgs.length === 2 && msgs[0].role === 'system' && msgs[1].role === 'user', 'chat() receives a system message then a user message');
   check(typeof msgs[0]?.content === 'string' && msgs[0].content.length > 0, 'system message carries the design system prompt');
   check(typeof msgs[1]?.content === 'string' && msgs[1].content.includes('a test landing page') && msgs[1].content.includes('hero.png'), 'user message carries the brief and image paths');
-  check(calls[0]?.options?.task === 'generate_code', 'chat() is called with a task option');
+  check(calls[0]?.options?.task === 'code_generation', 'chat() is called with a task option');
 }
 
 // --- HTTP helpers for F2 / F4 --------------------------------------------

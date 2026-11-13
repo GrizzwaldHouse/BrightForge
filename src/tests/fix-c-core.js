@@ -117,6 +117,12 @@ async function testPartialFailure() {
     r = await post(server, '/api/design/generate', { prompt: 'a landing page', options: { imageCount: 3 } });
     check(r.status === 200 && r.json?.success === true, `route answers 200 on partial failure (got ${r.status})`);
     check(r.json?.imagesFailed === 2 && Array.isArray(r.json?.warnings) && r.json.warnings.length > 0, 'route response includes imagesFailed and warnings');
+
+    // Route level: non-image failure (LLM throws) -> 500, not 502
+    designEngine.imageClient = fakeImageClient(5);
+    designEngine.llmClient = { chat: async () => { throw new Error('fake llm down'); } };
+    r = await post(server, '/api/design/generate', { prompt: 'a landing page', options: { imageCount: 1 } });
+    check(r.status === 500 && r.json?.success !== true, `route answers 500 on non-image failure (got ${r.status})`);
   } finally {
     designEngine.imageClient = originalImage;
     designEngine.llmClient = originalLlm;
