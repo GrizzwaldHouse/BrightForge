@@ -123,5 +123,5 @@ Findings 6, 7 and 8 of the review (listener count, duplicated block, SSE reload)
 Paste to start the new session:
 
 ```text
-Continue the BrightForge repair on branch repair/p0-recovery-2026-10 (GitHub GrizzwaldHouse/BrightForge). Read docs/audits/session-handoff-2026-11-13.md first, then docs/audits/fix-spec.md. Do section 8 in order. Do not merge to main, do not push to any other branch, no AI attribution in commits (see CLAUDE.md), never print or commit secrets. Keep agent use small: no more than two implementer agents and one final reviewer. Ask me before any GPU, model download or push of tags.
+Continue the BrightForge repair on branch repair/p0-recovery-2026-10 (GitHub GrizzwaldHouse/BrightForge). Read handoff.md first, then docs/audits/fix-spec.md. Do section 8 in order. Do not merge to main, do not push to any other branch, no AI attribution in commits (see CLAUDE.md), never print or commit secrets. Keep agent use small: no more than two implementer agents and one final reviewer. Ask me before any GPU, model download or push of tags.
 ```
