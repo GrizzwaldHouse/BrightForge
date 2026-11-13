@@ -188,7 +188,8 @@ export class PlanEngine {
 
     for (const op of plan.operations) {
       // Check for path traversal attempts
-      const absolutePath = path.resolve(projectRoot, op.filePath);
+      // Absolute plan paths are treated as relative to the root, matching DiffApplier
+      const absolutePath = path.resolve(path.join(path.resolve(projectRoot), String(op.filePath)));
       if (!absolutePath.startsWith(path.resolve(projectRoot) + path.sep)) {
         errors.push(`Security error: File path "${op.filePath}" attempts to escape project root`);
         continue;

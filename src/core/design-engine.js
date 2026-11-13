@@ -50,8 +50,14 @@ class DesignEngine {
       console.log(`[DESIGN] Parsed ${imageSpecs.length} image requirements`);
 
       // 3. Generate images
-      const images = await this.generateImages(imageSpecs);
-      console.log(`[DESIGN] Generated ${images.length} images`);
+      const { images, failures } = await this._generateImagesDetailed(imageSpecs);
+      console.log(`[DESIGN] Generated ${images.length} images (${failures.length} failed)`);
+      if (images.length === 0 && imageSpecs.length > 0) {
+        const reason = failures[0] || 'unknown error';
+        const allFailed = new Error(`All ${imageSpecs.length} image generations failed: ${reason}`);
+        allFailed.code = 'ALL_IMAGES_FAILED';
+        throw allFailed;
+      }
 
       // 4. Generate HTML layout with LLM
       const layoutResult = await this.generateLayout(prompt, images, style);
@@ -75,6 +81,8 @@ class DesignEngine {
         layout,
         style: styleName,
         cost: totalCost,
+        imagesFailed: failures.length,
+        warnings: failures.map(f => `Image generation failed: ${f}`),
         timestamp: new Date().toISOString()
       };
     } catch (error) {
@@ -136,8 +144,19 @@ class DesignEngine {
    * @returns {Promise<Array>} Generated images with paths
    */
   async generateImages(specs) {
+    const { images } = await this._generateImagesDetailed(specs);
+    return images;
+  }
+
+  /**
+   * Generate images and also report which ones failed
+   * @private
+   * @returns {Promise<{images: Array, failures: string[]}>}
+   */
+  async _generateImagesDetailed(specs) {
     console.log(`[DESIGN] Generating ${specs.length} images...`);
     const images = [];
+    const failures = [];
 
     for (const spec of specs) {
       try {
@@ -153,11 +172,12 @@ class DesignEngine {
       } catch (error) {
         console.warn(`[DESIGN] Image generation failed for "${spec.prompt}": ${error.message}`);
         errorHandler.report('image_generation_error', error, { spec });
+        failures.push(error.message);
         // Continue with other images even if one fails
       }
     }
 
-    return images;
+    return { images, failures };
   }
 
   /**
@@ -193,7 +213,7 @@ Generate a complete HTML page that implements this design using the provided sty
     const response = await this.llmClient.chat([
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt }
-    ], { task: 'generate_code' });
+    ], { task: 'code_generation' });
 
     // Extract HTML from response (may be wrapped in markdown code block)
     const html = this._extractHTML(response.content);
