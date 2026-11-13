@@ -300,44 +300,122 @@ export function agentRoutes() {
 }
 
 /**
- * Run the full pipeline: Planner → Builder → Tester → Reviewer
+ * Set the status of every subtask owned by the given agent.
+ * @private
+ */
+function _markAgentSubtasks(agentName, status) {
+  for (const subtask of pipelineState.subtasks) {
+    if (subtask.agent === agentName) subtask.status = status;
+  }
+}
+
+/**
+ * Mark subtasks that never ran (still pending/running) with a terminal status.
+ * @private
+ */
+function _settleRemaining(status) {
+  for (const subtask of pipelineState.subtasks) {
+    if (subtask.status === 'pending' || subtask.status === 'running') subtask.status = status;
+  }
+}
+
+/**
+ * Finish the pipeline as failed with a reason; remaining subtasks are skipped.
+ * @private
+ */
+function _failPipeline(reason) {
+  _settleRemaining('skipped');
+  pipelineState.status = 'failed';
+  pipelineState.error = reason;
+  pipelineState.completedAt = new Date().toISOString();
+  pipelineState.currentAgent = null;
+  console.log(`[ROUTE] Pipeline failed: ${reason}`);
+}
+
+/**
+ * Run the full pipeline: Planner -> Builder -> Tester -> Reviewer.
+ * Pipeline status is derived from subtask outcomes: it is 'completed' only
+ * when every subtask completed; a failed test, a critical review finding or
+ * a rejected verdict makes it 'failed' with the reason in `error`.
  * @private
  */
 async function _runPipeline(prompt) {
+  let activeAgent = 'Planner';
   try {
     // Step 1: Plan
-    pipelineState.currentAgent = 'Planner';
+    pipelineState.currentAgent = activeAgent;
     const plan = await plannerAgent.plan(prompt);
-    pipelineState.subtasks = plan.subtasks;
+    pipelineState.subtasks = plan.subtasks.map(t => ({ ...t, status: 'pending' }));
+    _markAgentSubtasks('Planner', 'completed');
 
     if (pipelineState.status === 'cancelled') return;
 
     // Step 2: Build
-    pipelineState.currentAgent = 'Builder';
+    activeAgent = 'Builder';
+    pipelineState.currentAgent = activeAgent;
+    _markAgentSubtasks('Builder', 'running');
     const buildResult = await builderAgent.build(plan);
+    _markAgentSubtasks('Builder', 'completed');
 
     if (pipelineState.status === 'cancelled') return;
 
     // Step 3: Test
-    pipelineState.currentAgent = 'Tester';
+    activeAgent = 'Tester';
+    pipelineState.currentAgent = activeAgent;
+    _markAgentSubtasks('Tester', 'running');
     const testResult = await testerAgent.runTests(buildResult);
+    const failedTests = testResult && Array.isArray(testResult.failed) ? testResult.failed : [];
 
     if (pipelineState.status === 'cancelled') return;
 
+    if (failedTests.length > 0) {
+      _markAgentSubtasks('Tester', 'failed');
+      _failPipeline(`Tests failed: ${failedTests.length} failing (${testResult.summary || 'see test results'})`);
+      pipelineState.result = { testResult };
+      return;
+    }
+    _markAgentSubtasks('Tester', 'completed');
+
     // Step 4: Review
-    pipelineState.currentAgent = 'Reviewer';
+    activeAgent = 'Reviewer';
+    pipelineState.currentAgent = activeAgent;
+    _markAgentSubtasks('Reviewer', 'running');
     const reviewResult = await reviewerAgent.review(testResult, buildResult.artifacts ?? []);
+
+    if (pipelineState.status === 'cancelled') return;
+
+    const findings = Array.isArray(reviewResult.findings) ? reviewResult.findings : [];
+    const critical = findings.filter(f => f.severity === 'critical');
+    pipelineState.result = reviewResult;
+
+    if (critical.length > 0 || reviewResult.verdict === 'rejected') {
+      _markAgentSubtasks('Reviewer', 'failed');
+      const reason = critical.length > 0
+        ? `Critical review finding: ${critical.map(f => f.message).join('; ')}`
+        : `Review rejected: ${reviewResult.summary || 'score below threshold'}`;
+      _failPipeline(reason);
+      return;
+    }
+    _markAgentSubtasks('Reviewer', 'completed');
+
+    const allDone = pipelineState.subtasks.every(t => t.status === 'completed');
+    if (!allDone) {
+      _failPipeline('Not every subtask completed');
+      return;
+    }
 
     pipelineState.status = 'completed';
     pipelineState.completedAt = new Date().toISOString();
     pipelineState.currentAgent = null;
-    pipelineState.result = reviewResult;
 
     console.log(`[ROUTE] Pipeline completed: ${reviewResult.verdict}`);
   } catch (err) {
+    _markAgentSubtasks(activeAgent, 'failed');
+    _settleRemaining('skipped');
     pipelineState.status = 'failed';
     pipelineState.error = err.message;
     pipelineState.completedAt = new Date().toISOString();
+    pipelineState.currentAgent = null;
     throw err;
   }
 }
