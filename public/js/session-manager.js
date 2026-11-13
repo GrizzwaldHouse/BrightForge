@@ -93,11 +93,11 @@ class SessionManager {
     }
 
     container.innerHTML = this.sessions.map(session => {
-      const isActive = session.id === this.app.sessionId;
+      const isActive = false; // list ids are plan ids, not chat session ids
       const task = this.truncate(session.task || session.firstMessage || 'New session', 30);
-      const date = this.formatDate(session.date || session.createdAt);
+      const date = this.formatDate(session.date || session.createdAt || session.timestamp);
       const status = session.status || 'active';
-      const cost = session.cost !== undefined ? `$${session.cost.toFixed(4)}` : '';
+      const cost = typeof session.cost === 'number' ? `$${session.cost.toFixed(4)}` : '';
 
       return `
         <li class="session-item ${isActive ? 'active' : ''}" data-session-id="${session.id}">
@@ -108,14 +108,6 @@ class SessionManager {
         </li>
       `;
     }).join('');
-
-    // Bind click handlers
-    container.querySelectorAll('.session-item').forEach(item => {
-      item.addEventListener('click', () => {
-        const sessionId = item.getAttribute('data-session-id');
-        this.switchSession(sessionId);
-      });
-    });
   }
 
   /**

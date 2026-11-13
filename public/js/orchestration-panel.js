@@ -117,7 +117,10 @@ class OrchestrationPanel {
   }
 
   // Accept either a bare array or an object wrapping the array under `key`.
-  toArray(body, key) {
+  toArray(body, key, res) {
+    if ((res && res.ok === false) || (body && !Array.isArray(body) && body.error)) {
+      throw new Error((body && body.error) || `HTTP ${res && res.status}`);
+    }
     if (Array.isArray(body)) return body;
     if (body && Array.isArray(body[key])) return body[key];
     return [];
@@ -126,7 +129,7 @@ class OrchestrationPanel {
   async loadAgents() {
     try {
       const res = await fetch('/api/orchestration/agents');
-      this.agents = this.toArray(await res.json(), 'agents');
+      this.agents = this.toArray(await res.json(), 'agents', res);
       this.renderAgents();
     } catch (err) {
       console.error('[ORCH-PANEL] Failed to load agents:', err);
@@ -160,7 +163,7 @@ class OrchestrationPanel {
       if (filters.agent) params.append('agent', filters.agent);
 
       const res = await fetch(`/api/orchestration/tasks?${params}`);
-      this.tasks = this.toArray(await res.json(), 'tasks');
+      this.tasks = this.toArray(await res.json(), 'tasks', res);
       this.renderTasks();
     } catch (err) {
       console.error('[ORCH-PANEL] Failed to load tasks:', err);

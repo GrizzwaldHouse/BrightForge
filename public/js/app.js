@@ -368,6 +368,11 @@ class App {
           targetPanel.classList.add('active');
         }
 
+        // Sessions are persisted server-side on approve/reject; refresh on view
+        if (targetTab === 'sessions' && this.sessionManager) {
+          this.sessionManager.loadSessions();
+        }
+
         // Initialize panels on first view
         if (targetTab === 'health' && !this.healthPanel.initialized) {
           this.healthPanel.init();
@@ -577,6 +582,7 @@ class App {
       this._showCancelButton(false);
       this._handlePlanResult(data);
       this._reenableInput();
+      this.sessionManager.loadSessions();
     });
 
     this._sseClient.on('failed', (e) => {
@@ -785,6 +791,7 @@ class App {
 
       this.planViewer.hide();
       this.currentPlan = null;
+      this.sessionManager.loadSessions();
 
       if (response.status === 'applied' || response.status === 'partial') {
         // Add timeline entry with rollback button
@@ -830,6 +837,7 @@ class App {
 
       this.planViewer.hide();
       this.currentPlan = null;
+      this.sessionManager.loadSessions();
 
       this.chat.addSystemMessage('Plan rejected. Please provide more details or try a different approach.');
 

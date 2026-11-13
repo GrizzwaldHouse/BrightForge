@@ -30,15 +30,17 @@ function check(cond, label) {
 const elements = new Map();
 function el(id) {
   if (!elements.has(id)) {
-    elements.set(id, { id, innerHTML: '', textContent: '', addEventListener() {}, querySelectorAll: () => [], classList: { add() {}, remove() {} } });
+    elements.set(id, { id, innerHTML: '', textContent: '', addEventListener(ev) { (this._listeners = this._listeners || []).push(ev); }, querySelectorAll: () => [], classList: { add() {}, remove() {} } });
   }
   return elements.get(id);
 }
 
 globalThis.window = globalThis;
+globalThis.addEventListener = () => {};
 globalThis.document = {
   getElementById: (id) => el(id),
   querySelectorAll: () => [],
+  addEventListener() {},
   createElement: () => {
     const node = { _t: '' };
     Object.defineProperty(node, 'textContent', { set(v) { node._t = String(v); }, get() { return node._t; } });
@@ -98,11 +100,90 @@ async function testSessionsTab() {
   check(el('session-list').innerHTML.includes('build the widget'), 'sidebar still lists the session');
 }
 
+async function testSessionRefreshTriggers() {
+  console.log('\n[R-E2] Sessions refresh triggers (driven through App)');
+  const { App } = await import('../../public/js/app.js');
+  const mk = (extra = {}) => {
+    const calls = { load: 0 };
+    const self = {
+      sessionId: 's1',
+      currentPlan: { id: 'p1' },
+      planViewer: { setLoading() {}, hide() {} },
+      chat: { addPlanAppliedEntry() {}, addSystemMessage() {}, addAssistantMessage() {}, hideLoading() {} },
+      sessionManager: { loadSessions: () => { calls.load++; } },
+      apiPost: async () => ({ status: 'applied' }),
+      ...extra
+    };
+    return { self, calls };
+  };
+
+  let t = mk();
+  await App.prototype.approvePlan.call(t.self);
+  check(t.calls.load === 1, 'approve reloads sessions');
+
+  t = mk();
+  await App.prototype.rejectPlan.call(t.self);
+  check(t.calls.load === 1, 'reject reloads sessions');
+
+  // Sessions tab activation
+  const tabEl = { dataset: { tab: 'sessions' }, classList: { add() {}, remove() {} }, addEventListener(_e, fn) { this.fn = fn; } };
+  const saved = document.querySelectorAll;
+  document.querySelectorAll = (sel) => (sel === '.tab' ? [tabEl] : []);
+  document.querySelector = () => null;
+  t = mk();
+  App.prototype.setupTabNavigation.call(t.self);
+  tabEl.fn();
+  document.querySelectorAll = saved;
+  check(t.calls.load === 1, 'activating Sessions tab reloads sessions');
+
+  // SSE complete handler
+  t = mk();
+  const handlers = {};
+  t.self._sseClient = { on: (n, fn) => { handlers[n] = fn; }, close() {} };
+  Object.assign(t.self, {
+    _cleanupStream() {}, _showCancelButton() {}, _handlePlanResult() {}, _reenableInput() {},
+    _updatePipelineStep() {}
+  });
+  try { App.prototype._connectStream.call(t.self, 's1'); } catch (_e) { /* constructor of SSEClient may be unavailable */ }
+  if (handlers.complete) {
+    handlers.complete({ data: '{}' });
+    check(t.calls.load === 1, 'SSE complete reloads sessions');
+  } else {
+    check(/on\('complete'[\s\S]{0,400}loadSessions\(\)/.test(readFileSync(join(ROOT, 'public', 'js', 'app.js'), 'utf8')), 'SSE complete handler reloads sessions (source check)');
+  }
+
+  // Click binding: list is read-only
+  const bound = [];
+  const item = { addEventListener: (e) => bound.push(e) };
+  const c = { innerHTML: '', querySelectorAll: () => [item] };
+  const { SessionManager } = await import('../../public/js/session-manager.js');
+  const mgr = new SessionManager({ sessionId: 'x' });
+  mgr.sessions = [{ id: 'plan_1', task: 'a', timestamp: new Date().toISOString() }];
+  mgr.renderInto(c);
+  check(bound.length === 0, 'session list binds no click handlers (read-only)');
+  check(c.innerHTML.includes('plan_1'), 'session rendered using timestamp fallback');
+}
+
+async function testOrchestrationErrors() {
+  console.log('\n[R-E1] Orchestration error states');
+  const Panel = globalThis.window.OrchestrationPanel;
+  const saved = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: false, status: 503, json: async () => ({ error: 'down' }) });
+  const p = new Panel();
+  await p.loadAgents();
+  check(el('agents-list').innerHTML.includes('Failed to load'), '503 shows failed-to-load for agents');
+  await p.loadTasks();
+  check(el('task-list').innerHTML.includes('Failed to load'), '503 shows failed-to-load for tasks');
+  globalThis.fetch = saved;
+}
+
 async function main() {
   console.log('[FIX-E] Dashboard acceptance tests...');
   try {
     await testOrchestration();
     await testSessionsTab();
+    await testOrchestrationErrors();
+    await testSessionRefreshTriggers();
   } catch (err) {
     check(false, `suite threw: ${err.stack || err.message}`);
   }
