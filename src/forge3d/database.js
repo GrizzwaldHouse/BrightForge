@@ -409,6 +409,14 @@ const MIGRATIONS = [
       CREATE INDEX IF NOT EXISTS idx_history_created ON generation_history(created_at);
       CREATE INDEX IF NOT EXISTS idx_history_priority ON generation_history(priority, status, created_at);
     `
+  },
+  {
+    version: 12,
+    description: 'Add pipeline_id column to prototypes so status can report the live pipeline',
+    sql: `
+      ALTER TABLE prototypes ADD COLUMN pipeline_id TEXT;
+      CREATE INDEX IF NOT EXISTS idx_prototypes_pipeline ON prototypes(pipeline_id);
+    `
   }
 ];
 
@@ -1243,6 +1251,7 @@ class Forge3DDatabase {
     if (updates.exportSize !== undefined) { fields.push('export_size = ?'); values.push(updates.exportSize); }
     if (updates.generationTime !== undefined) { fields.push('generation_time = ?'); values.push(updates.generationTime); }
     if (updates.error !== undefined) { fields.push('error = ?'); values.push(updates.error); }
+    if (updates.pipelineId !== undefined) { fields.push('pipeline_id = ?'); values.push(updates.pipelineId); }
     if (updates.status === 'complete' || updates.status === 'failed') {
       fields.push('completed_at = datetime(\'now\')');
     }

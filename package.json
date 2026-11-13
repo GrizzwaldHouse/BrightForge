@@ -96,6 +96,7 @@
     "test-mesh-flow": "node src/tests/mesh-optimize-flow.js",
     "test-clean-room-fixes": "node src/tests/clean-room-fixes.js",
     "test-fix-a": "node src/tests/fix-a-server.js",
+    "test-fix-b": "node src/tests/fix-b-data.js",
     "test-frontend-routes": "node src/tests/frontend-routes-check.js",
     "test-llm-contract": "node src/tests/llm-provider-contract.js",
     "test-ollama-live": "node src/tests/llm-provider-contract.js --live",

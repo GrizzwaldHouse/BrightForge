@@ -398,6 +398,14 @@ class OrchestrationStorage {
    * @param {Object} envelope - Event envelope with integrity_hash
    */
   insertEvent(envelope) {
+    // Producers such as the asset pipeline runner pass a pipeline id as task_id.
+    // Only link to task_states when that row exists; otherwise store NULL so the
+    // foreign key does not reject the event (the id stays in the payload).
+    let taskId = envelope.task_id || null;
+    if (taskId && !this.db.prepare('SELECT 1 FROM task_states WHERE task_id = ?').get(taskId)) {
+      taskId = null;
+    }
+
     const stmt = this.db.prepare(`
       INSERT INTO orchestration_events (event_id, timestamp, agent, task_id, event_type, payload, integrity_hash)
       VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -407,7 +415,7 @@ class OrchestrationStorage {
       envelope.event_id,
       envelope.timestamp,
       envelope.agent,
-      envelope.task_id || null,
+      taskId,
       envelope.event_type,
       JSON.stringify(envelope.payload),
       envelope.integrity_hash
