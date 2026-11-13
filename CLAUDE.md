@@ -619,3 +619,6 @@ Work is not done, and must not be reported as done or handed off, until the buil
 - Report the outcome first: READY at the commit, what changed, the evidence. Mention only OWNER blockers (usage quota, GPU hardware, credentials, approvals) and the single action needed from the owner.
 - Subagent briefs must say: "Before returning, run lint and your tests and fix failures. Return only when everything is green, or blocked on the owner."
 - `.claude/hooks/gate-stop-hook.sh` (a Stop hook) blocks stopping while `.gate/build-gate-report.json` shows fixable failures for the current commit; it gives up after 3 blocks per commit.
+
+### Saving work
+Run `bash .claude/tools/checkpoint.sh "message"` after each integration and before any long wait; it pushes only branches listed in `.claude/approved-branches`, never force-pushes, scans for secrets and verifies the remote tip. `bash .claude/tools/preserve_report.sh` lists anything that exists only locally.
