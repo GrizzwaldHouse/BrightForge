@@ -1,0 +1,234 @@
+[
+  {
+    "area": "input",
+    "name": "turn without message",
+    "expect": "400",
+    "actual": 400,
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "area": "input",
+    "name": "turn with numeric message",
+    "expect": "400",
+    "actual": 400,
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "area": "input",
+    "name": "malformed JSON body",
+    "expect": "400, no stack trace",
+    "actual": "400 {\"error\":\"Malformed JSON body\"}",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "area": "input",
+    "name": "5 MB JSON body",
+    "expect": "413",
+    "actual": 413,
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "area": "input",
+    "name": "approve unknown session",
+    "expect": "4xx",
+    "actual": 400,
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "area": "input",
+    "name": "SQL-ish project id",
+    "expect": "404/400",
+    "actual": 404,
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "area": "input",
+    "name": "download path traversal id",
+    "expect": "4xx, no file contents",
+    "actual": "404",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "area": "input",
+    "name": "texture name traversal",
+    "expect": "4xx, no file contents",
+    "actual": "404",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "area": "input",
+    "name": "revert HEAD",
+    "expect": "400",
+    "actual": 400,
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "area": "input",
+    "name": "revert HEAD~1..HEAD",
+    "expect": "400",
+    "actual": 400,
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "area": "input",
+    "name": "revert --help",
+    "expect": "400",
+    "actual": 400,
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "area": "input",
+    "name": "revert aaaaaaaaaaaaaaaaaaaa",
+    "expect": "400",
+    "actual": 400,
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "area": "input",
+    "name": "revert main",
+    "expect": "400",
+    "actual": 400,
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "area": "input",
+    "name": "server alive after input tests",
+    "expect": "200",
+    "actual": true,
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "area": "plan",
+    "name": "model proposes traversal path",
+    "expect": "rejected, nothing written outside project",
+    "actual": "turn 200 ops=1 approve=200 partial written=false",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "area": "plan",
+    "name": "model proposes absolute path",
+    "expect": "rejected, nothing written outside project",
+    "actual": "turn 200 ops=1 approve=200 applied written=false",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "area": "plan",
+    "name": "request body chooses projectRoot (R2)",
+    "expect": "documented risk: write lands where the client says",
+    "actual": "written=true",
+    "verdict": "PASS",
+    "note": "Confirms R2: any directory writable by the server user. Loopback-only today"
+  },
+  {
+    "area": "provider",
+    "name": "model returns malformed",
+    "expect": "error reported, no crash",
+    "actual": "200 in 30 ms: error",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "area": "provider",
+    "name": "model returns empty",
+    "expect": "error reported, no crash",
+    "actual": "200 in 14 ms: error",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "area": "provider",
+    "name": "model returns http500",
+    "expect": "error reported, no crash",
+    "actual": "200 in 13 ms: error",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "area": "provider",
+    "name": "model returns garbage",
+    "expect": "error reported, no crash",
+    "actual": "200 in 13 ms: no_changes",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "area": "provider",
+    "name": "model never answers (timeout)",
+    "expect": "error within OLLAMA_TIMEOUT_MS + fallback",
+    "actual": "200 after 39022 ms: {\"plan\":null,\"status\":\"error\",\"message\":\"Error generating plan: Operation timed ",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "area": "session",
+    "name": "cancel in-flight generation",
+    "expect": "cancelled event",
+    "actual": "cancel 200; events: event: provider_failed,event: cancelled",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "area": "session",
+    "name": "SSE client disconnects mid-stream",
+    "expect": "server alive",
+    "actual": true,
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "area": "session",
+    "name": "two concurrent sessions",
+    "expect": "distinct ids, files in own roots, no history mixing",
+    "actual": "ids differ=true a=true b=true mix=false",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "area": "limits",
+    "name": "70 GETs in a burst",
+    "expect": "429 after the 60/min limit",
+    "actual": "200s=70 429s=0",
+    "verdict": "FAIL",
+    "note": ""
+  },
+  {
+    "area": "limits",
+    "name": "x-brightforge-test header from loopback",
+    "expect": "bypasses limiter (by design, loopback only)",
+    "actual": 200,
+    "verdict": "PASS",
+    "note": "Any local process can bypass rate limits with this header"
+  },
+  {
+    "area": "load",
+    "name": "300 x GET /api/health, 10 concurrent",
+    "expect": "0 errors",
+    "actual": "errors=0 p50=39ms p95=60ms max=166ms",
+    "verdict": "PASS",
+    "note": ""
+  },
+  {
+    "area": "headers",
+    "name": "security headers",
+    "expect": "X-Content-Type-Options, no X-Powered-By",
+    "actual": "nosniff=nosniff powered=null csp=false",
+    "verdict": "PASS",
+    "note": "CSP absent is the known R6"
+  }
+]

@@ -1,0 +1,182 @@
+{
+  "docs/audits/evidence/phase-06-07/adversarial.json": {
+    "mtime": 1794473351.533724,
+    "seen": 1794545339.5984955,
+    "ast_hash": "c33d0e657a5dd3cce69cf7c5b1e8aeaa",
+    "semantic_hash": "c33d0e657a5dd3cce69cf7c5b1e8aeaa"
+  },
+  "docs/audits/evidence/phase-06-07/chat.json": {
+    "mtime": 1794473351.5365038,
+    "seen": 1794545339.5985003,
+    "ast_hash": "620073febba00a177e97e26c789a8c94",
+    "semantic_hash": "620073febba00a177e97e26c789a8c94"
+  },
+  "docs/audits/evidence/phase-06-07/features.json": {
+    "mtime": 1794473351.5365038,
+    "seen": 1794545339.5985026,
+    "ast_hash": "ddff8571d3b22ac7349110f8b9cdf942",
+    "semantic_hash": "ddff8571d3b22ac7349110f8b9cdf942"
+  },
+  "docs/audits/evidence/phase-06-07/idle-health.json": {
+    "mtime": 1794473351.5365038,
+    "seen": 1794545339.5985048,
+    "ast_hash": "74b8d911d608316b94bd80253e637c5d",
+    "semantic_hash": "74b8d911d608316b94bd80253e637c5d"
+  },
+  "docs/audits/evidence/phase-06-07/idle-orchestration.json": {
+    "mtime": 1794473351.5365038,
+    "seen": 1794545339.598506,
+    "ast_hash": "9f0b266db4a9b841e896412f1509509e",
+    "semantic_hash": "9f0b266db4a9b841e896412f1509509e"
+  },
+  "docs/audits/evidence/phase-06-07/idle.json": {
+    "mtime": 1794473351.5365038,
+    "seen": 1794545339.5985086,
+    "ast_hash": "9f0b266db4a9b841e896412f1509509e",
+    "semantic_hash": "9f0b266db4a9b841e896412f1509509e"
+  },
+  "docs/audits/evidence/phase-06-07/tabs.json": {
+    "mtime": 1794473351.5405037,
+    "seen": 1794545339.5985103,
+    "ast_hash": "f5e47c7c0781b64cd44b1576bc4a7ddd",
+    "semantic_hash": "f5e47c7c0781b64cd44b1576bc4a7ddd"
+  },
+  "docs/API.md": {
+    "mtime": 1794473351.532118,
+    "seen": 1794545339.5985131,
+    "ast_hash": "2b65cfc27e21c966702bb00720477444",
+    "semantic_hash": "2b65cfc27e21c966702bb00720477444"
+  },
+  "docs/BRAINSTORM_2026-04-29.md": {
+    "mtime": 1794473351.53262,
+    "seen": 1794545339.5985153,
+    "ast_hash": "20f685fa4cfb6278c80e925bf2abf4a5",
+    "semantic_hash": "20f685fa4cfb6278c80e925bf2abf4a5"
+  },
+  "docs/DEMO_SCRIPT.md": {
+    "mtime": 1794473351.53262,
+    "seen": 1794545339.5985162,
+    "ast_hash": "8806c2b5ac5ed5739d0a8d512c03cba1",
+    "semantic_hash": "8806c2b5ac5ed5739d0a8d512c03cba1"
+  },
+  "docs/RED_TEAM_REPORT.md": {
+    "mtime": 1794473351.53262,
+    "seen": 1794545339.598517,
+    "ast_hash": "9ec08375541367e9ebe0bdeba54a40e4",
+    "semantic_hash": "9ec08375541367e9ebe0bdeba54a40e4"
+  },
+  "docs/SETUP.md": {
+    "mtime": 1794473351.53262,
+    "seen": 1794545339.5985184,
+    "ast_hash": "088905121562e24e9480b870974cd9d6",
+    "semantic_hash": "088905121562e24e9480b870974cd9d6"
+  },
+  "docs/USER_TEST_PLAN.md": {
+    "mtime": 1794473351.53262,
+    "seen": 1794545339.5985193,
+    "ast_hash": "fc6e643f48275bc2639e51d2d619fc7c",
+    "semantic_hash": "fc6e643f48275bc2639e51d2d619fc7c"
+  },
+  "docs/audits/adversarial-report.md": {
+    "mtime": 1794473351.53262,
+    "seen": 1794545339.5985203,
+    "ast_hash": "bfe15609d4a7d23eca410230a1f69e28",
+    "semantic_hash": "bfe15609d4a7d23eca410230a1f69e28"
+  },
+  "docs/audits/baseline-test-report.md": {
+    "mtime": 1794473351.5333543,
+    "seen": 1794545339.598521,
+    "ast_hash": "c9ff1fa69cad2fcf8b0e8319e765c732",
+    "semantic_hash": "c9ff1fa69cad2fcf8b0e8319e765c732"
+  },
+  "docs/audits/branch-reconciliation-report.md": {
+    "mtime": 1794473351.5333543,
+    "seen": 1794545339.5985222,
+    "ast_hash": "9c17b62c82b88ab05a1a70bfc717deb1",
+    "semantic_hash": "9c17b62c82b88ab05a1a70bfc717deb1"
+  },
+  "docs/audits/clean-room-run-ed7bfca.md": {
+    "mtime": 1794473351.5333543,
+    "seen": 1794545339.5985231,
+    "ast_hash": "fda2c257e85fa4f54928e462ee27c11f",
+    "semantic_hash": "fda2c257e85fa4f54928e462ee27c11f"
+  },
+  "docs/audits/codex-verification-handoff.md": {
+    "mtime": 1794473351.5333543,
+    "seen": 1794545339.598524,
+    "ast_hash": "92ec03f1a3a1897814f38c3cf62a920b",
+    "semantic_hash": "92ec03f1a3a1897814f38c3cf62a920b"
+  },
+  "docs/audits/feature-verification-matrix.md": {
+    "mtime": 1794473351.5405037,
+    "seen": 1794545339.5985248,
+    "ast_hash": "d95f565a7f31d26e02bf90ace15512a4",
+    "semantic_hash": "d95f565a7f31d26e02bf90ace15512a4"
+  },
+  "docs/audits/final-change-manifest.md": {
+    "mtime": 1794473351.5405037,
+    "seen": 1794545339.598526,
+    "ast_hash": "555fa13876e2dbdabfc942cb184a3d33",
+    "semantic_hash": "555fa13876e2dbdabfc942cb184a3d33"
+  },
+  "docs/audits/ollama-docker-validation.md": {
+    "mtime": 1794473351.5405037,
+    "seen": 1794545339.598527,
+    "ast_hash": "c985474c6e40eedb1b3fde2ee2f0e447",
+    "semantic_hash": "c985474c6e40eedb1b3fde2ee2f0e447"
+  },
+  "docs/audits/sandbox-design.md": {
+    "mtime": 1794473351.5405037,
+    "seen": 1794545339.598528,
+    "ast_hash": "8f21164d345734f254f6d32c704be7fb",
+    "semantic_hash": "8f21164d345734f254f6d32c704be7fb"
+  },
+  "docs/audits/security-and-repository-hygiene.md": {
+    "mtime": 1794473351.5405037,
+    "seen": 1794545339.5985293,
+    "ast_hash": "6a93bccebaec879b593c769fa3ac2c18",
+    "semantic_hash": "6a93bccebaec879b593c769fa3ac2c18"
+  },
+  "docs/audits/threat-model.md": {
+    "mtime": 1794473351.5405037,
+    "seen": 1794545339.59853,
+    "ast_hash": "ae94a57f28351a29a80ca867b2c33976",
+    "semantic_hash": "ae94a57f28351a29a80ca867b2c33976"
+  },
+  "docs/competitive-analysis-2026.md": {
+    "mtime": 1794473351.5405037,
+    "seen": 1794545339.598531,
+    "ast_hash": "840c481e4219889375778db81a7777a1",
+    "semantic_hash": "840c481e4219889375778db81a7777a1"
+  },
+  "docs/feature-strategy-2026.md": {
+    "mtime": 1794473351.5405037,
+    "seen": 1794545339.5985322,
+    "ast_hash": "6bd76f3c738c146e2c08cf4ebd9cfbb6",
+    "semantic_hash": "6bd76f3c738c146e2c08cf4ebd9cfbb6"
+  },
+  "docs/honeybadger-bridge-spec.md": {
+    "mtime": 1794473351.5405037,
+    "seen": 1794545339.598533,
+    "ast_hash": "4145820c10186f7520a3c8e5dcfc22e4",
+    "semantic_hash": "4145820c10186f7520a3c8e5dcfc22e4"
+  },
+  "docs/pen-test-plan.md": {
+    "mtime": 1794473351.5405037,
+    "seen": 1794545339.5985339,
+    "ast_hash": "87ad062c8cb3a980bdef30c9a315b2d8",
+    "semantic_hash": "87ad062c8cb3a980bdef30c9a315b2d8"
+  },
+  "docs/superpowers/plans/2026-04-28-phase20-implementation.md": {
+    "mtime": 1794473351.543649,
+    "seen": 1794545339.5985346,
+    "ast_hash": "93f2e0808ce316a3262cd64bc26484f1",
+    "semantic_hash": "93f2e0808ce316a3262cd64bc26484f1"
+  },
+  "docs/superpowers/specs/2026-04-28-phase20-design.md": {
+    "mtime": 1794473351.543649,
+    "seen": 1794545339.5985358,
+    "ast_hash": "3d61865a171b036fd2d0aa8197c3082d",
+    "semantic_hash": "3d61865a171b036fd2d0aa8197c3082d"
+  }
+}

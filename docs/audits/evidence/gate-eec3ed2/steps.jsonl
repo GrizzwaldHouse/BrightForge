@@ -1,0 +1,4 @@
+{"step":"1","name":"build","result":"PASS","detail":"lint exit 0; images built; layer leak matches 0"}
+{"step":"2","name":"launch","result":"PASS","detail":"health 200 at 172.18.0.2 in 2s"}
+{"step":"3","name":"stability","result":"FAIL","detail":"health 11/11 ok; ws open=1 msgs=0; sse chunks=0 errors=0; memory 52.55MiB -> 42.71MiB (-18.7%); unhandled=1"}
+{"step":"4","name":"tests","result":"FAIL","detail":"node: [SUITE] 95/96 passed, 1 failed | python: Ran 14 tests in 0.101s OK | tabs: 429s= pageErrors= orchestration-map-errors= | chat: planShown= file='' sessions=0 | adversarial: 28/29 PASS (runner failures=1)"}

@@ -1,0 +1,17 @@
+[GATE] 1 build: PASS - lint exit 0; images built; layer leak matches 0
+[GATE] 2 launch: PASS - health 200 at 172.18.0.2 in 2s
+[GATE] 3 stability: FAIL - health 11/11 ok; ws open=1 msgs=0; sse chunks=0 errors=0; memory 52.55MiB -> 42.71MiB (-18.7%); unhandled=1
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+FileNotFoundError: [Errno 2] No such file or directory: '/tmp/claude-0/-home-user-BrightForge/267d898d-a30f-541f-8ec5-5a03c6f4fccf/scratchpad/gate-eec3ed2/out/tabs.json'
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+FileNotFoundError: [Errno 2] No such file or directory: '/tmp/claude-0/-home-user-BrightForge/267d898d-a30f-541f-8ec5-5a03c6f4fccf/scratchpad/gate-eec3ed2/out/tabs.json'
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+FileNotFoundError: [Errno 2] No such file or directory: '/tmp/claude-0/-home-user-BrightForge/267d898d-a30f-541f-8ec5-5a03c6f4fccf/scratchpad/gate-eec3ed2/out/tabs.json'
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+FileNotFoundError: [Errno 2] No such file or directory: '/tmp/claude-0/-home-user-BrightForge/267d898d-a30f-541f-8ec5-5a03c6f4fccf/scratchpad/gate-eec3ed2/out/chat.json'
+[GATE] 4 tests: FAIL - node: [SUITE] 95/96 passed, 1 failed | python: Ran 14 tests in 0.101s OK | tabs: 429s= pageErrors= orchestration-map-errors= | chat: planShown= file='' sessions=0 | adversarial: 28/29 PASS (runner failures=1)
+[GATE] done

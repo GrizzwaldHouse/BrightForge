@@ -1,0 +1,31 @@
+PASS input | turn without message | 400
+PASS input | turn with numeric message | 400
+PASS input | malformed JSON body | 400 {"error":"Malformed JSON body"}
+PASS input | 5 MB JSON body | 413
+PASS input | approve unknown session | 400
+PASS input | SQL-ish project id | 404
+PASS input | download path traversal id | 404
+PASS input | texture name traversal | 404
+PASS input | revert HEAD | 400
+PASS input | revert HEAD~1..HEAD | 400
+PASS input | revert --help | 400
+PASS input | revert aaaaaaaaaaaaaaaaaaaa | 400
+PASS input | revert main | 400
+PASS input | server alive after input tests | true
+PASS plan | model proposes traversal path | turn 200 ops=1 approve=200 partial written=false
+PASS plan | model proposes absolute path | turn 200 ops=1 approve=200 applied written=false
+PASS plan | request body chooses projectRoot (R2) | written=true
+PASS provider | model returns malformed | 200 in 30 ms: error
+PASS provider | model returns empty | 200 in 14 ms: error
+PASS provider | model returns http500 | 200 in 13 ms: error
+PASS provider | model returns garbage | 200 in 13 ms: no_changes
+PASS provider | model never answers (timeout) | 200 after 39022 ms: {"plan":null,"status":"error","message":"Error generating plan: Operation timed 
+PASS session | cancel in-flight generation | cancel 200; events: event: provider_failed,event: cancelled
+PASS session | SSE client disconnects mid-stream | true
+PASS session | two concurrent sessions | ids differ=true a=true b=true mix=false
+FAIL limits | 70 GETs in a burst | 200s=70 429s=0
+PASS limits | x-brightforge-test header from loopback | 200
+PASS load | 300 x GET /api/health, 10 concurrent | errors=0 p50=39ms p95=60ms max=166ms
+PASS headers | security headers | nosniff=nosniff powered=null csp=false
+
+28/29 PASS
