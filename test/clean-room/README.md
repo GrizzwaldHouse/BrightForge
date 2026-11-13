@@ -9,7 +9,8 @@ Test-only tooling. Nothing here is loaded by the application.
 | `tabs.cjs` | Playwright: clicks every `[data-tab]`, records `/api` calls, console and page errors, panel text, screenshot. Blocks every non-server host |
 | `chat.cjs` | Playwright: chat plan -> approve -> apply through the UI; with a seconds argument (and optional tab), measures idle polling |
 | `features.mjs` | Starts each workflow through the API (scene, world, prototype, playtest, agent pipeline, design, model scan, security scan, Forge3D) |
-| `adversarial.mjs` | Input validation, unsafe plan paths, provider failures and timeouts, cancel, SSE disconnect, concurrent sessions, rate limits, bounded load, headers |
+| `adversarial.mjs` | Input validation, unsafe plan paths, provider failures and timeouts, cancel, SSE disconnect, concurrent sessions, rate limits (650-request burst past the 600/min loopback limit), bounded load, headers |
+| `gate.sh` | The build gate: runs steps 1-4 from `git archive HEAD` and writes `.gate/build-gate-report.json` (see below) |
 
 Run (needs Docker and the `test` image built from the same commit; the browser and Node scripts run on the Docker host):
 
@@ -24,3 +25,14 @@ docker rm -f bf-server bf-sidecar
 ```
 
 All model output is fake. A pass here does not show that real inference works.
+
+## Build gate
+
+```bash
+test/clean-room/gate.sh [repo]                                  # steps 1-4, 5 min stability
+GATE_STABILITY_SECONDS=60 GATE_HEALTH_INTERVAL=10 test/clean-room/gate.sh   # quick mode
+GATE_STEPS=4 test/clean-room/gate.sh                            # re-run only step 4, keep the other results
+GATE_REVIEWER=APPROVED GATE_STEPS=5 test/clean-room/gate.sh     # after the reviewer agent approved
+```
+
+Exit code 0 only when the verdict is READY (steps 1-4 PASS and `GATE_REVIEWER=APPROVED`). It starts `dockerd` if the daemon is down. Failures carry a `failure_class` (PRODUCT, HARNESS, UNEXPLAINED, OWNER); a missing Playwright module is HARNESS with the step NOT RUN. The step 3 log scan matches real error formats only, and an idle WebSocket or SSE stream with zero messages is recorded, not failed.

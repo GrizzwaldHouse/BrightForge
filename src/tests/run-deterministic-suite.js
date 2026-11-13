@@ -20,6 +20,7 @@ import { readFileSync, mkdirSync, writeFileSync, mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { isMainModule } from '../core/is-main-module.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
@@ -27,8 +28,9 @@ const TIMEOUT_MS = Number.parseInt(process.env.SUITE_TIMEOUT_MS || '300000', 10)
 
 // Scripts write runtime state (.claude/*, .brightforge/memory.json) into a
 // throwaway directory so a suite run leaves tracked repo files unchanged.
-const STATE_DIR = mkdtempSync(join(tmpdir(), 'bf-suite-state-'));
-const CHILD_ENV = { ...process.env, BRIGHTFORGE_STATE_ROOT: STATE_DIR };
+// Created by main() so importing this module (for runScript) has no side effects.
+let STATE_DIR = null;
+let CHILD_ENV = process.env;
 
 // Not deterministic in a CPU-only, offline container (reason recorded in the report)
 const EXCLUDED = {
@@ -49,17 +51,36 @@ const EXCLUDED = {
   'test-ollama-live': 'opt-in live Ollama (ollama profile)'
 };
 
-function runScript(name) {
+/**
+ * Run `npm run -s <name>` in its own process group with a timeout.
+ * On timeout the whole group is killed (npm, the shell and the node script):
+ * killing only npm left the script running as an orphan that kept printing and
+ * holding the output pipe, so a stalled run looked like "failed after printing
+ * its summary" and the leaked process was never reaped.
+ * @param {string} name - package.json script name
+ * @param {{ cwd?: string, timeoutMs?: number }} [opts]
+ */
+export function runScript(name, { cwd = ROOT, timeoutMs = TIMEOUT_MS } = {}) {
   return new Promise((resolve) => {
     const started = Date.now();
     const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
     // Windows: Node refuses to spawn .cmd files without a shell (EINVAL since
     // the CVE-2024-27980 fix). Script names come from package.json, not users.
-    const child = spawn(npm, ['run', '-s', name], { cwd: ROOT, env: CHILD_ENV, stdio: ['ignore', 'pipe', 'pipe'], shell: process.platform === 'win32' });
+    const child = spawn(npm, ['run', '-s', name], {
+      cwd, env: CHILD_ENV, stdio: ['ignore', 'pipe', 'pipe'], shell: process.platform === 'win32', detached: process.platform !== 'win32'
+    });
+    let timedOut = false;
     let out = '';
     child.stdout.on('data', (d) => { out += d; });
     child.stderr.on('data', (d) => { out += d; });
-    const timer = setTimeout(() => child.kill('SIGKILL'), TIMEOUT_MS);
+    const timer = setTimeout(() => {
+      timedOut = true;
+      try {
+        if (process.platform === 'win32') child.kill('SIGKILL'); else process.kill(-child.pid, 'SIGKILL');
+      } catch (_err) {
+        child.kill('SIGKILL');
+      }
+    }, timeoutMs);
     child.on('close', (code, signal) => {
       clearTimeout(timer);
       const tail = out.trim().split(/\r?\n/).slice(-3);
@@ -68,7 +89,7 @@ function runScript(name) {
         name,
         exitCode: code,
         signal,
-        timedOut: signal === 'SIGKILL',
+        timedOut,
         hijacked,
         passed: code === 0 && !hijacked,
         durationMs: Date.now() - started,
@@ -79,6 +100,8 @@ function runScript(name) {
 }
 
 async function main() {
+  STATE_DIR = mkdtempSync(join(tmpdir(), 'bf-suite-state-'));
+  CHILD_ENV = { ...process.env, BRIGHTFORGE_STATE_ROOT: STATE_DIR };
   const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
   const onlyIdx = process.argv.indexOf('--only');
   const only = onlyIdx > -1 ? new Set(process.argv[onlyIdx + 1].split(',')) : null;
@@ -119,7 +142,9 @@ async function main() {
   process.exit(failed.length === 0 ? 0 : 1);
 }
 
-main().catch((err) => {
-  console.error('[SUITE] Crashed:', err);
-  process.exit(1);
-});
+if (isMainModule(import.meta.url)) {
+  main().catch((err) => {
+    console.error('[SUITE] Crashed:', err);
+    process.exit(1);
+  });
+}

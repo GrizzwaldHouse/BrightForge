@@ -69,9 +69,13 @@ const fexists = (p) => { try { sh('exec', 'bf-server', 'test', '-e', p); return 
   const ha = ra.json?.history?.map((h) => h.content).join('|') || '';
   rec('session', 'two concurrent sessions', 'distinct ids, files in own roots, no history mixing', `ids differ=${ra.json?.sessionId !== rb.json?.sessionId} a=${fexists('/tmp/a/hello.txt')} b=${fexists('/tmp/b/hello.txt')} mix=${ha.includes('/tmp/b')}`, ra.json?.sessionId !== rb.json?.sessionId && fexists('/tmp/a/hello.txt') && fexists('/tmp/b/hello.txt') && !ha.includes('/tmp/b'));
 
-  // 6. Rate limits (without the test header)
-  const codes = []; for (let i = 0; i < 70; i++) codes.push((await req('GET', '/api/sessions', { headers: { 'x-brightforge-test': 'false' } })).status);
-  rec('limits', '70 GETs in a burst', '429 after the 60/min limit', `200s=${codes.filter((x) => x === 200).length} 429s=${codes.filter((x) => x === 429).length}`, codes.includes(429));
+  // 6. Rate limits (without the test header). Loopback peers (the sidecar makes every client look local)
+  // get general_loopback = 600/min by design (config/agent-config.yaml, middleware/rate-limit.js), so burst past it.
+  // NODE_ENV=test only bypasses when the header value is exactly 'true'; 'false' does not.
+  const BURST = 650; const codes = new Array(BURST); let nextIdx = 0;
+  await Promise.all(Array.from({ length: 10 }, async () => { while (nextIdx < BURST) { const i = nextIdx++; codes[i] = (await req('GET', '/api/sessions', { headers: { 'x-brightforge-test': 'false' } })).status; } }));
+  const n200 = codes.filter((x) => x === 200).length; const n429 = codes.filter((x) => x === 429).length;
+  rec('limits', `${BURST} GETs in a burst`, '429 after the 600/min loopback limit; first 60 are 200', `200s=${n200} 429s=${n429} first60all200=${codes.slice(0, 60).every((x) => x === 200)}`, n429 > 0 && codes.slice(0, 60).every((x) => x === 200));
   r = await req('GET', '/api/sessions'); rec('limits', 'x-brightforge-test header from loopback', 'bypasses limiter (by design, loopback only)', r.status, r.status === 200, 'Any local process can bypass rate limits with this header');
 
   // 7. Bounded load: 300 requests, concurrency 10
