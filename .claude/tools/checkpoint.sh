@@ -22,7 +22,7 @@ if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
   git commit -q -m "$MSG" && echo "committed: $(git log -1 --format='%h %s')"
 fi
 NEW=$(git ls-files --others --exclude-standard | grep -vE '^(graphify-out|node_modules|\.gate)/' | head -20)
-[ -n "$NEW" ] && echo "NOTE: untracked files not included (add deliberately with git add): $(echo $NEW | tr '\n' ' ')"
+[ -n "$NEW" ] && echo "NOTE: $(echo "$NEW" | wc -l) untracked file(s) not included (add deliberately with git add), e.g. $(echo "$NEW" | head -3 | tr '\n' ' ')"
 git ls-files --others --exclude-standard | grep -qE '(^|/)\.env($|\.)' && { echo "REFUSED: an .env file is untracked in the tree; make sure it is ignored."; exit 2; }
 # Scan every commit that is about to leave this machine, not only the newest change.
 if git rev-parse -q --verify "origin/$BR" >/dev/null; then RANGE="origin/$BR..HEAD"; else RANGE="HEAD --not --remotes"; fi
