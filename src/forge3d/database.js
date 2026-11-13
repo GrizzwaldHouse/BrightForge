@@ -413,10 +413,16 @@ const MIGRATIONS = [
   {
     version: 12,
     description: 'Add pipeline_id column to prototypes so status can report the live pipeline',
-    sql: `
-      ALTER TABLE prototypes ADD COLUMN pipeline_id TEXT;
-      CREATE INDEX IF NOT EXISTS idx_prototypes_pipeline ON prototypes(pipeline_id);
-    `
+    // Idempotent: the column is only added when missing, so a re-run after a
+    // partial application (column added, version row not yet recorded) succeeds.
+    apply: (db) => {
+      const hasColumn = db.prepare('PRAGMA table_info(prototypes)').all()
+        .some((c) => c.name === 'pipeline_id');
+      if (!hasColumn) {
+        db.exec('ALTER TABLE prototypes ADD COLUMN pipeline_id TEXT');
+      }
+      db.exec('CREATE INDEX IF NOT EXISTS idx_prototypes_pipeline ON prototypes(pipeline_id)');
+    }
   }
 ];
 
@@ -591,7 +597,11 @@ class Forge3DDatabase {
     for (const migration of MIGRATIONS) {
       if (migration.version > appliedVersion) {
         console.log(`[DB] Applying migration v${migration.version}: ${migration.description}`);
-        this.db.exec(migration.sql);
+        if (typeof migration.apply === 'function') {
+          migration.apply(this.db);
+        } else {
+          this.db.exec(migration.sql);
+        }
         this.db.prepare(
           'INSERT INTO schema_version (version, description) VALUES (?, ?)'
         ).run(migration.version, migration.description);

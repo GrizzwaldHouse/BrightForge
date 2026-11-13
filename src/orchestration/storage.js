@@ -157,6 +157,19 @@ const MIGRATIONS = [
       DROP TABLE agent_registry;
       ALTER TABLE agent_registry_new RENAME TO agent_registry;
     `
+  },
+  {
+    version: 4,
+    description: 'Keep the declared task id of events whose task row does not exist',
+    // Idempotent: the column is only added when missing.
+    apply: (db) => {
+      const hasColumn = db.prepare('PRAGMA table_info(orchestration_events)').all()
+        .some((c) => c.name === 'declared_task_id');
+      if (!hasColumn) {
+        db.exec('ALTER TABLE orchestration_events ADD COLUMN declared_task_id TEXT');
+      }
+      db.exec('CREATE INDEX IF NOT EXISTS idx_events_declared_task ON orchestration_events(declared_task_id)');
+    }
   }
 ];
 
@@ -261,7 +274,11 @@ class OrchestrationStorage {
       console.log(`[ORCH-DB] Applying migration v${migration.version}: ${migration.description}`);
 
       try {
-        this.db.exec(migration.sql);
+        if (typeof migration.apply === 'function') {
+          migration.apply(this.db);
+        } else {
+          this.db.exec(migration.sql);
+        }
         this.db.prepare('INSERT INTO schema_version (version, description) VALUES (?, ?)').run(
           migration.version,
           migration.description
@@ -398,17 +415,21 @@ class OrchestrationStorage {
    * @param {Object} envelope - Event envelope with integrity_hash
    */
   insertEvent(envelope) {
-    // Producers such as the asset pipeline runner pass a pipeline id as task_id.
-    // Only link to task_states when that row exists; otherwise store NULL so the
-    // foreign key does not reject the event (the id stays in the payload).
-    let taskId = envelope.task_id || null;
+    // The foreign key only accepts ids that exist in task_states. For an id with
+    // no task row the link column is left NULL and the original id is kept in
+    // declared_task_id, so the event is stored and read back with exactly the
+    // task_id that was hashed (verifyIntegrity stays true on reload).
+    const declaredId = envelope.task_id || null;
+    let taskId = declaredId;
+    let declaredTaskId = null;
     if (taskId && !this.db.prepare('SELECT 1 FROM task_states WHERE task_id = ?').get(taskId)) {
+      declaredTaskId = taskId;
       taskId = null;
     }
 
     const stmt = this.db.prepare(`
-      INSERT INTO orchestration_events (event_id, timestamp, agent, task_id, event_type, payload, integrity_hash)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO orchestration_events (event_id, timestamp, agent, task_id, event_type, payload, integrity_hash, declared_task_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -418,8 +439,22 @@ class OrchestrationStorage {
       taskId,
       envelope.event_type,
       JSON.stringify(envelope.payload),
-      envelope.integrity_hash
+      envelope.integrity_hash,
+      declaredTaskId
     );
+  }
+
+  /**
+   * Rebuild an event envelope from a stored row (original task_id, parsed payload).
+   * @private
+   */
+  _eventFromRow(row) {
+    const { declared_task_id: declaredTaskId, ...rest } = row;
+    return {
+      ...rest,
+      task_id: rest.task_id || declaredTaskId || null,
+      payload: JSON.parse(row.payload)
+    };
   }
 
   /**
@@ -437,8 +472,8 @@ class OrchestrationStorage {
     const params = [];
 
     if (filters.taskId) {
-      sql += ' AND task_id = ?';
-      params.push(filters.taskId);
+      sql += ' AND (task_id = ? OR declared_task_id = ?)';
+      params.push(filters.taskId, filters.taskId);
     }
 
     if (filters.agent) {
@@ -468,11 +503,7 @@ class OrchestrationStorage {
     const stmt = this.db.prepare(sql);
     const rows = stmt.all(...params);
 
-    // Parse payload JSON
-    return rows.map(row => ({
-      ...row,
-      payload: JSON.parse(row.payload)
-    }));
+    return rows.map(row => this._eventFromRow(row));
   }
 
   /**
@@ -481,13 +512,10 @@ class OrchestrationStorage {
    * @returns {Array<Object>} Ordered event envelopes
    */
   getTaskEvents(taskId) {
-    const stmt = this.db.prepare('SELECT * FROM orchestration_events WHERE task_id = ? ORDER BY timestamp ASC');
-    const rows = stmt.all(taskId);
+    const stmt = this.db.prepare('SELECT * FROM orchestration_events WHERE task_id = ? OR declared_task_id = ? ORDER BY timestamp ASC');
+    const rows = stmt.all(taskId, taskId);
 
-    return rows.map(row => ({
-      ...row,
-      payload: JSON.parse(row.payload)
-    }));
+    return rows.map(row => this._eventFromRow(row));
   }
 
   /**

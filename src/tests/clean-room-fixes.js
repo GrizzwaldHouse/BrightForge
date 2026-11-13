@@ -219,11 +219,19 @@ async function testFailedPipelines(server) {
   const originalStart = assetPipelineRunner.start;
   let counter = 0;
   const started = [];
-  assetPipelineRunner.start = (name, params) => {
+  const hooksById = new Map();
+  assetPipelineRunner.start = (name, params, hooks) => {
     counter++;
     const id = `clean-room-pl-${counter}`;
     started.push({ name, params, id });
+    hooksById.set(id, hooks || {});
     return id;
+  };
+  // The runner reports terminal status to the hooks given to start() (R2-H2)
+  const terminal = (type, evt) => {
+    const hooks = hooksById.get(evt.pipelineId);
+    const fn = hooks && (type === 'pipeline_failed' ? hooks.onFailed : hooks.onComplete);
+    if (typeof fn === 'function') fn({ eventType: type, ...evt });
   };
 
   const kinds = [
@@ -244,10 +252,10 @@ async function testFailedPipelines(server) {
       check(res.status === 202 && recordId && pipelineId, `${k.kind}: generate answers 202 with ids (got ${res.status})`);
       check(k.get(recordId)?.status === k.running, `${k.kind}: record starts as '${k.running}'`);
 
-      assetPipelineRunner.emit('pipeline_failed', { pipelineId: 'some-other-pipeline', failedStage: 'x', error: 'unrelated' });
+      terminal('pipeline_failed', { pipelineId: 'some-other-pipeline', failedStage: 'x', error: 'unrelated' });
       check(k.get(recordId)?.status === k.running, `${k.kind}: a failure for another pipeline does not change the record`);
 
-      assetPipelineRunner.emit('pipeline_failed', { pipelineId, failedStage: 'analyze', stageIndex: 0, error: `${k.kind} stage exploded` });
+      terminal('pipeline_failed', { pipelineId, failedStage: 'analyze', stageIndex: 0, error: `${k.kind} stage exploded` });
       const rec = k.get(recordId);
       check(rec?.status === 'failed', `${k.kind}: record status becomes 'failed' (got '${rec?.status}')`);
       check(rec?.error === `${k.kind} stage exploded`, `${k.kind}: the pipeline error is stored on the record`);
@@ -256,14 +264,14 @@ async function testFailedPipelines(server) {
       // Success path must not be marked failed
       const ok = await request(server, 'POST', k.path, { prompt: `clean room ${k.kind} success` });
       const okId = ok.json?.[k.idKey];
-      assetPipelineRunner.emit('pipeline_complete', { pipelineId: ok.json?.pipelineId, stagesCompleted: 3, context: {} });
+      terminal('pipeline_complete', { pipelineId: ok.json?.pipelineId, stagesCompleted: 3, context: {} });
       check(ok.status === 202 && k.get(okId)?.status !== 'failed', `${k.kind}: pipeline_complete does not mark the record failed`);
       check(assetPipelineRunner.listenerCount('pipeline_failed') === baseFailed, `${k.kind}: listeners are removed after pipeline_complete`);
     }
 
     // Cancellation is reported as pipeline_failed with a reason and no error
     const c = await request(server, 'POST', '/api/world/generate', { prompt: 'clean room world cancel' });
-    assetPipelineRunner.emit('pipeline_failed', { pipelineId: c.json?.pipelineId, reason: 'cancelled', stageIndex: 1 });
+    terminal('pipeline_failed', { pipelineId: c.json?.pipelineId, reason: 'cancelled', stageIndex: 1 });
     const cw = forge3dDb.getWorld(c.json?.worldId);
     check(cw?.status === 'failed' && cw?.error === 'cancelled', `world: a cancelled pipeline is recorded as failed with reason (got '${cw?.status}', '${cw?.error}')`);
 

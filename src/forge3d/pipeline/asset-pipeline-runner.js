@@ -106,9 +106,12 @@ class AssetPipelineRunner extends EventEmitter {
    * @param {Buffer} [params.imageBuffer] - Reference image for mesh generation
    * @param {string} [params.projectId] - Target project for asset export
    * @param {string} [params.model] - Model override
+   * @param {Object} [hooks] - Terminal-status hooks (called at most once, errors swallowed)
+   * @param {Function} [hooks.onFailed] - Called with the pipeline_failed event (stage failure, cancel, crash)
+   * @param {Function} [hooks.onComplete] - Called with the pipeline_complete event
    * @returns {string} pipelineId - Unique ID for tracking this execution
    */
-  start(pipelineName, params = {}) {
+  start(pipelineName, params = {}, hooks = {}) {
     this.loadConfig();
 
     const definition = this.pipelines[pipelineName];
@@ -157,6 +160,9 @@ class AssetPipelineRunner extends EventEmitter {
       startedAt: null,
       completedAt: null,
       error: null,
+      orchTaskId: null,
+      hooks: { onFailed: hooks?.onFailed || null, onComplete: hooks?.onComplete || null },
+      hooksFired: false,
       abortController: new AbortController()
     };
 
@@ -166,6 +172,7 @@ class AssetPipelineRunner extends EventEmitter {
     this._execute(pipelineId).catch((err) => {
       console.error(`[PIPELINE] Unhandled execution error for ${pipelineId}:`, err.message);
       errorHandler.report('pipeline_error', err, { pipelineId });
+      this._failUnhandled(execution, err);
     });
 
     return pipelineId;
@@ -251,6 +258,38 @@ class AssetPipelineRunner extends EventEmitter {
     return results;
   }
 
+  /**
+   * Mark a pipeline whose execution threw as failed and emit pipeline_failed,
+   * so records waiting on the terminal event (and hooks) are resolved.
+   * @private
+   */
+  _failUnhandled(exec, err) {
+    const terminal = [PIPELINE_STATES.FAILED, PIPELINE_STATES.COMPLETED, PIPELINE_STATES.CANCELLED];
+    if (terminal.includes(exec.status)) return;
+
+    exec.status = PIPELINE_STATES.FAILED;
+    exec.completedAt = new Date().toISOString();
+    exec.error = err?.message || String(err);
+
+    if (exec.orchTaskId && orchestrator.initialized) {
+      try {
+        orchestrator.taskState.transition(exec.orchTaskId, 'failed', 'Claude', { reason: exec.error });
+      } catch (_e) {
+        // Non-fatal
+      }
+    }
+
+    this._emitEvent('pipeline_failed', {
+      pipelineId: exec.id,
+      pipelineName: exec.pipelineName,
+      stageIndex: exec.currentStageIndex,
+      error: exec.error
+    });
+
+    const timer = setTimeout(() => { this.activePipelines.delete(exec.id); }, 300000);
+    if (timer.unref) timer.unref();
+  }
+
   // --- Private execution engine ---
 
   /**
@@ -266,17 +305,6 @@ class AssetPipelineRunner extends EventEmitter {
 
     const endTimer = telemetryBus.startTimer('pipeline_execution');
 
-    // Emit pipeline_started
-    this._emitEvent('pipeline_started', {
-      pipelineId,
-      pipelineName: exec.pipelineName,
-      description: exec.description,
-      stageCount: exec.stages.length,
-      stages: exec.stages.map(s => s.name)
-    });
-
-    console.log(`[PIPELINE] Starting ${exec.pipelineName} (${exec.stages.length} stages)`);
-
     // Initialize orchestration task if runtime is available
     let orchTaskId = null;
     if (orchestrator.initialized && orchestrator.taskState) {
@@ -288,11 +316,24 @@ class AssetPipelineRunner extends EventEmitter {
           nextAction: `Execute stage: ${exec.stages[0]?.name || 'none'}`
         });
         orchTaskId = task.task_id;
+        exec.orchTaskId = orchTaskId;
       } catch (err) {
         // Orchestration is optional — continue without it
         console.warn('[PIPELINE] Orchestration task creation failed (non-fatal):', err.message);
       }
     }
+
+    // Emitted after the orchestration task exists so the event carries its id
+    // Emit pipeline_started
+    this._emitEvent('pipeline_started', {
+      pipelineId,
+      pipelineName: exec.pipelineName,
+      description: exec.description,
+      stageCount: exec.stages.length,
+      stages: exec.stages.map(s => s.name)
+    });
+
+    console.log(`[PIPELINE] Starting ${exec.pipelineName} (${exec.stages.length} stages)`);
 
     // Execute stages sequentially
     for (let i = 0; i < exec.stages.length; i++) {
@@ -552,6 +593,21 @@ class AssetPipelineRunner extends EventEmitter {
     // Forward to telemetry
     telemetryBus.emit('pipeline', { eventType, ...data });
 
+    const exec = data && data.pipelineId ? this.activePipelines.get(data.pipelineId) : null;
+
+    // Terminal-status hooks registered through start()
+    if (exec && !exec.hooksFired && (eventType === 'pipeline_failed' || eventType === 'pipeline_complete')) {
+      exec.hooksFired = true;
+      const hook = eventType === 'pipeline_failed' ? exec.hooks.onFailed : exec.hooks.onComplete;
+      if (typeof hook === 'function') {
+        try {
+          hook({ eventType, ...data });
+        } catch (err) {
+          console.error(`[PIPELINE] Terminal hook failed for ${exec.id}:`, err.message);
+        }
+      }
+    }
+
     // Forward to orchestration event bus if available
     if (orchestrator.initialized && orchestrator.eventBus) {
       try {
@@ -568,7 +624,9 @@ class AssetPipelineRunner extends EventEmitter {
         if (orchEventType) {
           orchestrator.eventBus.emit(orchEventType, {
             agent: 'Claude',
-            taskId: data.pipelineId,
+            // The orchestration task id, so the event keeps its task link
+            // (the pipeline id stays in the payload for lookups by pipeline).
+            taskId: exec?.orchTaskId || undefined,
             payload: data
           });
         }

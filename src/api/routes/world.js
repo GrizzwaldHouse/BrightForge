@@ -97,6 +97,11 @@ router.post('/generate', forge3dLimiter, (req, res) => {
       worldId: world.id,
       worldSize: sanitizedSize,
       worldType: worldType || 'open_world'
+    }, {
+      // A failed pipeline must not leave the record stuck in progress
+      onFailed: (evt) => {
+        forge3dDb.updateWorld(world.id, { status: 'failed', error: String(evt.error || evt.reason || 'Pipeline failed') });
+      }
     });
 
     // Update world with pipeline ID and set status to generating
@@ -104,18 +109,6 @@ router.post('/generate', forge3dLimiter, (req, res) => {
       pipelineId,
       status: 'generating'
     });
-
-    // Record a failed pipeline on the world so it does not stay 'generating' forever
-    const onPipelineEnd = (evt) => {
-      if (!evt || evt.pipelineId !== pipelineId) return;
-      assetPipelineRunner.off('pipeline_failed', onPipelineEnd);
-      assetPipelineRunner.off('pipeline_complete', onPipelineEnd);
-      if (evt.error !== undefined || evt.reason !== undefined || evt.failedStage !== undefined) {
-        forge3dDb.updateWorld(world.id, { status: 'failed', error: String(evt.error || evt.reason || 'Pipeline failed') });
-      }
-    };
-    assetPipelineRunner.on('pipeline_failed', onPipelineEnd);
-    assetPipelineRunner.on('pipeline_complete', onPipelineEnd);
 
     endTimer({ worldId: world.id, pipelineId });
 

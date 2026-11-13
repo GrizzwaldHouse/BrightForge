@@ -96,6 +96,11 @@ router.post('/generate', forge3dLimiter, (req, res) => {
       projectId: projectId || null,
       sceneId: scene.id,
       maxAssets: clampedMaxAssets
+    }, {
+      // A failed pipeline must not leave the record stuck in progress
+      onFailed: (evt) => {
+        forge3dDb.updateScene(scene.id, { status: 'failed', error: String(evt.error || evt.reason || 'Pipeline failed') });
+      }
     });
 
     // Update scene with pipeline ID and set status to analyzing
@@ -103,18 +108,6 @@ router.post('/generate', forge3dLimiter, (req, res) => {
       pipelineId,
       status: 'analyzing'
     });
-
-    // Record a failed pipeline on the scene so it does not stay 'analyzing' forever
-    const onPipelineEnd = (evt) => {
-      if (!evt || evt.pipelineId !== pipelineId) return;
-      assetPipelineRunner.off('pipeline_failed', onPipelineEnd);
-      assetPipelineRunner.off('pipeline_complete', onPipelineEnd);
-      if (evt.error !== undefined || evt.reason !== undefined || evt.failedStage !== undefined) {
-        forge3dDb.updateScene(scene.id, { status: 'failed', error: String(evt.error || evt.reason || 'Pipeline failed') });
-      }
-    };
-    assetPipelineRunner.on('pipeline_failed', onPipelineEnd);
-    assetPipelineRunner.on('pipeline_complete', onPipelineEnd);
 
     endTimer({ sceneId: scene.id, pipelineId });
 
