@@ -9,6 +9,7 @@ class SessionManager {
   constructor(app) {
     this.app = app;
     this.container = document.getElementById('session-list');
+    this.tabContainer = document.getElementById('sessions-tab-list');
     this.sessions = [];
   }
 
@@ -24,6 +25,7 @@ class SessionManager {
     } catch (error) {
       console.error('[SESSION] Failed to load sessions:', error);
       this.container.innerHTML = '<li class="session-error">Failed to load sessions</li>';
+      if (this.tabContainer) this.tabContainer.innerHTML = '<li class="session-error">Failed to load sessions</li>';
     }
   }
 
@@ -79,12 +81,18 @@ class SessionManager {
    * Render the session list
    */
   render() {
+    this.renderInto(this.container);
+    this.renderInto(this.tabContainer);
+  }
+
+  renderInto(container) {
+    if (!container) return;
     if (this.sessions.length === 0) {
-      this.container.innerHTML = '<li class="session-empty">No sessions yet</li>';
+      container.innerHTML = '<li class="session-empty">No sessions yet</li>';
       return;
     }
 
-    this.container.innerHTML = this.sessions.map(session => {
+    container.innerHTML = this.sessions.map(session => {
       const isActive = session.id === this.app.sessionId;
       const task = this.truncate(session.task || session.firstMessage || 'New session', 30);
       const date = this.formatDate(session.date || session.createdAt);
@@ -102,7 +110,7 @@ class SessionManager {
     }).join('');
 
     // Bind click handlers
-    this.container.querySelectorAll('.session-item').forEach(item => {
+    container.querySelectorAll('.session-item').forEach(item => {
       item.addEventListener('click', () => {
         const sessionId = item.getAttribute('data-session-id');
         this.switchSession(sessionId);
