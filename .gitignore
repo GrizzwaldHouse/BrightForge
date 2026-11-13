@@ -36,3 +36,5 @@ qa-reports/
 logs/
 output/
 live_validation_report.json
+# build gate working files
+.gate/

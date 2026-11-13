@@ -609,3 +609,13 @@ npm run lint:fix  # Auto-fix formatting
 npm run lint      # Check for remaining issues
 # Fix any remaining warnings manually (especially unused vars)
 ```
+
+## Definition of Done (build gate)
+
+Work is not done, and must not be reported as done or handed off, until the build gate (skill `verified-build-gate`, script `test/clean-room/gate.sh`) says READY for the current HEAD.
+
+- Run it after integrating branches or receiving subagent code, before pushing code changes, and before writing a handoff. Run lint and your own tests continuously.
+- When a step fails, do not stop and report it. Classify it (PRODUCT, HARNESS, UNEXPLAINED, OWNER), fix it, re-run only the failed steps, at most 3 rounds. Investigating an unexplained failure is part of the job.
+- Report the outcome first: READY at the commit, what changed, the evidence. Mention only OWNER blockers (usage quota, GPU hardware, credentials, approvals) and the single action needed from the owner.
+- Subagent briefs must say: "Before returning, run lint and your tests and fix failures. Return only when everything is green, or blocked on the owner."
+- `.claude/hooks/gate-stop-hook.sh` (a Stop hook) blocks stopping while `.gate/build-gate-report.json` shows fixable failures for the current commit; it gives up after 3 blocks per commit.
