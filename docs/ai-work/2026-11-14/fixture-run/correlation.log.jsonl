@@ -1,0 +1,35 @@
+{"corr": "fx-85574f4a9525", "event": "start", "stage": "provenance"}
+{"corr": "fx-85574f4a9525", "error": null, "event": "end", "peak_bytes": 64966, "seconds": 0.456672, "stage": "provenance", "status": "ok"}
+{"corr": "fx-85574f4a9525", "event": "probe", "note": "token=<REDACTED> path=<OUT>", "stage": "redaction_selfcheck"}
+{"corr": "fx-85574f4a9525", "event": "start", "stage": "build_crate"}
+{"corr": "fx-85574f4a9525", "error": null, "event": "end", "peak_bytes": 1725, "seconds": 0.000104, "stage": "build_crate", "status": "ok"}
+{"corr": "fx-85574f4a9525", "event": "start", "stage": "build_variant"}
+{"corr": "fx-85574f4a9525", "error": null, "event": "end", "peak_bytes": 2275, "seconds": 0.000664, "stage": "build_variant", "status": "ok"}
+{"corr": "fx-85574f4a9525", "event": "start", "stage": "oracle_crate"}
+{"corr": "fx-85574f4a9525", "error": null, "event": "end", "peak_bytes": 5500, "seconds": 0.000255, "stage": "oracle_crate", "status": "ok"}
+{"corr": "fx-85574f4a9525", "event": "start", "stage": "oracle_variant"}
+{"corr": "fx-85574f4a9525", "error": null, "event": "end", "peak_bytes": 1930, "seconds": 0.000156, "stage": "oracle_variant", "status": "ok"}
+{"corr": "fx-85574f4a9525", "event": "start", "stage": "export_crate"}
+{"corr": "fx-85574f4a9525", "error": null, "event": "end", "peak_bytes": 16075897, "seconds": 0.695177, "stage": "export_crate", "status": "ok"}
+{"corr": "fx-85574f4a9525", "event": "start", "stage": "export_variant"}
+{"corr": "fx-85574f4a9525", "error": null, "event": "end", "peak_bytes": 25135, "seconds": 0.001591, "stage": "export_variant", "status": "ok"}
+{"corr": "fx-85574f4a9525", "event": "start", "stage": "sha256_crate"}
+{"corr": "fx-85574f4a9525", "error": null, "event": "end", "peak_bytes": 71900, "seconds": 0.000139, "stage": "sha256_crate", "status": "ok"}
+{"corr": "fx-85574f4a9525", "event": "start", "stage": "sha256_variant"}
+{"corr": "fx-85574f4a9525", "error": null, "event": "end", "peak_bytes": 71926, "seconds": 8.5e-05, "stage": "sha256_variant", "status": "ok"}
+{"corr": "fx-85574f4a9525", "event": "start", "stage": "import_model_manager"}
+{"corr": "fx-85574f4a9525", "event": "info", "message": "[MODEL] Registered 3 adapters: ['hunyuan3d', 'sdxl', 'shap-e']", "stage": "logger:forge3d.model_manager"}
+{"corr": "fx-85574f4a9525", "error": null, "event": "end", "peak_bytes": 2002306, "seconds": 0.251946, "stage": "import_model_manager", "status": "ok"}
+{"corr": "fx-85574f4a9525", "event": "start", "stage": "construct_model_manager"}
+{"corr": "fx-85574f4a9525", "event": "info", "message": "[MODEL] Registered 3 adapters: ['hunyuan3d', 'sdxl', 'shap-e']", "stage": "logger:forge3d.model_manager"}
+{"corr": "fx-85574f4a9525", "error": null, "event": "end", "peak_bytes": 6138, "seconds": 0.000436, "stage": "construct_model_manager", "status": "ok"}
+{"corr": "fx-85574f4a9525", "event": "start", "stage": "mesh_quality_report_crate"}
+{"corr": "fx-85574f4a9525", "event": "info", "message": "[MODEL] Quality report: 8 verts, 12 faces, 0.0 MB est. VRAM", "stage": "logger:forge3d.model_manager"}
+{"corr": "fx-85574f4a9525", "error": null, "event": "end", "peak_bytes": 202531, "seconds": 0.046072, "stage": "mesh_quality_report_crate", "status": "ok"}
+{"corr": "fx-85574f4a9525", "event": "start", "stage": "mesh_quality_report_variant"}
+{"corr": "fx-85574f4a9525", "event": "info", "message": "[MODEL] Quality report: 9 verts, 13 faces, 0.0 MB est. VRAM", "stage": "logger:forge3d.model_manager"}
+{"corr": "fx-85574f4a9525", "error": null, "event": "end", "peak_bytes": 62096, "seconds": 0.007066, "stage": "mesh_quality_report_variant", "status": "ok"}
+{"corr": "fx-85574f4a9525", "event": "start", "stage": "trimesh_reference_crate"}
+{"corr": "fx-85574f4a9525", "error": null, "event": "end", "peak_bytes": 30576, "seconds": 0.002645, "stage": "trimesh_reference_crate", "status": "ok"}
+{"corr": "fx-85574f4a9525", "event": "start", "stage": "trimesh_reference_variant"}
+{"corr": "fx-85574f4a9525", "error": null, "event": "end", "peak_bytes": 30672, "seconds": 0.002577, "stage": "trimesh_reference_variant", "status": "ok"}

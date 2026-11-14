@@ -1,0 +1,521 @@
+{
+ "comparisons": [
+  {
+   "actual": 8,
+   "check": "crate: vertex_count vs expected",
+   "expected": 8,
+   "match": true
+  },
+  {
+   "actual": 12,
+   "check": "crate: face_count vs expected",
+   "expected": 12,
+   "match": true
+  },
+  {
+   "actual": 0,
+   "check": "crate: boundary_edges model vs oracle",
+   "expected": 0,
+   "match": true
+  },
+  {
+   "actual": 0,
+   "check": "crate: non_manifold_edges model vs oracle",
+   "expected": 0,
+   "match": true
+  },
+  {
+   "actual": true,
+   "check": "crate: is_manifold model vs oracle",
+   "expected": true,
+   "match": true
+  },
+  {
+   "actual": true,
+   "check": "crate: is_watertight model vs oracle",
+   "expected": true,
+   "match": true
+  },
+  {
+   "actual": true,
+   "check": "crate: top-level is_manifold equals topology.is_manifold",
+   "expected": true,
+   "match": true
+  },
+  {
+   "actual": true,
+   "check": "crate: trimesh is_watertight vs oracle (reference only)",
+   "expected": true,
+   "match": true
+  },
+  {
+   "actual": [
+    0,
+    0
+   ],
+   "check": "crate: degenerate/duplicate faces",
+   "expected": [
+    0,
+    0
+   ],
+   "match": true
+  },
+  {
+   "actual": 9,
+   "check": "variant: vertex_count vs expected",
+   "expected": 9,
+   "match": true
+  },
+  {
+   "actual": 13,
+   "check": "variant: face_count vs expected",
+   "expected": 13,
+   "match": true
+  },
+  {
+   "actual": 2,
+   "check": "variant: boundary_edges model vs oracle",
+   "expected": 2,
+   "match": true
+  },
+  {
+   "actual": 1,
+   "check": "variant: non_manifold_edges model vs oracle",
+   "expected": 1,
+   "match": true
+  },
+  {
+   "actual": false,
+   "check": "variant: is_manifold model vs oracle",
+   "expected": false,
+   "match": true
+  },
+  {
+   "actual": false,
+   "check": "variant: is_watertight model vs oracle",
+   "expected": false,
+   "match": true
+  },
+  {
+   "actual": false,
+   "check": "variant: top-level is_manifold equals topology.is_manifold",
+   "expected": false,
+   "match": true
+  },
+  {
+   "actual": false,
+   "check": "variant: trimesh is_watertight vs oracle (reference only)",
+   "expected": false,
+   "match": true
+  },
+  {
+   "actual": [
+    0,
+    0
+   ],
+   "check": "variant: degenerate/duplicate faces",
+   "expected": [
+    0,
+    0
+   ],
+   "match": true
+  },
+  {
+   "actual": 1,
+   "check": "variant: exactly one non-manifold edge",
+   "expected": 1,
+   "match": true
+  },
+  {
+   "actual": [
+    [
+     0,
+     1
+    ]
+   ],
+   "check": "variant: non-manifold edge is the configured shared edge",
+   "expected": [
+    [
+     0,
+     1
+    ]
+   ],
+   "match": true
+  },
+  {
+   "actual": 2,
+   "check": "variant: boundary edges from the added triangle",
+   "expected": 2,
+   "match": true
+  },
+  {
+   "actual": {
+    "2": 18
+   },
+   "check": "crate: every edge has incidence exactly 2",
+   "expected": {
+    "2": 18
+   },
+   "match": true
+  },
+  {
+   "actual": true,
+   "check": "determinism: rebuilt GLBs hash-identical",
+   "expected": true,
+   "match": true
+  },
+  {
+   "actual": 1,
+   "check": "fixtures differ by exactly one face",
+   "expected": 1,
+   "match": true
+  },
+  {
+   "actual": [],
+   "check": "redaction: canary secret and absolute paths absent from stored log",
+   "expected": [],
+   "match": true
+  }
+ ],
+ "config": {
+  "correlation_prefix": "fx",
+  "crate_edge_length": 1.0,
+  "crate_name": "static_crate_cube",
+  "determinism_rebuilds": 1,
+  "expected_cube_faces": 12,
+  "expected_cube_vertices": 8,
+  "expected_variant_boundary": 2,
+  "expected_variant_faces": 13,
+  "expected_variant_non_manifold": 1,
+  "expected_variant_vertices": 9,
+  "export_file_type": "glb",
+  "extra_apex_scale": [
+   0.5,
+   -0.5,
+   -0.5
+  ],
+  "shared_edge": [
+   0,
+   1
+  ],
+  "variant_name": "static_crate_cube_plus_one_triangle"
+ },
+ "correlation_id": "fx-85574f4a9525",
+ "determinism": [
+  {
+   "equal": true,
+   "fixture": "crate",
+   "rebuild": 0,
+   "sha256": "e0d8712773cb1c23cfdf85f0f9a13078321b35753f4f51fe5d874e7aeabfe841"
+  },
+  {
+   "equal": true,
+   "fixture": "variant",
+   "rebuild": 0,
+   "sha256": "510b7ac343b222f59afdfc414e5dae1cc0113f53221e7ce709ec0d801d41553f"
+  }
+ ],
+ "failures": [],
+ "model_manager_reports": {
+  "crate": {
+   "bounding_box": {
+    "depth": 1.0,
+    "height": 1.0,
+    "width": 1.0
+   },
+   "estimated_vram_mb": 0.0,
+   "face_count": 12,
+   "file_size_bytes": 888,
+   "is_manifold": true,
+   "is_watertight": true,
+   "recommendations": {
+    "desktop": {
+     "message": "Good for desktop (12 faces <= 10000 target)",
+     "status": "ok"
+    },
+    "mobile": {
+     "message": "Good for mobile (12 faces <= 2000 target)",
+     "status": "ok"
+    },
+    "unreal": {
+     "message": "Good for unreal (12 faces <= 50000 target)",
+     "status": "ok"
+    },
+    "web": {
+     "message": "Good for web (12 faces <= 5000 target)",
+     "status": "ok"
+    }
+   },
+   "recommendations_basis": "face_count_only",
+   "success": true,
+   "topology": {
+    "boundary_edges": 0,
+    "degenerate_faces": 0,
+    "duplicate_faces": 0,
+    "finite_vertices": true,
+    "geometries": {
+     "geometry_0": {
+      "boundary_edges": 0,
+      "degenerate_faces": 0,
+      "duplicate_faces": 0,
+      "face_count": 12,
+      "finite_vertices": true,
+      "is_manifold": true,
+      "is_watertight": true,
+      "non_manifold_edges": 0,
+      "status": "measured",
+      "vertex_count": 8
+     }
+    },
+    "is_manifold": true,
+    "is_watertight": true,
+    "non_manifold_edges": 0,
+    "status": "measured"
+   },
+   "vertex_count": 8
+  },
+  "variant": {
+   "bounding_box": {
+    "depth": 1.5,
+    "height": 1.5,
+    "width": 1.0
+   },
+   "estimated_vram_mb": 0.0,
+   "face_count": 13,
+   "file_size_bytes": 912,
+   "is_manifold": false,
+   "is_watertight": false,
+   "recommendations": {
+    "desktop": {
+     "message": "Good for desktop (13 faces <= 10000 target)",
+     "status": "ok"
+    },
+    "mobile": {
+     "message": "Good for mobile (13 faces <= 2000 target)",
+     "status": "ok"
+    },
+    "unreal": {
+     "message": "Good for unreal (13 faces <= 50000 target)",
+     "status": "ok"
+    },
+    "web": {
+     "message": "Good for web (13 faces <= 5000 target)",
+     "status": "ok"
+    }
+   },
+   "recommendations_basis": "face_count_only",
+   "success": true,
+   "topology": {
+    "boundary_edges": 2,
+    "degenerate_faces": 0,
+    "duplicate_faces": 0,
+    "finite_vertices": true,
+    "geometries": {
+     "geometry_0": {
+      "boundary_edges": 2,
+      "degenerate_faces": 0,
+      "duplicate_faces": 0,
+      "face_count": 13,
+      "finite_vertices": true,
+      "is_manifold": false,
+      "is_watertight": false,
+      "non_manifold_edges": 1,
+      "status": "measured",
+      "vertex_count": 9
+     }
+    },
+    "is_manifold": false,
+    "is_watertight": false,
+    "non_manifold_edges": 1,
+    "status": "measured"
+   },
+   "vertex_count": 9
+  }
+ },
+ "oracle": {
+  "crate": {
+   "boundary_edges": 0,
+   "edge_count": 18,
+   "histogram": {
+    "2": 18
+   },
+   "is_manifold": true,
+   "is_watertight": true,
+   "non_manifold_edge_list": [],
+   "non_manifold_edges": 0
+  },
+  "variant": {
+   "boundary_edges": 2,
+   "edge_count": 20,
+   "histogram": {
+    "1": 2,
+    "2": 17,
+    "3": 1
+   },
+   "is_manifold": false,
+   "is_watertight": false,
+   "non_manifold_edge_list": [
+    [
+     0,
+     1
+    ]
+   ],
+   "non_manifold_edges": 1
+  }
+ },
+ "peak_process_max_rss_kb": 63076,
+ "provenance": {
+  "branch": "HEAD",
+  "commit": "e95b0393f0f21a90419bf215e81fe182075f4b44",
+  "network_interfaces_proc_net_dev": [
+   "lo"
+  ],
+  "node": "v22.23.4",
+  "npm": "10.9.9",
+  "pip_freeze": [
+   "fast_simplification==0.2.0",
+   "numpy==2.4.6",
+   "pillow==12.3.0",
+   "PyYAML==6.0.3",
+   "trimesh==5.2.0",
+   "xatlas==0.0.11"
+  ],
+  "platform": "Linux-6.18.44-fc-v470-x86_64-with-glibc2.39",
+  "provider_env_present": [],
+  "python": "3.11.18",
+  "tracked_changes_before_run": []
+ },
+ "sha256": {
+  "static_crate_cube.glb": "e0d8712773cb1c23cfdf85f0f9a13078321b35753f4f51fe5d874e7aeabfe841",
+  "static_crate_cube_plus_one_triangle.glb": "510b7ac343b222f59afdfc414e5dae1cc0113f53221e7ce709ec0d801d41553f"
+ },
+ "skipped": [
+  "UE 5.7 import or validation: not run, not claimed",
+  "any provider/LLM/image/mesh model call: not run by design (no adapters loaded, network namespace empty)",
+  "GPU/CUDA paths and Shap-E/Hunyuan/SDXL generation: not run",
+  "UV unwrap (xatlas) and UV overlap report: not part of this comparison"
+ ],
+ "stages": [
+  {
+   "process_max_rss_kb_after": 18692,
+   "py_peak_alloc_bytes": 64966,
+   "seconds": 0.456672,
+   "stage": "provenance",
+   "status": "ok"
+  },
+  {
+   "process_max_rss_kb_after": 18692,
+   "py_peak_alloc_bytes": 1725,
+   "seconds": 0.000104,
+   "stage": "build_crate",
+   "status": "ok"
+  },
+  {
+   "process_max_rss_kb_after": 18692,
+   "py_peak_alloc_bytes": 2275,
+   "seconds": 0.000664,
+   "stage": "build_variant",
+   "status": "ok"
+  },
+  {
+   "process_max_rss_kb_after": 18692,
+   "py_peak_alloc_bytes": 5500,
+   "seconds": 0.000255,
+   "stage": "oracle_crate",
+   "status": "ok"
+  },
+  {
+   "process_max_rss_kb_after": 18692,
+   "py_peak_alloc_bytes": 1930,
+   "seconds": 0.000156,
+   "stage": "oracle_variant",
+   "status": "ok"
+  },
+  {
+   "process_max_rss_kb_after": 61800,
+   "py_peak_alloc_bytes": 16075897,
+   "seconds": 0.695177,
+   "stage": "export_crate",
+   "status": "ok"
+  },
+  {
+   "process_max_rss_kb_after": 61800,
+   "py_peak_alloc_bytes": 25135,
+   "seconds": 0.001591,
+   "stage": "export_variant",
+   "status": "ok"
+  },
+  {
+   "process_max_rss_kb_after": 61800,
+   "py_peak_alloc_bytes": 71900,
+   "seconds": 0.000139,
+   "stage": "sha256_crate",
+   "status": "ok"
+  },
+  {
+   "process_max_rss_kb_after": 61800,
+   "py_peak_alloc_bytes": 71926,
+   "seconds": 8.5e-05,
+   "stage": "sha256_variant",
+   "status": "ok"
+  },
+  {
+   "process_max_rss_kb_after": 61800,
+   "py_peak_alloc_bytes": 2002306,
+   "seconds": 0.251946,
+   "stage": "import_model_manager",
+   "status": "ok"
+  },
+  {
+   "process_max_rss_kb_after": 61800,
+   "py_peak_alloc_bytes": 6138,
+   "seconds": 0.000436,
+   "stage": "construct_model_manager",
+   "status": "ok"
+  },
+  {
+   "process_max_rss_kb_after": 62692,
+   "py_peak_alloc_bytes": 202531,
+   "seconds": 0.046072,
+   "stage": "mesh_quality_report_crate",
+   "status": "ok"
+  },
+  {
+   "process_max_rss_kb_after": 62820,
+   "py_peak_alloc_bytes": 62096,
+   "seconds": 0.007066,
+   "stage": "mesh_quality_report_variant",
+   "status": "ok"
+  },
+  {
+   "process_max_rss_kb_after": 63076,
+   "py_peak_alloc_bytes": 30576,
+   "seconds": 0.002645,
+   "stage": "trimesh_reference_crate",
+   "status": "ok"
+  },
+  {
+   "process_max_rss_kb_after": 63076,
+   "py_peak_alloc_bytes": 30672,
+   "seconds": 0.002577,
+   "stage": "trimesh_reference_variant",
+   "status": "ok"
+  }
+ ],
+ "tracked_changes_after_run": [],
+ "trimesh_reference": {
+  "crate": {
+   "faces": 12,
+   "is_watertight": true,
+   "is_winding_consistent": true,
+   "vertices": 8
+  },
+  "variant": {
+   "faces": 13,
+   "is_watertight": false,
+   "is_winding_consistent": true,
+   "vertices": 9
+  }
+ },
+ "verdict": "PASS"
+}
