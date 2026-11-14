@@ -1,0 +1,12 @@
+[GATE] warning: working tree has uncommitted changes; only HEAD 0808e50 is gated
+[GATE] docker daemon down, starting dockerd
+[GATE] step 1 build: PASS - lint exit 0; images built=yes; layer leak matches 0
+[GATE] step 2 launch: PASS - health 200 at 172.18.0.2 in 6s
+[GATE] step 3 stability: PASS - health 11/11 ok; ws open=1 msgs=0 (idle zero is recorded, not a failure); sse chunks=0 errors=0; memory 60.86MiB -> 41.33MiB (-32.1%); error lines=0 (startup lines ignored=1) (300s)
+[GATE] step 4 tests: PASS - node: [SUITE] 100/100 passed, 0 failed | python: Ran 14 tests in 0.077s OK | tabs: 429s=0 pageErrors=0 orchestration-map-errors=0 | chat: planShown=True file='hello from the fake model' | adversarial: 29/29 PASS
+[GATE] verdict READY at 0808e50 (round 1)
+[GATE]   1 build     PASS
+[GATE]   2 launch    PASS
+[GATE]   3 stability PASS
+[GATE]   4 tests     PASS
+[GATE]   5 reviewer  PASS

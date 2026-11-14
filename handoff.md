@@ -1,5 +1,13 @@
 # Session handoff: BrightForge repair, 2026-11-13
 
+## 0. Latest status (2026-11-14)
+
+Build gate verdict **READY** at `0808e50` on `repair/p0-recovery-2026-10` (pushed, remote tip verified). Steps 1-5 PASS: lint and offline Docker build, launch, 300 s stability, node suite 100/100 plus Python 14/14 plus browser tab sweep and 29/29 attack tests, independent reviewer APPROVED (round 2 and gate tooling; four minor findings fixed afterwards and covered by `npm run test-fix-r3`). Evidence: `docs/audits/evidence/gate-0808e50/`.
+
+Work-saving tools: `.claude/tools/checkpoint.sh`, `.claude/tools/preserve_report.sh`, branch list `.claude/approved-branches`.
+
+Still owner-only: OpenAI quota for the Codex audit, PowerSpec 3D render (`docs/audits/powerspec-3d-render-runbook.md`), recovery tag pushes, MSI inspection, any merge to main (not approved).
+
 Write-off report for starting a fresh session. The previous session reached about 875k tokens and hit the 5-hour usage limit twice, so the work below is written to be resumed cheaply. Start with "How to resume" at the end.
 
 ## 1. State in one paragraph

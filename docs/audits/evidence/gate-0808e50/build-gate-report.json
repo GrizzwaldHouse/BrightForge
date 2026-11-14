@@ -1,0 +1,44 @@
+{
+  "head": "0808e5007115d1799933ac2490fdd833122c21ff",
+  "verdict": "READY",
+  "round": 1,
+  "mapping": "1 build = eslint over src/ public/js/ bin/ plus docker build of the test and python-test images from git archive HEAD, layers checked for proxy/CA leaks; 2 launch = isolated server (no internet) answers /api/health within 60 s; 3 stability = 300s with health checks, memory growth under 50%, WebSocket and metrics SSE kept connected, server log scanned for real error formats only; 4 tests = offline node deterministic suite, python suite, Playwright tab sweep, chat plan/approve/apply flow, feature workflows and adversarial API checks against the isolated server; 5 reviewer = independent read-only reviewer agent given results and logs only",
+  "steps": [
+    {
+      "step": 1,
+      "name": "build",
+      "result": "PASS",
+      "failure_class": null,
+      "detail": "lint exit 0; images built=yes; layer leak matches 0"
+    },
+    {
+      "step": 2,
+      "name": "launch",
+      "result": "PASS",
+      "failure_class": null,
+      "detail": "health 200 at 172.18.0.2 in 6s"
+    },
+    {
+      "step": 3,
+      "name": "stability",
+      "result": "PASS",
+      "failure_class": null,
+      "detail": "health 11/11 ok; ws open=1 msgs=0 (idle zero is recorded, not a failure); sse chunks=0 errors=0; memory 60.86MiB -> 41.33MiB (-32.1%); error lines=0 (startup lines ignored=1) (300s)"
+    },
+    {
+      "step": 4,
+      "name": "tests",
+      "result": "PASS",
+      "failure_class": null,
+      "detail": "node: [SUITE] 100/100 passed, 0 failed | python: Ran 14 tests in 0.077s OK | tabs: 429s=0 pageErrors=0 orchestration-map-errors=0 | chat: planShown=True file='hello from the fake model' | adversarial: 29/29 PASS"
+    },
+    {
+      "step": 5,
+      "name": "reviewer",
+      "result": "PASS",
+      "failure_class": null,
+      "detail": "independent reviewer approved"
+    }
+  ],
+  "reviewer": "APPROVED"
+}
