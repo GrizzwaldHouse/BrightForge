@@ -28,11 +28,12 @@ git ls-files --others --exclude-standard | grep -qE '(^|/)\.env($|\.)' && { echo
 if git rev-parse -q --verify "origin/$BR" >/dev/null; then RANGE="origin/$BR..HEAD"; else RANGE="HEAD --not --remotes"; fi
 if git log -p $RANGE 2>/dev/null | grep -E '^\+' | grep -qiE 'sk-[A-Za-z0-9_-]{16,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}|BEGIN [A-Z ]*PRIVATE KEY'; then
   echo "REFUSED: a commit that would be pushed contains a secret-like string. Remove it from history (amend or reset your own unpushed commit; do not push it)."; exit 2; fi
+ERR=$(mktemp); trap 'rm -f "$ERR"' EXIT
 D=2; for i in 1 2 3 4; do
-  if git push -q origin "$BR" 2>/tmp/checkpoint-push.err; then break; fi
-  if grep -qiE 'non-fast-forward|rejected|fetch first' /tmp/checkpoint-push.err; then
+  if git push -q origin "$BR" 2>"$ERR"; then break; fi
+  if grep -qiE 'non-fast-forward|rejected|fetch first' "$ERR"; then
     echo "STOP: push rejected (remote has commits you do not have). Do NOT force-push. Run: git fetch origin $BR && git log HEAD..origin/$BR --oneline  then integrate (rebase is not allowed here; use merge or cherry-pick) and run this again."; exit 3; fi
-  sleep $D; D=$((D*2)); [ $i -eq 4 ] && { echo "push failed after retries: $(tail -1 /tmp/checkpoint-push.err)"; exit 4; }
+  sleep $D; D=$((D*2)); [ $i -eq 4 ] && { echo "push failed after retries: $(tail -1 "$ERR")"; exit 4; }
 done
 L=$(git rev-parse HEAD); R=$(git ls-remote origin "refs/heads/$BR" | cut -f1)
 [ "$L" = "$R" ] && echo "SAVED: $BR is on the remote at ${L:0:7}" || { echo "MISMATCH: local ${L:0:7} remote ${R:0:7}"; exit 5; }

@@ -81,6 +81,10 @@ export function runScript(name, { cwd = ROOT, timeoutMs = TIMEOUT_MS } = {}) {
         child.kill('SIGKILL');
       }
     }, timeoutMs);
+    child.on('error', (err) => {
+      clearTimeout(timer);
+      resolve({ name, exitCode: null, signal: null, timedOut: false, hijacked: false, passed: false, durationMs: Date.now() - started, tail: [`spawn failed: ${err.message}`] });
+    });
     child.on('close', (code, signal) => {
       clearTimeout(timer);
       const tail = out.trim().split(/\r?\n/).slice(-3);

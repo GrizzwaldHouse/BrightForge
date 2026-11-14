@@ -369,7 +369,7 @@ done
 
 # ---------------------------------------------------------------- report
 python3 - "$OUT/steps.jsonl" "$REPORT" "$HEAD_SHA" "$GATE_STEPS" "$REVIEWER_IN" "$STAB_SECONDS" <<'PY'
-import json, os, sys
+import json, os, re, sys
 steps_path, report_path, head, selected, reviewer_in, stab = sys.argv[1:7]
 names = {1: "build", 2: "launch", 3: "stability", 4: "tests"}
 prev = {}
@@ -391,7 +391,12 @@ for n in (1, 2, 3, 4):
     if n in new:
         steps.append(new[n])
     elif n in prev:
-        steps.append(prev[n])
+        carried = prev[n]
+        m = re.search(r"\((\d+)s\)\s*$", carried.get("detail", ""))
+        if n == 3 and carried.get("result") == "PASS" and m and int(m.group(1)) < 300:
+            carried = {"step": 3, "name": "stability", "result": "NOT RUN", "failure_class": "HARNESS",
+                       "detail": "earlier stability pass was only %ss; a full 300s run is required before READY" % m.group(1)}
+        steps.append(carried)
     else:
         steps.append({"step": n, "name": names[n], "result": "NOT RUN", "failure_class": None,
                       "detail": "not selected in this run (GATE_STEPS=%s) and no earlier result for this commit" % selected})

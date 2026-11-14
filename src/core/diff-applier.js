@@ -8,7 +8,7 @@
  * @date February 10, 2026
  */
 
-import { readFileSync, writeFileSync, unlinkSync, mkdirSync, existsSync, copyFileSync } from 'fs';
+import { readFileSync, writeFileSync, unlinkSync, mkdirSync, existsSync, copyFileSync, realpathSync } from 'fs';
 import { join, dirname, resolve, sep } from 'path';
 
 /**
@@ -22,7 +22,20 @@ export function resolveInsideRoot(projectRoot, filePath) {
   const target = resolve(join(root, filePath));
   // A filesystem root ('/', 'C:\\') already ends with the separator
   const prefix = root.endsWith(sep) ? root : root + sep;
-  return target.startsWith(prefix) ? target : null;
+  if (!target.startsWith(prefix)) return null;
+  // A symlink inside the project must not lead outside it: compare the real
+  // location of the nearest existing ancestor with the real root.
+  try {
+    let probe = target;
+    while (!existsSync(probe) && dirname(probe) !== probe) probe = dirname(probe);
+    const realRoot = realpathSync(root);
+    const realProbe = realpathSync(probe);
+    const realPrefix = realRoot.endsWith(sep) ? realRoot : realRoot + sep;
+    if (realProbe !== realRoot && !realProbe.startsWith(realPrefix)) return null;
+  } catch (_err) {
+    return null;
+  }
+  return target;
 }
 import { fileURLToPath } from 'url';
 import errorHandler from './error-handler.js';
